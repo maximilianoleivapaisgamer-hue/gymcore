@@ -35,7 +35,7 @@ function initials(name: string) {
 }
 function statusOf(expiry: string | null): { label: string; cls: string } {
   if (!expiry) return { label: "Sin plan", cls: "muted" };
-  const days = Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000);
+  const days = Math.ceil((new Date(expiry + "T00:00:00").getTime() - Date.now()) / 86400000);
   if (days < 0) return { label: "Vencido", cls: "crit" };
   if (days <= 7) return { label: "Vence pronto", cls: "warn" };
   return { label: "Activo", cls: "ok" };
@@ -163,7 +163,7 @@ export default function SociosPage() {
                       <td className="px-4 py-3 text-ink-2">{m.dni || "—"}</td>
                       <td className="px-4 py-3">{m.plan_name || "—"}</td>
                       <td className="px-4 py-3 text-ink-2">
-                        {m.membership_expiry ? new Date(m.membership_expiry).toLocaleDateString("es-AR") : "—"}
+                        {m.membership_expiry ? new Date(m.membership_expiry + "T00:00:00").toLocaleDateString("es-AR") : "—"}
                       </td>
                       <td className="px-4 py-3"><span className={BADGES[st.cls]}>{st.label}</span></td>
                       <td className="px-4 py-3">
