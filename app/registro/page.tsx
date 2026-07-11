@@ -35,43 +35,21 @@ export default function RegistroPage() {
     setLoading(true);
     setError("");
 
-    // 1) Crear cuenta (el trigger handle_new_user crea el profile con rol owner)
+    // El trigger handle_new_user (en la base) crea el profile + el gimnasio +
+    // la suscripción trial automáticamente, leyendo full_name y gym_name de la
+    // metadata. Así no dependemos de la sesión/RLS del cliente.
     const { data: signUp, error: signErr } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: { data: { full_name: form.fullName } },
+      options: { data: { full_name: form.fullName, gym_name: form.gymName } },
     });
     if (signErr || !signUp.user) {
       setLoading(false);
       return setError(signErr?.message || "No se pudo crear la cuenta.");
     }
-    const uid = signUp.user.id;
 
-    // 2) Crear el gimnasio del dueño
-    const slug = `${slugify(form.gymName)}-${Math.random().toString(36).slice(2, 6)}`;
-    const { data: gym, error: gymErr } = await supabase
-      .from("gyms")
-      .insert({ owner_id: uid, name: form.gymName, slug })
-      .select("id")
-      .single<{ id: string }>();
-    if (gymErr || !gym) {
-      setLoading(false);
-      return setError("Cuenta creada, pero falló crear el gimnasio. Escribinos.");
-    }
-
-    // 3) Vincular el profile al gimnasio + abrir suscripción trial (14 días)
-    await supabase.from("profiles").update({ gym_id: gym.id }).eq("id", uid);
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 14);
-    await supabase.from("subscriptions").insert({
-      gym_id: gym.id,
-      plan: "basico",
-      status: "trial",
-      trial_ends_at: trialEnd.toISOString(),
-    });
-
-    router.push("/dashboard/configuracion");
-    router.refresh();
+    // Navegación completa: manda las cookies frescas al servidor (evita el rebote a /acceso).
+    window.location.href = "/dashboard/configuracion";
   }
 
   return (
