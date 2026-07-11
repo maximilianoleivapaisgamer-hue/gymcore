@@ -4,8 +4,9 @@ import type { Gym, MemberPlan } from "@/types/db";
 
 /**
  * Landing pública white-label del gimnasio: gymcore.app/<slug>
- * Es un Server Component: lee el gimnasio por slug desde Supabase (lectura pública
- * permitida por RLS) y arma la página con el branding cargado por el dueño.
+ * Server Component: lee el gimnasio por slug (lectura pública por RLS) y arma
+ * una página premium con el branding cargado por el dueño. Conecta con el
+ * funnel de socios (registro con el código del gym prefijado).
  */
 export default async function GymLanding({
   params,
@@ -23,79 +24,71 @@ export default async function GymLanding({
 
   const accent = gym.accent_color || "#22d3ee";
   const plans: MemberPlan[] = gym.member_plans || [];
+  const benefits = gym.benefits || [];
+  const joinHref = `/portal/registro?gym=${gym.slug}`;
+  const waHref = gym.whatsapp ? `https://wa.me/${gym.whatsapp.replace(/\D/g, "")}` : null;
+  const mapsHref = gym.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gym.address)}` : null;
+
+  const Logo = () =>
+    gym.logo_url ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={gym.logo_url} alt={gym.name} className="h-10 w-10 rounded-xl object-cover" />
+    ) : (
+      <div className="grid h-10 w-10 place-items-center rounded-xl text-lg text-black" style={{ background: accent }}>💪</div>
+    );
 
   return (
     <main style={{ "--accent": accent } as React.CSSProperties} className="bg-bg text-ink">
+      {/* HEADER */}
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-bg/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+          <div className="flex items-center gap-3">
+            <Logo />
+            <span className="font-bold">{gym.name}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href="/acceso" className="hidden text-sm text-ink-2 hover:text-ink sm:inline">Ingresar</a>
+            <a href={joinHref} className="btn btn-primary text-sm">Sumate</a>
+          </div>
+        </div>
+      </header>
+
       {/* HERO */}
-      <section className="relative overflow-hidden px-6 py-20 text-center">
+      <section className="relative overflow-hidden">
         {gym.hero_url && (
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-30"
-            style={{ backgroundImage: `url(${gym.hero_url})` }}
-          />
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={gym.hero_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
         )}
+        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, rgba(10,13,18,.55), rgba(10,13,18,.92))` }} />
         <div
-          className="pointer-events-none absolute left-1/2 top-[-40%] h-[520px] w-[520px] -translate-x-1/2 rounded-full"
-          style={{ background: `radial-gradient(circle, ${accent}44, transparent 60%)` }}
+          className="pointer-events-none absolute left-1/2 top-[-30%] h-[600px] w-[600px] -translate-x-1/2 rounded-full blur-2xl"
+          style={{ background: `radial-gradient(circle, ${accent}33, transparent 60%)` }}
         />
-        <div className="relative z-10 mx-auto max-w-2xl">
-          {gym.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={gym.logo_url}
-              alt={gym.name}
-              className="mx-auto mb-4 h-16 w-16 rounded-2xl object-cover"
-            />
-          ) : (
-            <div
-              className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-black"
-              style={{ background: accent }}
-            >
-              💪
-            </div>
-          )}
-          <div
-            className="text-xs font-bold uppercase tracking-[3px]"
-            style={{ color: accent }}
-          >
+        <div className="relative z-10 mx-auto max-w-3xl px-6 py-24 text-center sm:py-32">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[2px]" style={{ color: accent }}>
             {gym.name}
           </div>
-          <h1 className="mx-auto mb-3 mt-3 max-w-xl text-4xl font-bold leading-tight tracking-tight">
+          <h1 className="mx-auto max-w-2xl text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
             {gym.tagline || "Entrená distinto. Resultados de verdad."}
           </h1>
-          <p className="mx-auto mb-6 max-w-md text-ink-2">{gym.description}</p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <a href="/acceso" className="btn btn-primary">
-              Acceso miembros
-            </a>
-            {gym.whatsapp && (
-              <a
-                href={`https://wa.me/${gym.whatsapp.replace(/\D/g, "")}`}
-                className="btn btn-ghost"
-              >
-                WhatsApp
-              </a>
-            )}
+          {gym.description && <p className="mx-auto mt-5 max-w-xl text-lg text-ink-2">{gym.description}</p>}
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <a href={joinHref} className="btn btn-primary px-6 py-3 text-base">Sumate ahora</a>
+            {waHref && <a href={waHref} target="_blank" rel="noreferrer" className="btn btn-ghost px-6 py-3 text-base">💬 Escribinos</a>}
           </div>
+          <p className="mt-4 text-xs text-muted">¿Ya sos socio? <a href="/acceso" className="underline hover:text-ink">Ingresá a tu portal</a></p>
         </div>
       </section>
 
       {/* BENEFICIOS */}
-      {gym.benefits?.length > 0 && (
-        <section className="px-6 py-12">
-          <h2 className="mb-6 text-center text-2xl font-semibold">
-            ¿Por qué elegirnos?
-          </h2>
-          <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-3">
-            {gym.benefits.map((b, i) => (
-              <div key={i} className="card text-center">
-                <div
-                  className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl text-black"
-                  style={{ background: accent }}
-                >
-                  ✓
-                </div>
-                <b>{b}</b>
+      {benefits.length > 0 && (
+        <section className="mx-auto max-w-5xl px-6 py-16">
+          <h2 className="text-center text-3xl font-bold tracking-tight">¿Por qué elegirnos?</h2>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {benefits.map((b, i) => (
+              <div key={i} className="rounded-2xl border border-white/10 bg-surface p-6 transition hover:border-white/20">
+                <div className="mb-3 grid h-11 w-11 place-items-center rounded-xl text-black" style={{ background: accent }}>✓</div>
+                <p className="font-semibold">{b}</p>
               </div>
             ))}
           </div>
@@ -104,41 +97,84 @@ export default async function GymLanding({
 
       {/* PLANES */}
       {plans.length > 0 && (
-        <section className="px-6 pb-12">
-          <h2 className="mb-6 text-center text-2xl font-semibold">
-            Planes de socio
-          </h2>
-          <div className="mx-auto grid max-w-3xl gap-4 md:grid-cols-3">
-            {plans.map((p, i) => (
-              <div
-                key={i}
-                className="card text-center"
-                style={
-                  i === 1 && plans.length === 3
-                    ? { borderColor: accent }
-                    : undefined
-                }
-              >
-                <b className="text-base">{p.name}</b>
-                <div className="my-2 text-3xl font-extrabold tracking-tight">
-                  ${p.price}
-                  <span className="text-xs text-muted">/mes</span>
+        <section className="mx-auto max-w-5xl px-6 py-16">
+          <h2 className="text-center text-3xl font-bold tracking-tight">Elegí tu plan</h2>
+          <p className="mt-2 text-center text-ink-2">Sumate hoy y arrancá a entrenar.</p>
+          <div className="mt-8 grid gap-5 md:grid-cols-3">
+            {plans.map((p, i) => {
+              const featured = plans.length === 3 ? i === 1 : i === 0;
+              return (
+                <div
+                  key={i}
+                  className="relative flex flex-col rounded-2xl border bg-surface p-6"
+                  style={{ borderColor: featured ? accent : "rgba(255,255,255,.1)" }}
+                >
+                  {featured && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-black" style={{ background: accent }}>
+                      Más elegido
+                    </span>
+                  )}
+                  <b className="text-lg">{p.name}</b>
+                  <div className="my-3 text-4xl font-black tracking-tight">
+                    ${p.price}
+                    <span className="text-sm font-normal text-muted">/mes</span>
+                  </div>
+                  {p.detail && <p className="mb-5 flex-1 text-sm text-ink-2">{p.detail}</p>}
+                  <a
+                    href={joinHref}
+                    className={`btn text-sm ${featured ? "btn-primary" : "btn-ghost"}`}
+                  >
+                    Elegir {p.name}
+                  </a>
                 </div>
-                <span className="text-sm text-ink-2">{p.detail}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
 
-      {/* FOOTER */}
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-surface px-6 py-5 text-sm text-ink-2">
-        <div>
-          {gym.address && <>📍 {gym.address} · </>}
-          {gym.whatsapp && <>📱 {gym.whatsapp}</>}
+      {/* UBICACIÓN / CONTACTO */}
+      {(gym.address || gym.whatsapp) && (
+        <section className="mx-auto max-w-5xl px-6 py-16">
+          <div className="grid gap-4 rounded-2xl border border-white/10 bg-surface p-8 md:grid-cols-2 md:items-center">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Vení a conocernos</h2>
+              <p className="mt-2 text-ink-2">Te esperamos para una clase de prueba. Escribinos o pasá cuando quieras.</p>
+              <div className="mt-4 space-y-1 text-sm text-ink-2">
+                {gym.address && <div>📍 {gym.address}</div>}
+                {gym.whatsapp && <div>📱 {gym.whatsapp}</div>}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3 md:justify-end">
+              {mapsHref && <a href={mapsHref} target="_blank" rel="noreferrer" className="btn btn-ghost">Cómo llegar</a>}
+              {waHref && <a href={waHref} target="_blank" rel="noreferrer" className="btn btn-primary">💬 WhatsApp</a>}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* CTA FINAL */}
+      <section className="px-6 pb-20">
+        <div
+          className="mx-auto max-w-4xl rounded-3xl border border-white/10 px-6 py-14 text-center"
+          style={{ background: `radial-gradient(120% 120% at 50% 0%, ${accent}22, transparent 60%)` }}
+        >
+          <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Empezá tu cambio hoy</h2>
+          <p className="mx-auto mt-3 max-w-md text-ink-2">Creá tu cuenta de socio en un minuto y accedé a tu rutina, tus clases y tu membresía.</p>
+          <a href={joinHref} className="btn btn-primary mt-6 px-7 py-3 text-base">Sumate a {gym.name}</a>
         </div>
-        <div className="text-xs text-muted">
-          Powered by <b style={{ color: accent }}>GymCore</b>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="border-t border-white/10 bg-surface">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-sm text-ink-2">
+          <div className="flex items-center gap-2">
+            <Logo />
+            <span className="font-semibold text-ink">{gym.name}</span>
+          </div>
+          <div className="text-xs text-muted">
+            Powered by <b style={{ color: accent }}>GymCore</b>
+          </div>
         </div>
       </footer>
     </main>
