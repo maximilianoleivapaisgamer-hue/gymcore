@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { PAY_METHODS, type PayMethod, type MemberPlan } from "@/types/db";
 
 interface Member {
   id: string;
@@ -44,12 +45,16 @@ function statusOf(expiry: string | null): { label: string; cls: string } {
 export default function SociosPage() {
   const supabase = createClient();
   const [gymId, setGymId] = useState<string | null>(null);
+  const [plans, setPlans] = useState<MemberPlan[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
   const [saving, setSaving] = useState(false);
+  // Cobro al alta
+  const [charge, setCharge] = useState(false);
+  const [method, setMethod] = useState<PayMethod>("efectivo");
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -57,6 +62,12 @@ export default function SociosPage() {
     const { data: profile } = await supabase
       .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
     setGymId(profile?.gym_id ?? null);
+    if (profile?.gym_id) {
+      const { data: gym } = await supabase
+        .from("gyms").select("member_plans").eq("id", profile.gym_id)
+        .single<{ member_plans: MemberPlan[] }>();
+      setPlans(gym?.member_plans || []);
+    }
     const { data } = await supabase
       .from("members").select("*").order("created_at", { ascending: false });
     setMembers((data as Member[]) || []);
@@ -71,12 +82,21 @@ export default function SociosPage() {
       m.full_name.toLowerCase().includes(q) || (m.dni || "").includes(q));
   }, [members, search]);
 
-  function openNew() { setEditing({ ...EMPTY }); setModal(true); }
-  function openEdit(m: Member) { setEditing({ ...m }); setModal(true); }
+  function openNew() { setEditing({ ...EMPTY }); setCharge(false); setMethod("efectivo"); setModal(true); }
+  function openEdit(m: Member) { setEditing({ ...m }); setCharge(false); setMethod("efectivo"); setModal(true); }
+
+  // Al elegir un plan del listado, autocompleta nombre y precio.
+  function selectPlan(name: string) {
+    const p = plans.find((x) => x.name === name);
+    setEditing((e) =>
+      e ? { ...e, plan_name: name, plan_price: p ? p.price : e.plan_price ?? null } : e
+    );
+  }
 
   async function save() {
     if (!editing || !gymId) return;
     setSaving(true);
+    const price = editing.plan_price ? Number(editing.plan_price) : null;
     const payload = {
       gym_id: gymId,
       full_name: editing.full_name || "",
@@ -84,11 +104,25 @@ export default function SociosPage() {
       email: editing.email || null,
       whatsapp: editing.whatsapp || null,
       plan_name: editing.plan_name || null,
-      plan_price: editing.plan_price ? Number(editing.plan_price) : null,
+      plan_price: price,
       membership_expiry: editing.membership_expiry || null,
     };
-    if (editing.id) await supabase.from("members").update(payload).eq("id", editing.id);
-    else await supabase.from("members").insert(payload);
+    if (editing.id) {
+      await supabase.from("members").update(payload).eq("id", editing.id);
+    } else {
+      await supabase.from("members").insert(payload);
+    }
+    // Cobro directo → registra ingreso en la caja
+    if (charge && price && price > 0) {
+      await supabase.from("cashflow_entries").insert({
+        gym_id: gymId,
+        type: "income",
+        amount: price,
+        method,
+        concept: `Cobro plan ${editing.plan_name || ""} · ${editing.full_name || ""}`.trim(),
+        date: new Date().toISOString().slice(0, 10),
+      });
+    }
     setSaving(false); setModal(false); setEditing(null); load();
   }
 
@@ -196,12 +230,56 @@ export default function SociosPage() {
                 <input className="input" placeholder="WhatsApp" value={editing.whatsapp || ""} onChange={(e) => setF("whatsapp", e.target.value)} />
               </div>
               <input className="input" type="email" placeholder="Email" value={editing.email || ""} onChange={(e) => setF("email", e.target.value)} />
+
+              <label className="text-xs text-ink-2">Plan</label>
+              {plans.length > 0 ? (
+                <select
+                  className="input"
+                  value={plans.some((p) => p.name === editing.plan_name) ? editing.plan_name || "" : (editing.plan_name ? "__custom" : "")}
+                  onChange={(e) => {
+                    if (e.target.value === "__custom") { setF("plan_name", ""); setF("plan_price", ""); }
+                    else selectPlan(e.target.value);
+                  }}
+                >
+                  <option value="">Seleccioná un plan…</option>
+                  {plans.map((p) => (
+                    <option key={p.name} value={p.name}>{p.name} — ${p.price}</option>
+                  ))}
+                  <option value="__custom">Otro / personalizado</option>
+                </select>
+              ) : (
+                <p className="text-xs text-muted">
+                  No cargaste planes todavía. Configuralos en <Link href="/dashboard/configuracion" className="text-brand">Mi página</Link> o escribilos abajo.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <input className="input" placeholder="Nombre del plan" value={editing.plan_name || ""} onChange={(e) => setF("plan_name", e.target.value)} />
                 <input className="input" type="number" placeholder="Precio ($)" value={editing.plan_price ?? ""} onChange={(e) => setF("plan_price", e.target.value)} />
               </div>
+
               <label className="text-xs text-ink-2">Vencimiento de la membresía</label>
               <input className="input" type="date" value={editing.membership_expiry || ""} onChange={(e) => setF("membership_expiry", e.target.value)} />
+
+              {/* COBRO DIRECTO */}
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+                  <input type="checkbox" checked={charge} onChange={(e) => setCharge(e.target.checked)} />
+                  Cobrar ahora {editing.plan_price ? `($${editing.plan_price})` : ""}
+                </label>
+                {charge && (
+                  <div className="mt-3">
+                    <label className="mb-1 block text-xs text-ink-2">Medio de pago</label>
+                    <select className="input" value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>
+                      {PAY_METHODS.map((m) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                    {(!editing.plan_price || Number(editing.plan_price) <= 0) && (
+                      <p className="mt-2 text-xs text-[#f5b13d]">Cargá un precio para poder registrar el cobro.</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-ghost" onClick={() => setModal(false)}>Cancelar</button>
