@@ -99,6 +99,7 @@ export default function FinanzasPage() {
     setSaving(true);
     const { error } = await supabase.from("cashflow_entries").insert({
       gym_id: gymId,
+      member_id: form.member_id || null,
       concept: form.concept || (form.type === "income" ? "Ingreso" : "Egreso"),
       type: form.type,
       amount: Number(form.amount),
