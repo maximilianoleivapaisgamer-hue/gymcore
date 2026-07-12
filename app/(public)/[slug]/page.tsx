@@ -23,7 +23,12 @@ export default async function GymLanding({
   if (!gym) notFound();
 
   const accent = gym.accent_color || "#22d3ee";
-  const plans: MemberPlan[] = gym.member_plans || [];
+  // Los planes "reales" que el dueño tildó para mostrar en la página se
+  // combinan con la lista de marketing configurada en Mi página.
+  const syncedRealPlans: MemberPlan[] = (gym.real_plans || [])
+    .filter((p) => p.sync_landing)
+    .map((p) => ({ name: p.name, price: p.price, detail: p.detail }));
+  const plans: MemberPlan[] = [...syncedRealPlans, ...(gym.member_plans || [])];
   const benefits = gym.benefits || [];
   const gallery = gym.gallery || [];
   const joinHref = `/portal/registro?gym=${gym.slug}`;
