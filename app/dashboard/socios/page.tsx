@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { PAY_METHODS, type PayMethod, type MemberPlan } from "@/types/db";
+import { PAY_METHODS, type PayMethod, type RealPlan } from "@/types/db";
 
 interface Member {
   id: string;
@@ -15,11 +15,15 @@ interface Member {
   plan_name: string | null;
   plan_price: number | null;
   membership_expiry: string | null;
+  observacion: string | null;
+  reminder_whatsapp: boolean;
+  reminder_email: boolean;
 }
 
 const EMPTY: Partial<Member> = {
   full_name: "", dni: "", email: "", whatsapp: "",
   plan_name: "", plan_price: null, membership_expiry: "",
+  observacion: "", reminder_whatsapp: true, reminder_email: false,
 };
 
 const BADGE_BASE = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ";
@@ -45,7 +49,7 @@ function statusOf(expiry: string | null): { label: string; cls: string } {
 export default function SociosPage() {
   const supabase = createClient();
   const [gymId, setGymId] = useState<string | null>(null);
-  const [plans, setPlans] = useState<MemberPlan[]>([]);
+  const [plans, setPlans] = useState<RealPlan[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -64,9 +68,9 @@ export default function SociosPage() {
     setGymId(profile?.gym_id ?? null);
     if (profile?.gym_id) {
       const { data: gym } = await supabase
-        .from("gyms").select("member_plans").eq("id", profile.gym_id)
-        .single<{ member_plans: MemberPlan[] }>();
-      setPlans(gym?.member_plans || []);
+        .from("gyms").select("real_plans").eq("id", profile.gym_id)
+        .single<{ real_plans: RealPlan[] }>();
+      setPlans(gym?.real_plans || []);
     }
     const { data } = await supabase
       .from("members").select("*").order("created_at", { ascending: false });
@@ -106,19 +110,26 @@ export default function SociosPage() {
       plan_name: editing.plan_name || null,
       plan_price: price,
       membership_expiry: editing.membership_expiry || null,
+      observacion: editing.observacion || null,
+      reminder_whatsapp: editing.reminder_whatsapp ?? true,
+      reminder_email: editing.reminder_email ?? false,
     };
-    if (editing.id) {
-      await supabase.from("members").update(payload).eq("id", editing.id);
+    let memberId = editing.id || null;
+    if (memberId) {
+      await supabase.from("members").update(payload).eq("id", memberId);
     } else {
-      await supabase.from("members").insert(payload);
+      const { data: inserted } = await supabase.from("members").insert(payload).select("id").single<{ id: string }>();
+      memberId = inserted?.id || null;
     }
-    // Cobro directo → registra ingreso en la caja
+    // Cobro directo → registra ingreso en la caja, vinculado al socio y al plan cobrado
     if (charge && price && price > 0) {
       await supabase.from("cashflow_entries").insert({
         gym_id: gymId,
+        member_id: memberId,
         type: "income",
         amount: price,
         method,
+        plan_name: editing.plan_name || null,
         concept: `Cobro plan ${editing.plan_name || ""} · ${editing.full_name || ""}`.trim(),
         date: new Date().toISOString().slice(0, 10),
       });
@@ -184,7 +195,7 @@ export default function SociosPage() {
                   return (
                     <tr key={m.id} className="border-t border-white/10 hover:bg-white/[.02]">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                        <Link href={`/dashboard/socios/${m.id}`} className="flex items-center gap-3 hover:opacity-80">
                           <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-xs font-bold text-black">
                             {initials(m.full_name)}
                           </div>
@@ -192,7 +203,7 @@ export default function SociosPage() {
                             <div className="font-medium">{m.full_name}</div>
                             <div className="text-xs text-muted">{m.email}</div>
                           </div>
-                        </div>
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-ink-2">{m.dni || "—"}</td>
                       <td className="px-4 py-3">{m.plan_name || "—"}</td>
@@ -202,6 +213,7 @@ export default function SociosPage() {
                       <td className="px-4 py-3"><span className={BADGES[st.cls]}>{st.label}</span></td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
+                          <Link className={MINI} title="Ver detalle" href={`/dashboard/socios/${m.id}`}>👁️</Link>
                           {m.whatsapp && (
                             <a className={MINI} title="WhatsApp" target="_blank" rel="noreferrer"
                               href={"https://wa.me/" + (m.whatsapp || "").replace(/\D/g, "")}>💬</a>
@@ -259,6 +271,27 @@ export default function SociosPage() {
 
               <label className="text-xs text-ink-2">Vencimiento de la membresía</label>
               <input className="input" type="date" value={editing.membership_expiry || ""} onChange={(e) => setF("membership_expiry", e.target.value)} />
+
+              <label className="text-xs text-ink-2">Observación (opcional)</label>
+              <textarea className="input" rows={2} placeholder="Ej: con descuento por 3 meses"
+                value={editing.observacion || ""} onChange={(e) => setF("observacion", e.target.value)} />
+
+              {/* RECORDATORIOS AUTOMÁTICOS */}
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="mb-2 text-sm font-semibold">Recordatorios automáticos de vencimiento</div>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-2">
+                    <input type="checkbox" checked={!!editing.reminder_whatsapp}
+                      onChange={(e) => setEditing((ed) => (ed ? { ...ed, reminder_whatsapp: e.target.checked } : ed))} />
+                    💬 WhatsApp
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-2">
+                    <input type="checkbox" checked={!!editing.reminder_email}
+                      onChange={(e) => setEditing((ed) => (ed ? { ...ed, reminder_email: e.target.checked } : ed))} />
+                    ✉️ Email
+                  </label>
+                </div>
+              </div>
 
               {/* COBRO DIRECTO */}
               <div className="rounded-lg border border-white/10 bg-white/5 p-3">
