@@ -18,7 +18,9 @@ const NAV: NavItem[] = [
   { href: "/dashboard/rutinas", label: "Rutinas", icon: "◈" },
   { href: "/dashboard/finanzas", label: "Finanzas", icon: "◆" },
   { href: "/dashboard/clases", label: "Clases", icon: "◑" },
+  { href: "/dashboard/planes", label: "Planes", icon: "💳" },
   { href: "/dashboard/configuracion", label: "Mi página", icon: "❖" },
+  { href: "/dashboard/mi-plan", label: "Mi plan", icon: "★" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
