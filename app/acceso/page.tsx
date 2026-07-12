@@ -36,8 +36,7 @@ export default function AccesoPage() {
       .eq("id", data.user.id)
       .single<{ role: UserRole }>();
 
-    router.push(redirectForRole(profile?.role));
-    router.refresh();
+    window.location.href = redirectForRole(profile?.role);
   }
 
   return (
