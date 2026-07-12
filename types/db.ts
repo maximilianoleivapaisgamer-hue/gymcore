@@ -22,7 +22,20 @@ export interface Gym {
   member_plans: MemberPlan[];
   whatsapp: string | null;
   address: string | null;
+  instagram: string | null;
+  gallery: string[];
 }
+
+/** Medios de pago para la caja / cobros. */
+export type PayMethod = "efectivo" | "debito" | "credito" | "mp" | "transferencia" | "otro";
+export const PAY_METHODS: { value: PayMethod; label: string }[] = [
+  { value: "efectivo", label: "Efectivo" },
+  { value: "debito", label: "Débito" },
+  { value: "credito", label: "Crédito" },
+  { value: "mp", label: "Mercado Pago" },
+  { value: "transferencia", label: "Transferencia" },
+  { value: "otro", label: "Otro" },
+];
 
 export interface Member {
   id: string;
