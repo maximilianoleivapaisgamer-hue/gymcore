@@ -17,7 +17,10 @@ interface Routine {
 }
 
 interface EditDay { name: string; rows: RExercise[] }
-interface EditRoutine { id: string | null; name: string; member_id: string | null; days: EditDay[] }
+interface EditRoutine {
+  id: string | null; name: string; member_id: string | null;
+  is_template: boolean; days: EditDay[];
+}
 
 const emptyRow = (day: number, pos: number): RExercise => ({
   exercise_id: null, day_number: day, block_name: null, position: pos,
@@ -25,7 +28,7 @@ const emptyRow = (day: number, pos: number): RExercise => ({
 });
 
 const newRoutine = (): EditRoutine => ({
-  id: null, name: "", member_id: null,
+  id: null, name: "", member_id: null, is_template: true,
   days: [{ name: "Día 1", rows: [emptyRow(1, 0)] }],
 });
 
@@ -40,6 +43,8 @@ export default function RutinasPage() {
   const [saving, setSaving] = useState(false);
   const [libOpen, setLibOpen] = useState(false);
   const [newEx, setNewEx] = useState("");
+  const [applyMember, setApplyMember] = useState("");
+  const [applyMsg, setApplyMsg] = useState("");
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -76,7 +81,45 @@ export default function RutinasPage() {
       name: byDay[d]?.[0]?.block_name || `Día ${i + 1}`,
       rows: (byDay[d] || [emptyRow(i + 1, 0)]).map((row) => ({ ...row })),
     }));
-    setEdit({ id: r.id, name: r.name || "", member_id: r.member_id, days });
+    setApplyMember(""); setApplyMsg("");
+    setEdit({ id: r.id, name: r.name || "", member_id: r.member_id, is_template: r.is_template, days });
+  }
+
+  function startNew() { setApplyMember(""); setApplyMsg(""); setEdit(newRoutine()); }
+
+  // Convierte los días del editor en filas de routine_exercises para un routine_id.
+  function rowsFor(routineId: string) {
+    return edit!.days.flatMap((d, di) =>
+      d.rows.map((r, pi) => ({
+        routine_id: routineId, exercise_id: r.exercise_id || null,
+        day_number: di + 1, block_name: d.name || null, position: pi,
+        sets: r.sets || null, reps: r.reps || null, notes: r.notes || null,
+      }))
+    ).filter((r) => r.exercise_id);
+  }
+
+  // Aplica la rutina/plantilla a un socio creando una COPIA independiente.
+  // La plantilla original queda intacta.
+  async function applyToSocio() {
+    if (!edit || !gymId || !applyMember) return;
+    setSaving(true);
+    setApplyMsg("");
+    const memberName = members.find((m) => m.id === applyMember)?.full_name || "socio";
+    const { data } = await supabase.from("routines").insert({
+      gym_id: gymId,
+      name: edit.name ? `${edit.name} — ${memberName}` : `Rutina de ${memberName}`,
+      member_id: applyMember,
+      is_template: false,
+    }).select("id").single();
+    const copyId = (data as { id: string } | null)?.id ?? null;
+    if (copyId) {
+      const rows = rowsFor(copyId);
+      if (rows.length) await supabase.from("routine_exercises").insert(rows);
+    }
+    setSaving(false);
+    setApplyMsg(`Copia creada para ${memberName}. La plantilla quedó intacta.`);
+    setApplyMember("");
+    load();
   }
 
   async function addExercise() {
@@ -117,28 +160,26 @@ export default function RutinasPage() {
   async function saveRoutine() {
     if (!edit || !gymId) return;
     setSaving(true);
-    const payload = {
-      gym_id: gymId,
-      name: edit.name || "Rutina sin nombre",
-      member_id: edit.member_id || null,
-      is_template: !edit.member_id,
-    };
     let routineId = edit.id;
     if (routineId) {
-      await supabase.from("routines").update(payload).eq("id", routineId);
+      // Editar en el lugar: preserva su naturaleza (plantilla o de socio).
+      // Nunca reconvierte una plantilla en la rutina de un cliente.
+      await supabase.from("routines")
+        .update({ name: edit.name || "Rutina sin nombre" })
+        .eq("id", routineId);
     } else {
-      const { data } = await supabase.from("routines").insert(payload).select("id").single();
+      // Nueva: si elegís un socio queda como su rutina; si no, es plantilla.
+      const { data } = await supabase.from("routines").insert({
+        gym_id: gymId,
+        name: edit.name || "Rutina sin nombre",
+        member_id: edit.member_id || null,
+        is_template: !edit.member_id,
+      }).select("id").single();
       routineId = (data as { id: string } | null)?.id ?? null;
     }
     if (routineId) {
       await supabase.from("routine_exercises").delete().eq("routine_id", routineId);
-      const rows = edit.days.flatMap((d, di) =>
-        d.rows.map((r, pi) => ({
-          routine_id: routineId, exercise_id: r.exercise_id || null,
-          day_number: di + 1, block_name: d.name || null, position: pi,
-          sets: r.sets || null, reps: r.reps || null, notes: r.notes || null,
-        }))
-      ).filter((r) => r.exercise_id);
+      const rows = rowsFor(routineId);
       if (rows.length) await supabase.from("routine_exercises").insert(rows);
     }
     setSaving(false); setEdit(null); load();
@@ -165,7 +206,7 @@ export default function RutinasPage() {
         </div>
         <div className="flex gap-2">
           <button className="btn btn-ghost" onClick={() => setLibOpen(true)}>Biblioteca</button>
-          <button className="btn btn-primary" onClick={() => setEdit(newRoutine())}>+ Nueva rutina</button>
+          <button className="btn btn-primary" onClick={startNew}>+ Nueva rutina</button>
         </div>
       </div>
 
@@ -215,14 +256,47 @@ export default function RutinasPage() {
                 <input className="input" placeholder="Ej: Hipertrofia 4 días" value={edit.name}
                   onChange={(e) => setName(e.target.value)} />
               </div>
-              <div className="w-56">
-                <label className="mb-1 block text-xs text-ink-2">Asignar a</label>
-                <select className="input" value={edit.member_id || ""} onChange={(e) => setMember(e.target.value)}>
-                  <option value="">Plantilla (sin socio)</option>
-                  {members.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
-                </select>
-              </div>
+              {edit.id === null ? (
+                <div className="w-56">
+                  <label className="mb-1 block text-xs text-ink-2">Tipo</label>
+                  <select className="input" value={edit.member_id || ""} onChange={(e) => setMember(e.target.value)}>
+                    <option value="">Plantilla (reutilizable)</option>
+                    {members.map((m) => <option key={m.id} value={m.id}>Rutina de {m.full_name}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div className="w-56">
+                  <label className="mb-1 block text-xs text-ink-2">Tipo</label>
+                  <div className="flex h-[42px] items-center rounded-lg border border-white/10 bg-surface-2 px-3 text-sm">
+                    {edit.is_template
+                      ? <span className="font-semibold text-brand">Plantilla reutilizable</span>
+                      : <span className="text-ink-2">Rutina de {memberName(edit.member_id) || "socio"}</span>}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Aplicar a socio: crea una COPIA independiente (la plantilla queda intacta) */}
+            {edit.id !== null && (
+              <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-2 text-sm font-semibold">
+                  {edit.is_template ? "Aplicar esta plantilla a un socio" : "Duplicar para otro socio"}
+                </div>
+                <p className="mb-3 text-xs text-ink-2">
+                  Se crea una copia editable para el socio. Los cambios en la copia no afectan {edit.is_template ? "la plantilla" : "esta rutina"}.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <select className="input max-w-[220px]" value={applyMember} onChange={(e) => setApplyMember(e.target.value)}>
+                    <option value="">— Elegí un socio —</option>
+                    {members.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                  </select>
+                  <button className="btn btn-primary" onClick={applyToSocio} disabled={!applyMember || saving}>
+                    Aplicar (crear copia)
+                  </button>
+                </div>
+                {applyMsg && <p className="mt-2 text-xs text-good">{applyMsg}</p>}
+              </div>
+            )}
 
             <div className="space-y-4">
               {edit.days.map((day, di) => (
