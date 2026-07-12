@@ -25,9 +25,15 @@ export default async function GymLanding({
   const accent = gym.accent_color || "#22d3ee";
   const plans: MemberPlan[] = gym.member_plans || [];
   const benefits = gym.benefits || [];
+  const gallery = gym.gallery || [];
   const joinHref = `/portal/registro?gym=${gym.slug}`;
   const waHref = gym.whatsapp ? `https://wa.me/${gym.whatsapp.replace(/\D/g, "")}` : null;
   const mapsHref = gym.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gym.address)}` : null;
+  const igHref = gym.instagram
+    ? (gym.instagram.startsWith("http")
+        ? gym.instagram
+        : `https://instagram.com/${gym.instagram.replace(/^@/, "").trim()}`)
+    : null;
 
   const Logo = () =>
     gym.logo_url ? (
@@ -47,6 +53,9 @@ export default async function GymLanding({
             <span className="font-bold">{gym.name}</span>
           </div>
           <div className="flex items-center gap-2">
+            {igHref && (
+              <a href={igHref} target="_blank" rel="noreferrer" className="hidden text-sm text-ink-2 hover:text-ink sm:inline" title="Instagram">📷 Instagram</a>
+            )}
             <a href="/acceso" className="hidden text-sm text-ink-2 hover:text-ink sm:inline">Ingresar</a>
             <a href={joinHref} className="btn btn-primary text-sm">Sumate</a>
           </div>
@@ -89,6 +98,24 @@ export default async function GymLanding({
               <div key={i} className="rounded-2xl border border-white/10 bg-surface p-6 transition hover:border-white/20">
                 <div className="mb-3 grid h-11 w-11 place-items-center rounded-xl text-black" style={{ background: accent }}>✓</div>
                 <p className="font-semibold">{b}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* GALERÍA / BANNERS */}
+      {gallery.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 py-12">
+          <h2 className="mb-6 text-center text-3xl font-bold tracking-tight">Conocé el lugar</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {gallery.map((url, i) => (
+              <div
+                key={i}
+                className={`overflow-hidden rounded-2xl border border-white/10 ${i === 0 && gallery.length > 2 ? "sm:col-span-2 lg:col-span-2 lg:row-span-2" : ""}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="h-full min-h-[180px] w-full object-cover transition hover:scale-105" />
               </div>
             ))}
           </div>
@@ -143,10 +170,12 @@ export default async function GymLanding({
               <div className="mt-4 space-y-1 text-sm text-ink-2">
                 {gym.address && <div>📍 {gym.address}</div>}
                 {gym.whatsapp && <div>📱 {gym.whatsapp}</div>}
+                {igHref && <div>📷 <a href={igHref} target="_blank" rel="noreferrer" className="underline hover:text-ink">{gym.instagram}</a></div>}
               </div>
             </div>
             <div className="flex flex-wrap gap-3 md:justify-end">
               {mapsHref && <a href={mapsHref} target="_blank" rel="noreferrer" className="btn btn-ghost">Cómo llegar</a>}
+              {igHref && <a href={igHref} target="_blank" rel="noreferrer" className="btn btn-ghost">📷 Instagram</a>}
               {waHref && <a href={waHref} target="_blank" rel="noreferrer" className="btn btn-primary">💬 WhatsApp</a>}
             </div>
           </div>
@@ -164,6 +193,20 @@ export default async function GymLanding({
           <a href={joinHref} className="btn btn-primary mt-6 px-7 py-3 text-base">Sumate a {gym.name}</a>
         </div>
       </section>
+
+      {/* WHATSAPP FLOTANTE */}
+      {waHref && (
+        <a
+          href={waHref}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Escribinos por WhatsApp"
+          className="fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full text-2xl shadow-lg transition hover:scale-105"
+          style={{ background: "#25D366", boxShadow: "0 8px 24px rgba(37,211,102,.45)" }}
+        >
+          <span aria-hidden>💬</span>
+        </a>
+      )}
 
       {/* FOOTER */}
       <footer className="border-t border-white/10 bg-surface">
