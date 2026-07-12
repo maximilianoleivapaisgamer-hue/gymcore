@@ -3,15 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { PAY_METHODS, type PayMethod } from "@/types/db";
 
 interface Entry {
   id: string;
   concept: string | null;
   type: "income" | "expense";
   amount: number;
+  method: PayMethod | null;
   date: string;
 }
 interface Member { id: string; full_name: string; plan_price: number | null; }
+
+const methodLabel = (m: string | null) =>
+  PAY_METHODS.find((x) => x.value === m)?.label || "—";
 
 const money = (n: number) =>
   "$" + Math.round(n).toLocaleString("es-AR");
@@ -28,6 +33,7 @@ const emptyForm = () => ({
   type: "income" as "income" | "expense",
   concept: "",
   amount: "",
+  method: "efectivo" as PayMethod,
   date: new Date().toISOString().slice(0, 10),
   member_id: "",
 });
@@ -52,7 +58,7 @@ export default function FinanzasPage() {
       .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
     setGymId(profile?.gym_id ?? null);
     const [{ data: ent }, { data: mem }] = await Promise.all([
-      supabase.from("cashflow_entries").select("id, concept, type, amount, date")
+      supabase.from("cashflow_entries").select("id, concept, type, amount, method, date")
         .gte("date", monthStart(y, m)).lt("date", nextMonthStart(y, m))
         .order("date", { ascending: false }),
       supabase.from("members").select("id, full_name, plan_price").order("full_name"),
@@ -96,6 +102,7 @@ export default function FinanzasPage() {
       concept: form.concept || (form.type === "income" ? "Ingreso" : "Egreso"),
       type: form.type,
       amount: Number(form.amount),
+      method: form.method,
       date: form.date || new Date().toISOString().slice(0, 10),
     });
     setSaving(false);
@@ -172,6 +179,7 @@ export default function FinanzasPage() {
                   <th className="px-4 pb-3 pt-1">Fecha</th>
                   <th className="px-4 pb-3 pt-1">Concepto</th>
                   <th className="px-4 pb-3 pt-1">Tipo</th>
+                  <th className="px-4 pb-3 pt-1">Medio</th>
                   <th className="px-4 pb-3 pt-1 text-right">Monto</th>
                   <th className="px-4 pb-3 pt-1"></th>
                 </tr>
@@ -186,6 +194,7 @@ export default function FinanzasPage() {
                         {e.type === "income" ? "Ingreso" : "Egreso"}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-ink-2">{methodLabel(e.method)}</td>
                     <td className={`px-4 py-3 text-right font-semibold ${e.type === "income" ? "text-good" : "text-crit"}`}>
                       {e.type === "income" ? "+" : "−"}{money(Number(e.amount))}
                     </td>
@@ -238,6 +247,12 @@ export default function FinanzasPage() {
                   <label className="mb-1 block text-xs text-ink-2">Fecha</label>
                   <input className="input" type="date" value={form.date} onChange={(e) => setF("date", e.target.value)} />
                 </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-ink-2">Medio de pago</label>
+                <select className="input" value={form.method} onChange={(e) => setF("method", e.target.value)}>
+                  {PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
               </div>
             </div>
 
