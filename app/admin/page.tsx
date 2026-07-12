@@ -29,6 +29,7 @@ export default function AdminPage() {
   const [subs, setSubs] = useState<Sub[]>([]);
   const [owners, setOwners] = useState<Profile[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -74,6 +75,27 @@ export default function AdminPage() {
   async function logout() {
     await supabase.auth.signOut();
     window.location.href = "/acceso";
+  }
+
+  // Alta/edición de la suscripción de un gimnasio (vos administrás esto acá).
+  async function saveSub(gymId: string, patch: Partial<Sub>) {
+    setSavingId(gymId);
+    const current = subByGym[gymId];
+    const row = {
+      gym_id: gymId,
+      plan: patch.plan ?? current?.plan ?? "basico",
+      status: patch.status ?? current?.status ?? "trial",
+      trial_ends_at: patch.trial_ends_at !== undefined ? patch.trial_ends_at : current?.trial_ends_at ?? null,
+      current_period_end: patch.current_period_end !== undefined ? patch.current_period_end : current?.current_period_end ?? null,
+    };
+    const { error } = await supabase.from("subscriptions").upsert(row, { onConflict: "gym_id" });
+    if (!error) {
+      setSubs((ss) => {
+        const rest = ss.filter((s) => s.gym_id !== gymId);
+        return [...rest, row as Sub];
+      });
+    }
+    setSavingId(null);
   }
 
   if (status === "loading") return <main className="grid min-h-screen place-items-center text-ink-2">Cargando…</main>;
@@ -137,11 +159,38 @@ export default function AdminPage() {
                         <div className="text-xs text-muted">/{g.slug}</div>
                       </td>
                       <td className="px-4 py-3 text-ink-2">{ownerName(g.owner_id)}</td>
-                      <td className="px-4 py-3">{s ? PLAN_LABEL[s.plan] : "—"}</td>
                       <td className="px-4 py-3">
-                        {st ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${st.cls}`}>{st.label}</span> : "—"}
+                        <select
+                          className="input h-8 py-0 text-xs"
+                          value={s?.plan ?? "basico"}
+                          onChange={(e) => saveSub(g.id, { plan: e.target.value as Sub["plan"] })}
+                        >
+                          {Object.keys(PLAN_LABEL).map((k) => <option key={k} value={k}>{PLAN_LABEL[k]}</option>)}
+                        </select>
                       </td>
-                      <td className="px-4 py-3 text-ink-2">{fdate(vence)}</td>
+                      <td className="px-4 py-3">
+                        <select
+                          className="input h-8 py-0 text-xs"
+                          value={s?.status ?? "trial"}
+                          onChange={(e) => saveSub(g.id, { status: e.target.value as Sub["status"] })}
+                        >
+                          {Object.keys(STATUS).map((k) => <option key={k} value={k}>{STATUS[k].label}</option>)}
+                        </select>
+                        {st && <span className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.label}</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="date"
+                          className="input h-8 py-0 text-xs"
+                          value={(vence || "").slice(0, 10)}
+                          onChange={(e) =>
+                            saveSub(g.id, s?.status === "trial"
+                              ? { trial_ends_at: e.target.value || null }
+                              : { current_period_end: e.target.value || null })
+                          }
+                        />
+                        {savingId === g.id && <span className="ml-1 text-[11px] text-muted">Guardando…</span>}
+                      </td>
                       <td className="px-4 py-3 text-right text-ink-2">{counts[g.id] || 0}</td>
                       <td className="px-4 py-3 text-right">
                         <a href={`/${g.slug}`} target="_blank" rel="noreferrer" className="text-sm text-brand hover:underline">Ver página</a>
