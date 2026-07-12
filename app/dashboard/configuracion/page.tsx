@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import type { Gym, MemberPlan } from "@/types/db";
 
@@ -226,7 +227,7 @@ export default function ConfiguracionPage() {
         {/* PLANES — lista editable */}
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between">
-            <label className="block text-xs font-semibold text-ink-2">Planes</label>
+            <label className="block text-xs font-semibold text-ink-2">Planes de esta página</label>
             <button
               type="button"
               onClick={addPlan}
@@ -235,6 +236,12 @@ export default function ConfiguracionPage() {
               + Agregar plan
             </button>
           </div>
+          <p className="mb-2 text-xs text-muted">
+            Estos planes son solo para mostrar en tu página pública (podés poner precios promocionales). Para los
+            planes reales que le cobrás a tus socios, configuralos en{" "}
+            <Link href="/dashboard/planes" className="text-brand">Planes</Link> — desde ahí también podés tildar cuáles
+            sincronizar automáticamente acá.
+          </p>
           {(gym.member_plans || []).length === 0 && (
             <p className="mb-2 text-xs text-muted">Todavía no cargaste planes. Agregá al menos uno.</p>
           )}
