@@ -16,7 +16,8 @@ interface Routine {
   is_template: boolean; routine_exercises: RExercise[];
 }
 
-interface EditDay { name: string; rows: RExercise[] }
+interface EditBlock { name: string; rows: RExercise[] }
+interface EditDay { name: string; blocks: EditBlock[] }
 interface EditRoutine {
   id: string | null; name: string; member_id: string | null;
   is_template: boolean; days: EditDay[];
@@ -27,9 +28,12 @@ const emptyRow = (day: number, pos: number): RExercise => ({
   sets: "", reps: "", notes: "",
 });
 
+const newBlock = (n: number): EditBlock => ({ name: `Bloque ${n}`, rows: [emptyRow(1, 0)] });
+const newDay = (n: number): EditDay => ({ name: `Día ${n}`, blocks: [newBlock(1)] });
+
 const newRoutine = (): EditRoutine => ({
   id: null, name: "", member_id: null, is_template: true,
-  days: [{ name: "Día 1", rows: [emptyRow(1, 0)] }],
+  days: [newDay(1)],
 });
 
 export default function RutinasPage() {
@@ -70,6 +74,8 @@ export default function RutinasPage() {
     return m;
   }, [exercises]);
 
+  // Agrupa routine_exercises en días y, dentro de cada día, en bloques (por
+  // block_name) preservando el orden en que aparecen.
   function openRoutine(r: Routine) {
     const byDay: Record<number, RExercise[]> = {};
     r.routine_exercises
@@ -77,24 +83,37 @@ export default function RutinasPage() {
       .sort((a, b) => a.day_number - b.day_number || a.position - b.position)
       .forEach((re) => { (byDay[re.day_number] ||= []).push(re); });
     const dayNums = Object.keys(byDay).map(Number).sort((a, b) => a - b);
-    const days: EditDay[] = (dayNums.length ? dayNums : [1]).map((d, i) => ({
-      name: byDay[d]?.[0]?.block_name || `Día ${i + 1}`,
-      rows: (byDay[d] || [emptyRow(i + 1, 0)]).map((row) => ({ ...row })),
-    }));
+    const days: EditDay[] = (dayNums.length ? dayNums : [1]).map((d, i) => {
+      const rows = byDay[d] || [];
+      const blocks: EditBlock[] = [];
+      const idx: Record<string, number> = {};
+      if (rows.length === 0) {
+        blocks.push({ name: "Bloque 1", rows: [emptyRow(i + 1, 0)] });
+      } else {
+        rows.forEach((row) => {
+          const bname = row.block_name || "Bloque 1";
+          if (!(bname in idx)) { idx[bname] = blocks.length; blocks.push({ name: bname, rows: [] }); }
+          blocks[idx[bname]].rows.push({ ...row });
+        });
+      }
+      return { name: `Día ${i + 1}`, blocks };
+    });
     setApplyMember(""); setApplyMsg("");
     setEdit({ id: r.id, name: r.name || "", member_id: r.member_id, is_template: r.is_template, days });
   }
 
   function startNew() { setApplyMember(""); setApplyMsg(""); setEdit(newRoutine()); }
 
-  // Convierte los días del editor en filas de routine_exercises para un routine_id.
+  // Convierte los días/bloques del editor en filas de routine_exercises.
   function rowsFor(routineId: string) {
     return edit!.days.flatMap((d, di) =>
-      d.rows.map((r, pi) => ({
-        routine_id: routineId, exercise_id: r.exercise_id || null,
-        day_number: di + 1, block_name: d.name || null, position: pi,
-        sets: r.sets || null, reps: r.reps || null, notes: r.notes || null,
-      }))
+      d.blocks.flatMap((b, bi) =>
+        b.rows.map((r, ri) => ({
+          routine_id: routineId, exercise_id: r.exercise_id || null,
+          day_number: di + 1, block_name: b.name || null, position: bi * 1000 + ri,
+          sets: r.sets || null, reps: r.reps || null, notes: r.notes || null,
+        }))
+      )
     ).filter((r) => r.exercise_id);
   }
 
@@ -143,17 +162,43 @@ export default function RutinasPage() {
   const setDayName = (di: number, v: string) =>
     setEdit((e) => e ? { ...e, days: e.days.map((d, i) => i === di ? { ...d, name: v } : d) } : e);
   const addDay = () =>
-    setEdit((e) => e ? { ...e, days: [...e.days, { name: `Día ${e.days.length + 1}`, rows: [emptyRow(e.days.length + 1, 0)] }] } : e);
+    setEdit((e) => e ? { ...e, days: [...e.days, newDay(e.days.length + 1)] } : e);
   const removeDay = (di: number) =>
     setEdit((e) => e ? { ...e, days: e.days.filter((_, i) => i !== di) } : e);
-  const addRow = (di: number) =>
-    setEdit((e) => e ? { ...e, days: e.days.map((d, i) => i === di ? { ...d, rows: [...d.rows, emptyRow(di + 1, d.rows.length)] } : d) } : e);
-  const removeRow = (di: number, ri: number) =>
-    setEdit((e) => e ? { ...e, days: e.days.map((d, i) => i === di ? { ...d, rows: d.rows.filter((_, j) => j !== ri) } : d) } : e);
-  const setRow = (di: number, ri: number, k: keyof RExercise, v: string) =>
+
+  const setBlockName = (di: number, bi: number, v: string) =>
     setEdit((e) => e ? {
       ...e, days: e.days.map((d, i) => i === di ? {
-        ...d, rows: d.rows.map((r, j) => j === ri ? { ...r, [k]: v } : r),
+        ...d, blocks: d.blocks.map((b, j) => j === bi ? { ...b, name: v } : b),
+      } : d),
+    } : e);
+  const addBlock = (di: number) =>
+    setEdit((e) => e ? {
+      ...e, days: e.days.map((d, i) => i === di ? { ...d, blocks: [...d.blocks, newBlock(d.blocks.length + 1)] } : d),
+    } : e);
+  const removeBlock = (di: number, bi: number) =>
+    setEdit((e) => e ? {
+      ...e, days: e.days.map((d, i) => i === di ? { ...d, blocks: d.blocks.filter((_, j) => j !== bi) } : d),
+    } : e);
+
+  const addRow = (di: number, bi: number) =>
+    setEdit((e) => e ? {
+      ...e, days: e.days.map((d, i) => i === di ? {
+        ...d, blocks: d.blocks.map((b, j) => j === bi ? { ...b, rows: [...b.rows, emptyRow(di + 1, b.rows.length)] } : b),
+      } : d),
+    } : e);
+  const removeRow = (di: number, bi: number, ri: number) =>
+    setEdit((e) => e ? {
+      ...e, days: e.days.map((d, i) => i === di ? {
+        ...d, blocks: d.blocks.map((b, j) => j === bi ? { ...b, rows: b.rows.filter((_, k) => k !== ri) } : b),
+      } : d),
+    } : e);
+  const setRow = (di: number, bi: number, ri: number, k: keyof RExercise, v: string) =>
+    setEdit((e) => e ? {
+      ...e, days: e.days.map((d, i) => i === di ? {
+        ...d, blocks: d.blocks.map((b, j) => j === bi ? {
+          ...b, rows: b.rows.map((r, l) => l === ri ? { ...r, [k]: v } : r),
+        } : b),
       } : d),
     } : e);
 
@@ -192,6 +237,7 @@ export default function RutinasPage() {
   }
 
   const memberName = (id: string | null) => members.find((m) => m.id === id)?.full_name;
+  const exerciseCount = (r: Routine) => r.routine_exercises.length;
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-8">
@@ -229,7 +275,7 @@ export default function RutinasPage() {
                     <div>
                       <div className="font-medium">{r.name || "Rutina sin nombre"}</div>
                       <div className="text-xs text-muted">
-                        {r.member_id ? memberName(r.member_id) || "Socio" : "Plantilla"} · {r.routine_exercises.length} ejercicios
+                        {r.member_id ? memberName(r.member_id) || "Socio" : "Plantilla"} · {exerciseCount(r)} ejercicios
                       </div>
                     </div>
                     <span className="text-ink-2">›</span>
@@ -298,41 +344,59 @@ export default function RutinasPage() {
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               {edit.days.map((day, di) => (
                 <div key={di} className="rounded-xl border border-white/10 bg-surface-2 p-3">
                   <div className="mb-3 flex items-center gap-2">
                     <input className="input max-w-[200px] font-semibold" value={day.name}
                       onChange={(e) => setDayName(di, e.target.value)} />
                     <div className="ml-auto flex gap-2">
-                      <button className="text-xs text-ink-2 hover:text-brand" onClick={() => addRow(di)}>+ Ejercicio</button>
+                      <button className="text-xs text-ink-2 hover:text-brand" onClick={() => addBlock(di)}>+ Bloque</button>
                       {edit.days.length > 1 && (
                         <button className="text-xs text-ink-2 hover:text-crit" onClick={() => removeDay(di)}>Quitar día</button>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    {day.rows.map((row, ri) => (
-                      <div key={ri} className="grid grid-cols-[1fr_70px_70px_1fr_28px] items-center gap-2">
-                        <select className="input" value={row.exercise_id || ""}
-                          onChange={(e) => setRow(di, ri, "exercise_id", e.target.value)}>
-                          <option value="">— Ejercicio —</option>
-                          {exercises.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                        </select>
-                        <input className="input" placeholder="Series" value={row.sets || ""}
-                          onChange={(e) => setRow(di, ri, "sets", e.target.value)} />
-                        <input className="input" placeholder="Reps" value={row.reps || ""}
-                          onChange={(e) => setRow(di, ri, "reps", e.target.value)} />
-                        <input className="input" placeholder="Nota (opcional)" value={row.notes || ""}
-                          onChange={(e) => setRow(di, ri, "notes", e.target.value)} />
-                        <button className="grid h-8 w-7 place-items-center rounded-lg text-ink-2 hover:text-crit"
-                          title="Quitar" onClick={() => removeRow(di, ri)}>×</button>
+                  <div className="space-y-3">
+                    {day.blocks.map((block, bi) => (
+                      <div key={bi} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <input className="input max-w-[220px] text-sm font-semibold text-brand" value={block.name}
+                            placeholder="Ej: Bloque brazos"
+                            onChange={(e) => setBlockName(di, bi, e.target.value)} />
+                          <div className="ml-auto flex gap-2">
+                            <button className="text-xs text-ink-2 hover:text-brand" onClick={() => addRow(di, bi)}>+ Ejercicio</button>
+                            {day.blocks.length > 1 && (
+                              <button className="text-xs text-ink-2 hover:text-crit" onClick={() => removeBlock(di, bi)}>Quitar bloque</button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          {block.rows.map((row, ri) => (
+                            <div key={ri} className="grid grid-cols-[1fr_70px_70px_1fr_28px] items-center gap-2">
+                              <select className="input" value={row.exercise_id || ""}
+                                onChange={(e) => setRow(di, bi, ri, "exercise_id", e.target.value)}>
+                                <option value="">— Ejercicio —</option>
+                                {exercises.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                              </select>
+                              <input className="input" placeholder="Series" value={row.sets || ""}
+                                onChange={(e) => setRow(di, bi, ri, "sets", e.target.value)} />
+                              <input className="input" placeholder="Reps" value={row.reps || ""}
+                                onChange={(e) => setRow(di, bi, ri, "reps", e.target.value)} />
+                              <input className="input" placeholder="Nota (opcional)" value={row.notes || ""}
+                                onChange={(e) => setRow(di, bi, ri, "notes", e.target.value)} />
+                              <button className="grid h-8 w-7 place-items-center rounded-lg text-ink-2 hover:text-crit"
+                                title="Quitar" onClick={() => removeRow(di, bi, ri)}>×</button>
+                            </div>
+                          ))}
+                          {block.rows.length === 0 && (
+                            <p className="text-xs text-muted">Sin ejercicios. Tocá “+ Ejercicio”.</p>
+                          )}
+                        </div>
                       </div>
                     ))}
-                    {day.rows.length === 0 && (
-                      <p className="text-xs text-muted">Sin ejercicios. Tocá “+ Ejercicio”.</p>
-                    )}
                   </div>
                 </div>
               ))}
