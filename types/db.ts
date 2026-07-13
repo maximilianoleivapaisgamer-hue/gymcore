@@ -1,6 +1,6 @@
 // Tipos del dominio GymCore (alineados con supabase/schema.sql)
 
-export type UserRole = "super_admin" | "owner" | "member";
+export type UserRole = "super_admin" | "owner" | "member" | "empleado";
 
 export interface MemberPlan {
   name: string;
@@ -67,6 +67,7 @@ export const PAY_METHODS: { value: PayMethod; label: string }[] = [
 export interface Member {
   id: string;
   gym_id: string;
+  member_number: number | null;
   full_name: string;
   dni: string | null;
   email: string | null;
@@ -79,4 +80,5 @@ export interface Member {
   reminder_whatsapp: boolean;
   reminder_email: boolean;
   height_cm: number | null;
+  created_at: string;
 }
