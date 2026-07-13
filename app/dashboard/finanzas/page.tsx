@@ -58,6 +58,7 @@ export default function FinanzasPage() {
   const [saving, setSaving] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [dayDate, setDayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [cash6, setCash6] = useState<{ date: string; type: "income" | "expense"; amount: number }[]>([]);
 
   async function load(y: number, m: number) {
     setLoading(true);
@@ -71,14 +72,18 @@ export default function FinanzasPage() {
         .eq("id", profile.gym_id).maybeSingle<{ employees_see_finance: boolean }>();
       if (!g?.employees_see_finance) { setBlocked(true); setLoading(false); return; }
     }
-    const [{ data: ent }, { data: mem }] = await Promise.all([
+    const c6 = new Date(y, m - 5, 1);
+    const c6Iso = `${c6.getFullYear()}-${pad(c6.getMonth() + 1)}-01`;
+    const [{ data: ent }, { data: mem }, { data: cf6 }] = await Promise.all([
       supabase.from("cashflow_entries").select("id, concept, type, amount, method, date")
         .gte("date", monthStart(y, m)).lt("date", nextMonthStart(y, m))
         .order("date", { ascending: false }),
       supabase.from("members").select("id, full_name, plan_price, membership_expiry").order("full_name"),
+      supabase.from("cashflow_entries").select("date, type, amount").gte("date", c6Iso).lt("date", nextMonthStart(y, m)),
     ]);
     setEntries((ent as Entry[]) || []);
     setMembers((mem as Member[]) || []);
+    setCash6((cf6 as { date: string; type: "income" | "expense"; amount: number }[]) || []);
     setLoading(false);
   }
   useEffect(() => { load(cur.y, cur.m); /* eslint-disable-next-line */ }, [cur.y, cur.m]);
@@ -119,6 +124,22 @@ export default function FinanzasPage() {
     }
     return { income, expense };
   }, [entries, dayDate]);
+
+  // Flujo mensual: ingresos vs gastos de los últimos 6 meses (hasta el mes visible).
+  const flow = useMemo(() => {
+    const buckets: { key: string; label: string; ing: number; gas: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(cur.y, cur.m - i, 1);
+      buckets.push({ key: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, label: MONTHS[d.getMonth()].slice(0, 3), ing: 0, gas: 0 });
+    }
+    for (const c of cash6) {
+      const b = buckets.find((x) => x.key === c.date.slice(0, 7));
+      if (!b) continue;
+      if (c.type === "income") b.ing += Number(c.amount); else b.gas += Number(c.amount);
+    }
+    const max = Math.max(1, ...buckets.flatMap((b) => [b.ing, b.gas]));
+    return { buckets, max };
+  }, [cash6, cur]);
 
   function prevMonth() { setCur((c) => c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }); }
   function nextMonth() { setCur((c) => c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }); }
@@ -203,25 +224,14 @@ export default function FinanzasPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="card">
-          <div className="text-xs uppercase tracking-wide text-muted">Ingresos</div>
-          <div className="mt-1 text-3xl font-bold text-good">{loading ? "…" : money(totals.income)}</div>
-        </div>
-        <div className="card">
-          <div className="text-xs uppercase tracking-wide text-muted">Egresos</div>
-          <div className="mt-1 text-3xl font-bold text-crit">{loading ? "…" : money(totals.expense)}</div>
-        </div>
-        <div className="card">
-          <div className="text-xs uppercase tracking-wide text-muted">Balance</div>
-          <div className={`mt-1 text-3xl font-bold ${totals.balance >= 0 ? "text-brand" : "text-crit"}`}>
-            {loading ? "…" : money(totals.balance)}
-          </div>
-        </div>
-        <div className="card">
-          <div className="text-xs uppercase tracking-wide text-muted">Abonos a cobrar</div>
-          <div className="mt-1 text-3xl font-bold text-warn">{loading ? "…" : money(abonosACobrar.sum)}</div>
-          <div className="mt-1 text-xs text-ink-2">{abonosACobrar.count} socio(s) con cuota vencida</div>
-        </div>
+        <FinKpi label="Total ingresos" tone="text-good" value={loading ? "…" : money(totals.income)} sub="Suma del mes"
+          icon={<path d="M7 17L17 7M17 7H9M17 7v8" />} />
+        <FinKpi label="Total gastos" tone="text-crit" value={loading ? "…" : money(totals.expense)} sub="Suma del mes"
+          icon={<path d="M17 7L7 17M7 17h8M7 17V9" />} />
+        <FinKpi label="Balance neto" tone={totals.balance >= 0 ? "text-brand" : "text-crit"} value={loading ? "…" : money(totals.balance)} sub="Ingresos − egresos"
+          icon={<><rect x="2" y="6" width="20" height="13" rx="2" /><path d="M2 10h20" /></>} />
+        <FinKpi label="Abonos a cobrar" tone="text-warn" value={loading ? "…" : money(abonosACobrar.sum)} sub={`${abonosACobrar.count} con cuota vencida`}
+          icon={<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>} />
       </div>
 
       {/* Cobros por medio de pago (mes) */}
@@ -257,6 +267,29 @@ export default function FinanzasPage() {
           </div>
         </div>
         <p className="mt-2 text-xs text-muted">Elegí otra fecha (del mes que estás viendo) para controlar días anteriores.</p>
+      </div>
+
+      {/* Flujo mensual (6 meses) */}
+      <div className="mt-4 card">
+        <div className="mb-3.5 flex items-center justify-between">
+          <h3 className="text-base font-semibold">Flujo mensual</h3>
+          <span className="text-[13px] font-semibold text-brand">Últimos 6 meses</span>
+        </div>
+        <div className="flex h-[200px] items-end gap-4 pt-2.5">
+          {flow.buckets.map((b) => (
+            <div key={b.key} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+              <div className="flex h-full w-full items-end justify-center gap-[5px]">
+                <div className="w-4 rounded-t bg-gradient-to-b from-brand to-brand-2" style={{ height: `${(b.ing / flow.max) * 100}%` }} title={money(b.ing)} />
+                <div className="w-4 rounded-t bg-[#3b4b63]" style={{ height: `${(b.gas / flow.max) * 100}%` }} title={money(b.gas)} />
+              </div>
+              <span className="text-[11.5px] text-muted">{b.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-1.5 flex gap-[18px]">
+          <div className="flex items-center gap-1.5 text-[12.5px] text-ink-2"><i className="block h-2.5 w-2.5 rounded-[3px] bg-brand" />Ingresos</div>
+          <div className="flex items-center gap-1.5 text-[12.5px] text-ink-2"><i className="block h-2.5 w-2.5 rounded-[3px] bg-[#3b4b63]" />Gastos</div>
+        </div>
       </div>
 
       <div className="mt-6 card p-0">
@@ -360,5 +393,20 @@ export default function FinanzasPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function FinKpi({ label, tone, value, sub, icon }: { label: string; tone: string; value: string; sub: string; icon: React.ReactNode }) {
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between text-[12.5px] font-medium text-ink-2">
+        {label}
+        <span className={`grid h-9 w-9 place-items-center rounded-[10px] bg-surface-3 ${tone}`}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[18px] w-[18px]">{icon}</svg>
+        </span>
+      </div>
+      <div className={`mt-3 text-3xl font-bold tracking-[-.5px] tabular-nums ${tone}`}>{value}</div>
+      <div className="mt-1 text-xs text-ink-2">{sub}</div>
+    </div>
   );
 }

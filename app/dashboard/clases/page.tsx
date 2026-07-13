@@ -67,6 +67,7 @@ export default function ClasesPage() {
   const [resDate, setResDate] = useState<string | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [addMember, setAddMember] = useState("");
+  const [allBookings, setAllBookings] = useState<{ class_id: string; class_date: string }[]>([]);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -74,12 +75,14 @@ export default function ClasesPage() {
     const { data: profile } = await supabase
       .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
     setGymId(profile?.gym_id ?? null);
-    const [{ data: cl }, { data: mem }] = await Promise.all([
+    const [{ data: cl }, { data: mem }, { data: bk }] = await Promise.all([
       supabase.from("classes").select("*").order("start_time"),
       supabase.from("members").select("id, full_name").order("full_name"),
+      supabase.from("bookings").select("class_id, class_date").gte("class_date", iso(new Date())),
     ]);
     setClasses((cl as Klass[]) || []);
     setMembers((mem as Member[]) || []);
+    setAllBookings((bk as { class_id: string; class_date: string }[]) || []);
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
@@ -153,12 +156,21 @@ export default function ClasesPage() {
     setBookings((bs) => bs.filter((b) => b.id !== id));
   }
 
-  const classesByDay = (code: string) =>
-    classes.filter((c) => (c.weekdays || []).includes(code))
-      .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
-
   const availableToAdd = members.filter((m) => !bookings.some((b) => b.member_id === m.id));
   const full = resFor?.capacity ? bookings.length >= resFor.capacity : false;
+
+  const occFor = (c: Klass) => {
+    const date = nextOccurrence(c.weekdays);
+    if (!date) return 0;
+    return allBookings.filter((b) => b.class_id === c.id && b.class_date === date).length;
+  };
+  const dayLabels = (codes: string[]) =>
+    (codes || []).map((code) => DAYS.find((d) => d.code === code)?.label).filter(Boolean).join("/");
+  const BADGE: Record<string, string> = {
+    ok: "bg-[rgba(34,197,94,.14)] text-[#4ade80]",
+    info: "bg-brand/20 text-brand",
+    crit: "bg-[rgba(240,82,82,.14)] text-[#f87171]",
+  };
 
   return (
     <main className="p-5 md:p-7">
@@ -168,39 +180,50 @@ export default function ClasesPage() {
             <Link href="/dashboard" className="hover:text-brand">Panel</Link>
             <span>/</span><span>Clases</span>
           </div>
-          <h1 className="text-2xl font-bold">Clases</h1>
-          <p className="text-ink-2">{classes.length} clases en la agenda semanal.</p>
+          <h1 className="text-2xl font-bold">Clases y reservas</h1>
+          <p className="text-ink-2">Armá la grilla a tu manera. Tocá una clase para ver y anotar reservas.</p>
         </div>
         <button className="btn btn-primary" onClick={openNew}>+ Nueva clase</button>
       </div>
 
       {loading ? (
         <p className="p-8 text-center text-ink-2">Cargando…</p>
-      ) : classes.length === 0 ? (
-        <div className="card py-16 text-center text-ink-2">
-          Todavía no cargaste clases. Tocá “+ Nueva clase” para armar tu agenda.
-        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
-          {DAYS.map((d) => (
-            <div key={d.code} className="rounded-xl border border-white/10 bg-surface p-2">
-              <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-2">{d.label}</div>
-              <div className="flex flex-col gap-2">
-                {classesByDay(d.code).length === 0 ? (
-                  <div className="px-1 py-4 text-center text-xs text-muted">—</div>
-                ) : classesByDay(d.code).map((c) => (
-                  <button key={c.id + d.code} onClick={() => openReservas(c)}
-                    className="rounded-lg border-l-4 bg-surface-2 p-2 text-left transition hover:bg-white/[.05]"
-                    style={{ borderLeftColor: c.color || "#22d3ee" }}>
-                    <div className="text-sm font-semibold">{c.name}</div>
-                    <div className="text-xs text-ink-2">{fmtTime(c.start_time)}{c.duration ? ` · ${c.duration}′` : ""}</div>
-                    {c.instructor && <div className="text-xs text-muted">{c.instructor}</div>}
-                    {c.capacity != null && <div className="mt-1 text-[11px] text-muted">Cupo {c.capacity}</div>}
-                  </button>
-                ))}
-              </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {classes.map((c) => {
+            const cap = c.capacity || 0;
+            const occ = occFor(c);
+            const ratio = cap ? Math.min(1, occ / cap) : 0;
+            const badge = cap && occ >= cap ? { cls: "crit", txt: "Completo" } : ratio >= 0.8 ? { cls: "ok", txt: "Casi lleno" } : { cls: "info", txt: "Disponible" };
+            return (
+              <button key={c.id} onClick={() => openReservas(c)} className="card text-left transition hover:border-brand/40">
+                <div className="flex items-center justify-between gap-2">
+                  <b className="text-base">{c.name}</b>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${BADGE[badge.cls]}`}>
+                    <i className="h-1.5 w-1.5 rounded-full bg-current" />{badge.txt}
+                  </span>
+                </div>
+                <p className="mb-3.5 mt-1.5 text-sm text-ink-2">
+                  {dayLabels(c.weekdays)}{c.start_time ? ` · ${fmtTime(c.start_time)}` : ""}{c.instructor ? ` · ${c.instructor}` : ""}
+                </p>
+                <div className="flex items-center justify-between text-[13px] text-ink-2">
+                  <span>Cupos</span>
+                  <span className="font-semibold text-ink">{occ}{cap ? ` / ${cap}` : ""}</span>
+                </div>
+                <div className="mt-2 h-[7px] overflow-hidden rounded-full bg-surface-3">
+                  <div className="h-full rounded-full"
+                    style={{ width: `${cap ? ratio * 100 : 0}%`, background: cap && occ >= cap ? "#f05252" : "linear-gradient(90deg, rgb(var(--brand-rgb)), rgb(var(--brand-2-rgb)))" }} />
+                </div>
+              </button>
+            );
+          })}
+          <button onClick={openNew}
+            className="grid min-h-[150px] place-items-center rounded-xl border border-dashed border-white/15 text-muted transition hover:border-brand/40 hover:text-ink">
+            <div className="text-center">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="mx-auto mb-1"><path d="M12 5v14M5 12h14" /></svg>
+              Crear nueva clase
             </div>
-          ))}
+          </button>
         </div>
       )}
 
