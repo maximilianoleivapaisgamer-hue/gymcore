@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import InstallAppButton from "@/components/InstallAppButton";
 
 interface Member {
   id: string; gym_id: string; full_name: string; dni: string | null;
@@ -122,9 +123,17 @@ export default function PortalPage() {
     routine.routine_exercises
       .slice().sort((a, b) => a.day_number - b.day_number || a.position - b.position)
       .forEach((re) => { (by[re.day_number] ||= []).push(re); });
-    return Object.keys(by).map(Number).sort((a, b) => a - b).map((d) => ({
-      label: by[d][0]?.block_name || `Día ${d}`, rows: by[d],
-    }));
+    return Object.keys(by).map(Number).sort((a, b) => a - b).map((d) => {
+      const rows = by[d];
+      const blocks: { name: string; rows: RExercise[] }[] = [];
+      const idx: Record<string, number> = {};
+      rows.forEach((re) => {
+        const bname = re.block_name || "Bloque 1";
+        if (!(bname in idx)) { idx[bname] = blocks.length; blocks.push({ name: bname, rows: [] }); }
+        blocks[idx[bname]].rows.push(re);
+      });
+      return { label: `Día ${d}`, blocks };
+    });
   }, [routine]);
 
   const dietDays = useMemo(() => {
@@ -237,6 +246,8 @@ export default function PortalPage() {
         <button className="text-sm text-ink-2 hover:text-crit" onClick={logout}>Salir</button>
       </header>
 
+      <InstallAppButton />
+
       {/* Tabs */}
       <div className={`mb-5 grid gap-1 rounded-xl border border-white/10 bg-surface-2 p-1 ${isElite ? "grid-cols-4" : "grid-cols-3"}`}>
         {BASE_TABS.filter((t) => t.key !== "dieta" || isElite).map((t) => (
@@ -268,6 +279,16 @@ export default function PortalPage() {
             <Link href="/portal/peso" className="btn btn-ghost mt-4 w-full text-center">
               {lastWeight ? "Ver evolución de peso →" : "Cargar mi peso inicial →"}
             </Link>
+          </div>
+
+          {/* Card entrenamiento: iniciar rutina + progreso */}
+          <div className="card">
+            <div className="text-xs uppercase tracking-wide text-muted">Entrenamiento</div>
+            <p className="mt-1 text-sm text-ink-2">Marcá los ejercicios a medida que los hacés y mirá tu progreso.</p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Link href="/portal/entrenar" className="btn btn-primary flex-1 text-center">▶ Iniciar rutina</Link>
+              <Link href="/portal/progreso" className="btn btn-ghost flex-1 text-center">Ver mi progreso →</Link>
+            </div>
           </div>
 
           {/* Card 2: estado de cuenta */}
@@ -318,19 +339,28 @@ export default function PortalPage() {
           {days.length === 0 ? (
             <p className="p-6 text-center text-sm text-ink-2">Tu gimnasio todavía no te asignó una rutina.</p>
           ) : (
-            <div className="flex flex-col gap-4 p-4">
+            <div className="flex flex-col gap-5 p-4">
               {days.map((day, i) => (
                 <div key={i}>
                   <div className="mb-2 text-sm font-semibold text-brand">{day.label}</div>
-                  <div className="overflow-hidden rounded-lg border border-white/10">
-                    {day.rows.map((re, j) => (
-                      <div key={j} className="flex items-center justify-between border-b border-white/5 px-3 py-2 last:border-0">
-                        <div>
-                          <div className="text-sm">{re.exercises?.name || "Ejercicio"}</div>
-                          {re.notes && <div className="text-xs text-muted">{re.notes}</div>}
-                        </div>
-                        <div className="text-sm text-ink-2">
-                          {re.sets || "-"} × {re.reps || "-"}
+                  <div className="flex flex-col gap-3">
+                    {day.blocks.map((block, bi) => (
+                      <div key={bi} className="rounded-lg border border-white/10 bg-black/20 p-2">
+                        {(day.blocks.length > 1 || block.name !== "Bloque 1") && (
+                          <div className="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-ink-2">{block.name}</div>
+                        )}
+                        <div className="overflow-hidden rounded-lg border border-white/10">
+                          {block.rows.map((re, j) => (
+                            <div key={j} className="flex items-center justify-between border-b border-white/5 px-3 py-2 last:border-0">
+                              <div>
+                                <div className="text-sm">{re.exercises?.name || "Ejercicio"}</div>
+                                {re.notes && <div className="text-xs text-muted">{re.notes}</div>}
+                              </div>
+                              <div className="text-sm text-ink-2">
+                                {re.sets || "-"} × {re.reps || "-"}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}
