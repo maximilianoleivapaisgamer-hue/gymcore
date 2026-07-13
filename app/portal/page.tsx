@@ -15,6 +15,9 @@ interface MyBooking { id: string; class_id: string; class_date: string; classes:
 interface Klass { id: string; name: string; instructor: string | null; weekdays: string[]; start_time: string | null; duration: number | null; capacity: number | null; color: string | null; }
 interface BookingLite { id: string; class_id: string; member_id: string; class_date: string; }
 interface WeightLog { date: string; weight_kg: number; }
+interface DMeal { id: string; day_number: number; meal_type: string; position: number; title: string | null; detail: string | null; photo_url: string | null; }
+interface Diet { id: string; name: string | null; diet_meals: DMeal[]; }
+interface DietProgressRow { meal_id: string; date: string; }
 
 const DAYS = [
   { code: "lun", label: "Lun", js: 1 }, { code: "mar", label: "Mar", js: 2 }, { code: "mie", label: "Mié", js: 3 },
@@ -41,12 +44,14 @@ function daysLeft(expiry: string | null): number | null {
 }
 const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 const fmtTime = (t: string | null) => (t ? t.slice(0, 5) : "");
-const TABS = [
+const BASE_TABS = [
   { key: "perfil", label: "Mi perfil" },
   { key: "rutina", label: "Rutina" },
+  { key: "dieta", label: "Dieta" },
   { key: "clases", label: "Clases" },
 ] as const;
-type TabKey = (typeof TABS)[number]["key"];
+type TabKey = (typeof BASE_TABS)[number]["key"];
+const DAY_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 export default function PortalPage() {
   const supabase = createClient();
@@ -60,6 +65,11 @@ export default function PortalPage() {
   const [allBookings, setAllBookings] = useState<BookingLite[]>([]);
   const [lastWeight, setLastWeight] = useState<WeightLog | null>(null);
   const [busyClassKey, setBusyClassKey] = useState<string | null>(null);
+  const [isElite, setIsElite] = useState(false);
+  const [diet, setDiet] = useState<Diet | null>(null);
+  const [dietProgress, setDietProgress] = useState<DietProgressRow[]>([]);
+  const [dietSub, setDietSub] = useState<"plan" | "progreso">("plan");
+  const [busyMeal, setBusyMeal] = useState<string | null>(null);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -71,7 +81,7 @@ export default function PortalPage() {
     setMember(m);
 
     const iso0 = todayIso();
-    const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }] = await Promise.all([
+    const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
       supabase.from("gyms").select("name, logo_url, whatsapp").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null }>(),
       supabase.from("routines").select("id, name, routine_exercises(day_number, block_name, position, sets, reps, notes, exercises(name))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
@@ -80,6 +90,9 @@ export default function PortalPage() {
       supabase.from("classes").select("*").order("start_time"),
       supabase.from("bookings").select("id, class_id, member_id, class_date").gte("class_date", iso0),
       supabase.from("weight_logs").select("date, weight_kg").eq("member_id", m.id).order("date", { ascending: false }).limit(1),
+      supabase.from("subscriptions").select("plan").eq("gym_id", m.gym_id).maybeSingle<{ plan: string }>(),
+      supabase.from("diets").select("id, name, diet_meals(id, day_number, meal_type, position, title, detail, photo_url)")
+        .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Diet>(),
     ]);
     setGym(g ?? null);
     setRoutine((r as Routine) ?? null);
@@ -87,6 +100,13 @@ export default function PortalPage() {
     setClasses((cl as Klass[]) || []);
     setAllBookings((ab as BookingLite[]) || []);
     setLastWeight(((wl as WeightLog[]) || [])[0] ?? null);
+    setIsElite(sub?.plan === "elite");
+    setDiet((dt as Diet) ?? null);
+    if (dt) {
+      const { data: dp } = await supabase.from("diet_progress").select("meal_id, date")
+        .eq("member_id", m.id).eq("diet_id", (dt as Diet).id);
+      setDietProgress((dp as DietProgressRow[]) || []);
+    }
     setState("ok");
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
@@ -106,6 +126,45 @@ export default function PortalPage() {
       label: by[d][0]?.block_name || `Día ${d}`, rows: by[d],
     }));
   }, [routine]);
+
+  const dietDays = useMemo(() => {
+    if (!diet) return [];
+    const by: Record<number, DMeal[]> = {};
+    diet.diet_meals.slice().sort((a, b) => a.day_number - b.day_number || a.position - b.position)
+      .forEach((m) => { (by[m.day_number] ||= []).push(m); });
+    return Object.keys(by).map(Number).sort((a, b) => a - b).map((d, i) => ({
+      label: DAY_LABELS[i] || `Día ${d}`, meals: by[d],
+    }));
+  }, [diet]);
+
+  const doneMealIds = useMemo(() => {
+    const t = todayIso();
+    return new Set(dietProgress.filter((p) => p.date === t).map((p) => p.meal_id));
+  }, [dietProgress]);
+
+  const dietAdherence = useMemo(() => {
+    if (!diet || diet.diet_meals.length === 0) return null;
+    const totalSlots = diet.diet_meals.length;
+    const doneCount = new Set(dietProgress.map((p) => `${p.date}:${p.meal_id}`)).size;
+    const daysTracked = new Set(dietProgress.map((p) => p.date)).size;
+    return { totalSlots, doneCount, daysTracked };
+  }, [diet, dietProgress]);
+
+  async function toggleMeal(mealId: string) {
+    if (!member || !diet) return;
+    setBusyMeal(mealId);
+    const t = todayIso();
+    const already = doneMealIds.has(mealId);
+    if (already) {
+      await supabase.from("diet_progress").delete()
+        .eq("member_id", member.id).eq("meal_id", mealId).eq("date", t);
+      setDietProgress((ps) => ps.filter((p) => !(p.meal_id === mealId && p.date === t)));
+    } else {
+      await supabase.from("diet_progress").insert({ diet_id: diet.id, member_id: member.id, meal_id: mealId, date: t });
+      setDietProgress((ps) => [...ps, { meal_id: mealId, date: t }]);
+    }
+    setBusyMeal(null);
+  }
 
   async function reservar(c: Klass, date: string) {
     if (!member) return;
@@ -179,8 +238,8 @@ export default function PortalPage() {
       </header>
 
       {/* Tabs */}
-      <div className="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-surface-2 p-1">
-        {TABS.map((t) => (
+      <div className={`mb-5 grid gap-1 rounded-xl border border-white/10 bg-surface-2 p-1 ${isElite ? "grid-cols-4" : "grid-cols-3"}`}>
+        {BASE_TABS.filter((t) => t.key !== "dieta" || isElite).map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -278,6 +337,87 @@ export default function PortalPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "dieta" && isElite && (
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-surface-2 p-1">
+            <button onClick={() => setDietSub("plan")}
+              className={`rounded-lg py-2 text-sm font-semibold transition ${dietSub === "plan" ? "bg-brand text-black" : "text-ink-2 hover:text-ink"}`}>
+              Tu Plan
+            </button>
+            <button onClick={() => setDietSub("progreso")}
+              className={`rounded-lg py-2 text-sm font-semibold transition ${dietSub === "progreso" ? "bg-brand text-black" : "text-ink-2 hover:text-ink"}`}>
+              Tu progreso
+            </button>
+          </div>
+
+          {!diet ? (
+            <div className="card py-10 text-center text-sm text-ink-2">
+              Tu gimnasio todavía no te asignó una dieta.
+            </div>
+          ) : dietSub === "plan" ? (
+            <div className="card p-0">
+              <div className="border-b border-white/10 p-4">
+                <h2 className="font-semibold">{diet.name || "Tu dieta"}</h2>
+              </div>
+              <div className="flex flex-col gap-4 p-4">
+                {dietDays.map((day, i) => (
+                  <div key={i}>
+                    <div className="mb-2 text-sm font-semibold text-brand">{day.label}</div>
+                    <div className="space-y-2">
+                      {day.meals.map((m) => (
+                        <div key={m.id} className="flex items-center gap-3 rounded-lg border border-white/10 p-2">
+                          {m.photo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={m.photo_url} alt="" className="h-12 w-12 rounded-lg object-cover" />
+                          ) : (
+                            <div className="grid h-12 w-12 place-items-center rounded-lg bg-white/5 text-lg">🍽️</div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs uppercase tracking-wide text-muted">{m.meal_type}</div>
+                            <div className="truncate text-sm font-medium">{m.title || "—"}</div>
+                            {m.detail && <div className="truncate text-xs text-ink-2">{m.detail}</div>}
+                          </div>
+                          <button
+                            className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border text-sm transition ${
+                              doneMealIds.has(m.id) ? "border-good bg-[rgba(34,197,94,.14)] text-good" : "border-white/15 text-ink-2 hover:text-ink"
+                            }`}
+                            disabled={busyMeal === m.id}
+                            title={doneMealIds.has(m.id) ? "Cumplida hoy" : "Marcar como cumplida hoy"}
+                            onClick={() => toggleMeal(m.id)}
+                          >
+                            ✓
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="card">
+              <div className="text-xs uppercase tracking-wide text-muted">Adherencia</div>
+              {dietAdherence ? (
+                <>
+                  <div className="mt-2 text-3xl font-black">
+                    {dietAdherence.doneCount}
+                    <span className="text-base font-normal text-muted"> comidas cumplidas</span>
+                  </div>
+                  <div className="mt-1 text-sm text-ink-2">
+                    Registraste progreso en {dietAdherence.daysTracked} día{dietAdherence.daysTracked === 1 ? "" : "s"}.
+                  </div>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-ink-2">Todavía no marcaste ninguna comida como cumplida.</p>
+              )}
+              <p className="mt-4 text-xs text-muted">
+                Marcá cada comida como cumplida desde “Tu Plan” a medida que la vas haciendo, para ver acá tu evolución día a día.
+              </p>
             </div>
           )}
         </div>
