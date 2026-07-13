@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import type { Gym, LandingSectionConfig, LandingTemplate, MemberPlan } from "@/types/db";
-import { DEFAULT_LANDING_SECTIONS, LANDING_SECTION_LABELS, LANDING_TEMPLATES } from "@/types/db";
+import type { Gym, LandingSectionConfig, LandingSectionKey, MemberPlan } from "@/types/db";
+import { DEFAULT_LANDING_SECTIONS, LANDING_SECTION_LABELS } from "@/types/db";
 import { combinedLandingPlans, visibleLandingSections } from "@/lib/landing";
 import { THEMES, BG_STYLES } from "@/lib/theme";
 import ThemeApply from "@/components/ThemeApply";
@@ -32,6 +32,9 @@ export default function ConfiguracionPage() {
     address: "",
     instagram: "",
     gallery: [],
+    testimonials: [],
+    class_schedule: [],
+    open_hours: "",
     logo_url: null,
     hero_url: null,
     landing_template: "clasica",
@@ -124,12 +127,36 @@ export default function ConfiguracionPage() {
     }));
   }
 
-  // ---- Plantilla y orden/visibilidad de secciones ----
-  const sectionList: LandingSectionConfig[] = gym.landing_sections?.length ? gym.landing_sections : DEFAULT_LANDING_SECTIONS;
-
-  function setTemplate(t: LandingTemplate) {
-    set("landing_template", t);
+  // ---- Testimonios (lista editable) ----
+  function addTestimonial() {
+    setGym((g) => ({ ...g, testimonials: [...(g.testimonials || []), { name: "", text: "" }] }));
   }
+  function setTestimonial(i: number, patch: Partial<{ name: string; text: string }>) {
+    setGym((g) => ({
+      ...g,
+      testimonials: (g.testimonials || []).map((t, idx) => (idx === i ? { ...t, ...patch } : t)),
+    }));
+  }
+  function removeTestimonial(i: number) {
+    setGym((g) => ({ ...g, testimonials: (g.testimonials || []).filter((_, idx) => idx !== i) }));
+  }
+
+  // ---- Horarios / clases (lista editable) ----
+  function addSchedule() {
+    setGym((g) => ({ ...g, class_schedule: [...(g.class_schedule || []), { day: "", time: "", name: "" }] }));
+  }
+  function setSchedule(i: number, patch: Partial<{ day: string; time: string; name: string }>) {
+    setGym((g) => ({
+      ...g,
+      class_schedule: (g.class_schedule || []).map((s, idx) => (idx === i ? { ...s, ...patch } : s)),
+    }));
+  }
+  function removeSchedule(i: number) {
+    setGym((g) => ({ ...g, class_schedule: (g.class_schedule || []).filter((_, idx) => idx !== i) }));
+  }
+
+  // ---- Orden/visibilidad de secciones ----
+  const sectionList: LandingSectionConfig[] = gym.landing_sections?.length ? gym.landing_sections : DEFAULT_LANDING_SECTIONS;
 
   function moveSection(i: number, dir: -1 | 1) {
     setGym((g) => {
@@ -173,6 +200,9 @@ export default function ConfiguracionPage() {
         address: gym.address,
         instagram: gym.instagram,
         gallery: gym.gallery,
+        testimonials: gym.testimonials,
+        class_schedule: gym.class_schedule,
+        open_hours: gym.open_hours,
         logo_url: gym.logo_url,
         hero_url: gym.hero_url,
         landing_template: gym.landing_template || "clasica",
@@ -186,7 +216,6 @@ export default function ConfiguracionPage() {
   }
 
   const accent = gym.accent_color || "#22d3ee";
-  const template: LandingTemplate = gym.landing_template || "clasica";
   const plans = combinedLandingPlans(gym);
   const previewSections = visibleLandingSections(gym, plans);
 
@@ -229,47 +258,6 @@ export default function ConfiguracionPage() {
         <p className="mb-4 text-[11px] text-muted">
           El color tiñe los botones, los acentos y el fondo de todo el panel, el portal del socio y el login — así siempre combina.
         </p>
-
-        {/* PLANTILLA */}
-        <label className="mb-2 block text-xs font-semibold text-ink-2">Plantilla de la página</label>
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          {LANDING_TEMPLATES.map((t) => {
-            const active = template === t.key;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTemplate(t.key)}
-                className={`rounded-xl border p-2 text-left transition ${
-                  active ? "border-brand bg-white/5" : "border-white/10 hover:bg-white/5"
-                }`}
-              >
-                <div className="mb-2 overflow-hidden rounded-lg border border-white/10 bg-[#05070b]">
-                  {t.key === "clasica" ? (
-                    <div className="flex flex-col items-center gap-1.5 p-3">
-                      <div className="h-1.5 w-8 rounded-full" style={{ background: accent }} />
-                      <div className="h-2.5 w-16 rounded bg-white/25" />
-                      <div className="h-1.5 w-20 rounded bg-white/10" />
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 items-center gap-1.5 p-3">
-                      <div className="space-y-1.5">
-                        <div className="h-1.5 w-9 rounded bg-white/25" />
-                        <div className="h-1.5 w-11 rounded bg-white/10" />
-                      </div>
-                      <div className="h-9 rounded-md" style={{ background: `${accent}55` }} />
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 text-xs font-semibold">
-                  {active && <span style={{ color: accent }}>✓</span>}
-                  {t.label}
-                </div>
-                <p className="text-[11px] leading-snug text-muted">{t.description}</p>
-              </button>
-            );
-          })}
-        </div>
 
         <label className="mb-1 block text-xs font-semibold text-ink-2">Logo</label>
         <input
@@ -347,6 +335,93 @@ export default function ConfiguracionPage() {
           value={(gym.benefits || []).join("\n")}
           onChange={(e) => set("benefits", e.target.value.split("\n").filter(Boolean))}
         />
+
+        {/* TESTIMONIOS — lista editable */}
+        <div className="mb-4">
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-xs font-semibold text-ink-2">Testimonios de socios</label>
+            <button
+              type="button"
+              onClick={addTestimonial}
+              className="rounded-lg border border-white/15 px-2 py-1 text-xs font-semibold text-ink hover:bg-white/5"
+            >
+              + Agregar
+            </button>
+          </div>
+          <div className="space-y-2">
+            {(gym.testimonials || []).map((t, i) => (
+              <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2">
+                <div className="mb-1 flex items-center gap-2">
+                  <input
+                    className="input flex-1"
+                    placeholder="Nombre del socio"
+                    value={t.name}
+                    onChange={(e) => setTestimonial(i, { name: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeTestimonial(i)}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/15 text-sm text-ink-2 hover:bg-white/5"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <textarea
+                  className="input"
+                  rows={2}
+                  placeholder="Su comentario / opinión"
+                  value={t.text}
+                  onChange={(e) => setTestimonial(i, { text: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* HORARIOS / CLASES — lista editable */}
+        <div className="mb-4">
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-xs font-semibold text-ink-2">Horarios y clases</label>
+            <button
+              type="button"
+              onClick={addSchedule}
+              className="rounded-lg border border-white/15 px-2 py-1 text-xs font-semibold text-ink hover:bg-white/5"
+            >
+              + Agregar
+            </button>
+          </div>
+          <div className="space-y-2">
+            {(gym.class_schedule || []).map((s, i) => (
+              <div key={i} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-2">
+                <input
+                  className="input w-24"
+                  placeholder="Día"
+                  value={s.day}
+                  onChange={(e) => setSchedule(i, { day: e.target.value })}
+                />
+                <input
+                  className="input w-24"
+                  placeholder="Horario"
+                  value={s.time}
+                  onChange={(e) => setSchedule(i, { time: e.target.value })}
+                />
+                <input
+                  className="input flex-1"
+                  placeholder="Clase"
+                  value={s.name}
+                  onChange={(e) => setSchedule(i, { name: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeSchedule(i)}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/15 text-sm text-ink-2 hover:bg-white/5"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* ORDEN Y VISIBILIDAD DE SECCIONES */}
         <div className="mb-4">
@@ -464,7 +539,15 @@ export default function ConfiguracionPage() {
         />
 
         <label className="mb-1 block text-xs font-semibold text-ink-2">Dirección</label>
-        <input className="input mb-4" value={gym.address || ""} onChange={(e) => set("address", e.target.value)} />
+        <input className="input mb-3" value={gym.address || ""} onChange={(e) => set("address", e.target.value)} />
+
+        <label className="mb-1 block text-xs font-semibold text-ink-2">Horarios de atención</label>
+        <input
+          className="input mb-4"
+          placeholder="Lun a Vie 7 a 23 · Sáb 9 a 14"
+          value={gym.open_hours || ""}
+          onChange={(e) => set("open_hours", e.target.value)}
+        />
 
         <button className="btn btn-primary w-full" onClick={save} disabled={saving}>
           {saving ? "Guardando…" : "Guardar y publicar"}
@@ -474,104 +557,60 @@ export default function ConfiguracionPage() {
 
       {/* PREVIEW EN VIVO */}
       <div className="overflow-auto p-6" style={{ "--accent": accent } as React.CSSProperties}>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3">
           <p className="text-sm text-ink-2">Vista previa · gymcore.app/{gym.slug || "tu-gym"}</p>
-          <span className="rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-muted">
-            Plantilla {LANDING_TEMPLATES.find((t) => t.key === template)?.label}
-          </span>
         </div>
 
-        {template === "clasica" ? (
-          <div className="overflow-hidden rounded-xl border border-white/10">
-            <div className="relative px-6 py-16 text-center">
-              {gym.hero_url && (
-                <div
-                  className="absolute inset-0 bg-cover bg-center opacity-30"
-                  style={{ backgroundImage: `url(${gym.hero_url})` }}
-                />
+        <div className="overflow-hidden rounded-xl border border-white/10">
+          <div className="relative px-6 py-16 text-center">
+            {gym.hero_url && (
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-30"
+                style={{ backgroundImage: `url(${gym.hero_url})` }}
+              />
+            )}
+            <div className="relative z-10">
+              {gym.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={gym.logo_url} alt="" className="mx-auto mb-4 h-16 w-16 rounded-2xl object-cover" />
+              ) : (
+                <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-black" style={{ background: accent }}>
+                  💪
+                </div>
               )}
-              <div className="relative z-10">
-                {gym.logo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={gym.logo_url} alt="" className="mx-auto mb-4 h-16 w-16 rounded-2xl object-cover" />
-                ) : (
-                  <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-black" style={{ background: accent }}>
-                    💪
-                  </div>
-                )}
-                <div className="text-xs font-bold uppercase tracking-[3px]" style={{ color: accent }}>
-                  {gym.name || "Tu gimnasio"}
-                </div>
-                <h2 className="mx-auto my-3 max-w-lg text-3xl font-bold">
-                  {gym.tagline || "Entrená distinto."}
-                </h2>
-                <p className="mx-auto max-w-md text-ink-2">{gym.description}</p>
-                <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs text-ink-2">
-                  {gym.whatsapp && <span className="rounded-full border border-white/15 px-3 py-1">💬 WhatsApp</span>}
-                  {gym.instagram && <span className="rounded-full border border-white/15 px-3 py-1">📷 Instagram</span>}
-                </div>
+              <div className="text-xs font-bold uppercase tracking-[3px]" style={{ color: accent }}>
+                {gym.name || "Tu gimnasio"}
+              </div>
+              <h2 className="mx-auto my-3 max-w-lg text-3xl font-bold">
+                {gym.tagline || "Entrená distinto."}
+              </h2>
+              <p className="mx-auto max-w-md text-ink-2">{gym.description}</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs text-ink-2">
+                {gym.whatsapp && <span className="rounded-full border border-white/15 px-3 py-1">💬 WhatsApp</span>}
+                {gym.instagram && <span className="rounded-full border border-white/15 px-3 py-1">📷 Instagram</span>}
               </div>
             </div>
-            {previewSections.map((key) => (
-              <PreviewSection key={key} sectionKey={key} gym={gym} plans={plans} accent={accent} variant="clasica" />
-            ))}
           </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-white/10">
-            <div className="h-1 w-full" style={{ background: accent }} />
-            <div className="grid gap-4 p-6 sm:grid-cols-2 sm:items-center">
-              <div>
-                <div
-                  className="mb-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[2px]"
-                  style={{ color: accent, borderColor: `${accent}55` }}
-                >
-                  {gym.name || "Tu gimnasio"}
-                </div>
-                <h2 className="max-w-sm text-2xl font-bold">{gym.tagline || "Entrená distinto."}</h2>
-                <p className="mt-2 max-w-sm text-sm text-ink-2">{gym.description}</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-2">
-                  {gym.whatsapp && <span className="rounded-full border border-white/15 px-3 py-1">💬 WhatsApp</span>}
-                  {gym.instagram && <span className="rounded-full border border-white/15 px-3 py-1">📷 Instagram</span>}
-                </div>
-              </div>
-              <div className="aspect-[4/3] overflow-hidden rounded-2xl border-2" style={{ borderColor: `${accent}55` }}>
-                {gym.hero_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={gym.hero_url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div
-                    className="grid h-full w-full place-items-center text-4xl"
-                    style={{ background: `linear-gradient(135deg, ${accent}55, rgba(255,255,255,.05))` }}
-                  >
-                    💪
-                  </div>
-                )}
-              </div>
-            </div>
-            {previewSections.map((key) => (
-              <PreviewSection key={key} sectionKey={key} gym={gym} plans={plans} accent={accent} variant="moderna" />
-            ))}
-          </div>
-        )}
+          {previewSections.map((key) => (
+            <PreviewSection key={key} sectionKey={key} gym={gym} plans={plans} accent={accent} />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-/** Bloque condensado de preview para una sección opcional, con un estilo
- * levemente distinto según la plantilla activa (variant). */
+/** Bloque condensado de preview para una sección opcional de la landing. */
 function PreviewSection({
   sectionKey,
   gym,
   plans,
   accent,
-  variant,
 }: {
-  sectionKey: "beneficios" | "galeria" | "planes" | "contacto";
+  sectionKey: LandingSectionKey;
   gym: Partial<Gym>;
   plans: MemberPlan[];
   accent: string;
-  variant: "clasica" | "moderna";
 }) {
   if (sectionKey === "beneficios") {
     return (
@@ -579,13 +618,37 @@ function PreviewSection({
         <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Beneficios</div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {(gym.benefits || []).slice(0, 6).map((b, i) => (
+            <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2 text-xs">{b}</div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (sectionKey === "testimonios") {
+    return (
+      <div className="border-t border-white/10 p-4">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Testimonios</div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(gym.testimonials || []).slice(0, 4).map((t, i) => (
             <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2 text-xs">
-              {variant === "moderna" && (
-                <div className="mb-1 text-sm font-black" style={{ color: accent }}>
-                  {String(i + 1).padStart(2, "0")}
-                </div>
-              )}
-              {b}
+              <div className="text-ink-2">“{t.text}”</div>
+              <div className="mt-1 font-semibold" style={{ color: accent }}>{t.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (sectionKey === "horarios") {
+    return (
+      <div className="border-t border-white/10 p-4">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Horarios y clases</div>
+        <div className="overflow-hidden rounded-lg border border-white/10">
+          {(gym.class_schedule || []).slice(0, 6).map((s, i) => (
+            <div key={i} className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 text-xs last:border-0">
+              <span className="font-medium">{s.day}</span>
+              <span className="text-ink-2">{s.time}</span>
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${accent}22`, color: accent }}>{s.name}</span>
             </div>
           ))}
         </div>
@@ -595,17 +658,10 @@ function PreviewSection({
   if (sectionKey === "galeria") {
     return (
       <div className="border-t border-white/10 p-1">
-        <div
-          className={variant === "moderna" ? "flex gap-1 overflow-x-auto p-3" : "grid grid-cols-3 gap-1 p-1"}
-        >
+        <div className="grid grid-cols-3 gap-1 p-1">
           {(gym.gallery || []).slice(0, 6).map((url, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={i}
-              src={url}
-              alt=""
-              className={variant === "moderna" ? "h-20 w-24 shrink-0 rounded-lg object-cover" : "h-24 w-full object-cover"}
-            />
+            <img key={i} src={url} alt="" className="h-24 w-full object-cover" />
           ))}
         </div>
       </div>
@@ -618,7 +674,6 @@ function PreviewSection({
         <div className="grid gap-2 sm:grid-cols-3">
           {plans.map((p, i) => (
             <div key={i} className="overflow-hidden rounded-lg border border-white/10 bg-white/5 text-center">
-              {variant === "moderna" && <div className="h-1" style={{ background: accent }} />}
               <div className="p-3">
                 <div className="text-sm font-bold">{p.name || "Plan"}</div>
                 <div className="text-lg font-black" style={{ color: accent }}>
@@ -636,11 +691,9 @@ function PreviewSection({
   return (
     <div className="border-t border-white/10 p-4">
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Ubicación / Contacto</div>
-      <div
-        className="rounded-lg p-3 text-xs text-ink-2"
-        style={{ background: variant === "moderna" ? `${accent}1a` : "rgba(255,255,255,.05)" }}
-      >
+      <div className="rounded-lg p-3 text-xs text-ink-2" style={{ background: "rgba(255,255,255,.05)" }}>
         {gym.address && <div>📍 {gym.address}</div>}
+        {gym.open_hours && <div>🕒 {gym.open_hours}</div>}
         {gym.whatsapp && <div>📱 {gym.whatsapp}</div>}
         {gym.instagram && <div>📷 {gym.instagram}</div>}
       </div>

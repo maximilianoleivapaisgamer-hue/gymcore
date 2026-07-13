@@ -16,11 +16,16 @@ export default function ClasicaLanding({
   const accent = gym.accent_color || "#22d3ee";
   const benefits = gym.benefits || [];
   const gallery = gym.gallery || [];
+  const testimonials = gym.testimonials || [];
+  const schedule = gym.class_schedule || [];
   const joinHref = `/portal/registro?gym=${gym.slug}`;
   const loginHref = `/g/${gym.slug}`;
   const waHref = gym.whatsapp ? `https://wa.me/${gym.whatsapp.replace(/\D/g, "")}` : null;
   const mapsHref = gym.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gym.address)}`
+    : null;
+  const mapEmbed = gym.address
+    ? `https://www.google.com/maps?q=${encodeURIComponent(gym.address)}&output=embed`
     : null;
   const igHref = gym.instagram
     ? gym.instagram.startsWith("http")
@@ -112,6 +117,57 @@ export default function ClasicaLanding({
             </div>
           </section>
         );
+      case "horarios":
+        return (
+          <section key={key} className="mx-auto max-w-5xl px-6 py-16">
+            <h2 className="text-center text-3xl font-bold tracking-tight">Horarios y clases</h2>
+            <p className="mt-2 text-center text-ink-2">Organizá tu semana y no te pierdas ninguna.</p>
+            <div className="mt-8 overflow-x-auto rounded-2xl border border-white/10 bg-surface">
+              <table className="w-full min-w-[420px] text-left text-sm">
+                <thead className="bg-white/5 text-ink-2">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Día</th>
+                    <th className="px-4 py-3 font-semibold">Horario</th>
+                    <th className="px-4 py-3 font-semibold">Clase</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedule.map((s, i) => (
+                    <tr key={i} className="border-t border-white/5">
+                      <td className="px-4 py-3 font-medium">{s.day}</td>
+                      <td className="px-4 py-3 text-ink-2">{s.time}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: `${accent}22`, color: accent }}>
+                          {s.name}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      case "testimonios":
+        return (
+          <section key={key} className="mx-auto max-w-5xl px-6 py-16">
+            <h2 className="text-center text-3xl font-bold tracking-tight">Lo que dicen nuestros socios</h2>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {testimonials.map((t, i) => (
+                <figure key={i} className="flex flex-col rounded-2xl border border-white/10 bg-surface p-6">
+                  <div className="text-3xl leading-none" style={{ color: accent }}>“</div>
+                  <blockquote className="mt-2 flex-1 text-sm text-ink-2">{t.text}</blockquote>
+                  <figcaption className="mt-4 flex items-center gap-3">
+                    <div className="grid h-9 w-9 place-items-center rounded-full text-sm font-black text-black" style={{ background: accent }}>
+                      {(t.name || "S").slice(0, 1).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-semibold">{t.name}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        );
       case "contacto":
         return (
           <section key={key} className="mx-auto max-w-5xl px-6 py-16">
@@ -121,6 +177,7 @@ export default function ClasicaLanding({
                 <p className="mt-2 text-ink-2">Te esperamos para una clase de prueba. Escribinos o pasá cuando quieras.</p>
                 <div className="mt-4 space-y-1 text-sm text-ink-2">
                   {gym.address && <div>📍 {gym.address}</div>}
+                  {gym.open_hours && <div>🕒 {gym.open_hours}</div>}
                   {gym.whatsapp && <div>📱 {gym.whatsapp}</div>}
                   {igHref && (
                     <div>
@@ -150,6 +207,17 @@ export default function ClasicaLanding({
                 )}
               </div>
             </div>
+            {mapEmbed && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+                <iframe
+                  src={mapEmbed}
+                  title="Ubicación"
+                  className="h-72 w-full"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            )}
           </section>
         );
       default:

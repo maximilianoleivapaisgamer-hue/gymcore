@@ -18,30 +18,38 @@ export interface RealPlan {
   sync_landing: boolean;
 }
 
-/** Plantilla visual de la landing pública. El hero y el CTA final son fijos
- * en las dos; lo que cambia es la disposición y el estilo de las secciones. */
-export type LandingTemplate = "clasica" | "moderna";
+/** Plantilla visual de la landing pública. Hoy hay una sola plantilla
+ * (la "Clásica"): hero con banner de fondo y secciones apiladas. */
+export type LandingTemplate = "clasica";
 export const LANDING_TEMPLATES: { key: LandingTemplate; label: string; description: string }[] = [
-  { key: "clasica", label: "Clásica", description: "Hero centrado con imagen de fondo. Cálida y directa." },
-  { key: "moderna", label: "Moderna", description: "Hero en dos columnas, tarjetas con acento de color. Look editorial." },
+  { key: "clasica", label: "Clásica", description: "Hero con banner de fondo y secciones apiladas. Cálida y directa." },
 ];
+
+/** Un testimonio/opinión de socio para la landing. */
+export interface Testimonial { name: string; text: string; }
+/** Una fila de la grilla de horarios/clases de la landing. */
+export interface ScheduleItem { day: string; time: string; name: string; }
 
 /** Secciones opcionales de la landing: el dueño elige orden y visibilidad.
  * El hero y el CTA final no se listan acá porque siempre están presentes. */
-export type LandingSectionKey = "beneficios" | "galeria" | "planes" | "contacto";
+export type LandingSectionKey = "beneficios" | "testimonios" | "horarios" | "galeria" | "planes" | "contacto";
 export interface LandingSectionConfig {
   key: LandingSectionKey;
   visible: boolean;
 }
 export const LANDING_SECTION_LABELS: Record<LandingSectionKey, string> = {
   beneficios: "Beneficios",
+  testimonios: "Testimonios",
+  horarios: "Horarios y clases",
   galeria: "Galería",
   planes: "Planes",
   contacto: "Ubicación / Contacto",
 };
 export const DEFAULT_LANDING_SECTIONS: LandingSectionConfig[] = [
   { key: "beneficios", visible: true },
+  { key: "horarios", visible: true },
   { key: "galeria", visible: true },
+  { key: "testimonios", visible: true },
   { key: "planes", visible: true },
   { key: "contacto", visible: true },
 ];
@@ -63,6 +71,9 @@ export interface Gym {
   address: string | null;
   instagram: string | null;
   gallery: string[];
+  testimonials: Testimonial[];
+  class_schedule: ScheduleItem[];
+  open_hours: string | null;
   landing_template: LandingTemplate;
   landing_sections: LandingSectionConfig[];
   theme: string;

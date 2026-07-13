@@ -3,12 +3,11 @@ import { notFound } from "next/navigation";
 import type { Gym } from "@/types/db";
 import { combinedLandingPlans, visibleLandingSections } from "@/lib/landing";
 import ClasicaLanding from "@/components/landing/ClasicaLanding";
-import ModernaLanding from "@/components/landing/ModernaLanding";
 
 /**
- * Landing publica white-label del gimnasio: gymcore.app/<slug>
- * Server Component: lee el gimnasio por slug (lectura publica por RLS) y
- * despacha a la plantilla que el dueno eligio en /dashboard/configuracion,
+ * Landing pública white-label del gimnasio: gymcore.app/<slug>
+ * Server Component: lee el gimnasio por slug (lectura pública por RLS) y
+ * despacha a la plantilla que el dueño eligió en /dashboard/configuracion,
  * con las secciones opcionales ya filtradas y ordenadas.
  */
 export default async function GymLanding({
@@ -28,8 +27,5 @@ export default async function GymLanding({
   const plans = combinedLandingPlans(gym);
   const sections = visibleLandingSections(gym, plans);
 
-  if (gym.landing_template === "moderna") {
-    return <ModernaLanding gym={gym} plans={plans} sections={sections} />;
-  }
   return <ClasicaLanding gym={gym} plans={plans} sections={sections} />;
 }
