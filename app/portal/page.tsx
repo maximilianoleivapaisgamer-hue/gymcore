@@ -45,7 +45,6 @@ function daysLeft(expiry: string | null): number | null {
   if (!expiry) return null;
   return Math.ceil((new Date(expiry + "T00:00:00").getTime() - Date.now()) / 86400000);
 }
-const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 const fmtTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 const BASE_TABS = [
   { key: "perfil", label: "Mi perfil" },
@@ -73,6 +72,8 @@ export default function PortalPage() {
   const [dietProgress, setDietProgress] = useState<DietProgressRow[]>([]);
   const [dietSub, setDietSub] = useState<"plan" | "progreso">("plan");
   const [busyMeal, setBusyMeal] = useState<string | null>(null);
+  const [rutDayIdx, setRutDayIdx] = useState(0);
+  const [dietDayIdx, setDietDayIdx] = useState(0);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -219,6 +220,27 @@ export default function PortalPage() {
     : d <= 7 ? { label: `Vence en ${d} días`, cls: "text-warn", chip: "bg-[rgba(245,177,61,.14)] text-warn" }
     : { label: "Activo", cls: "text-good", chip: "bg-[rgba(34,197,94,.14)] text-good" };
 
+  // Datos para la tarjeta de identidad centrada del socio.
+  const initials =
+    member!.full_name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "S";
+  const membCentral =
+    d === null ? "Sin membresía activa"
+    : d < 0 ? "Membresía vencida"
+    : d <= 7 ? `Vence en ${d} días`
+    : "Membresía activa";
+  const fdateVence = member!.membership_expiry
+    ? new Date(member!.membership_expiry + "T00:00:00").toLocaleDateString("es-AR")
+    : null;
+
+  // Día seleccionado en Rutina y en Dieta (para mostrar solo ese día).
+  const curRutIdx = days.length ? Math.min(rutDayIdx, days.length - 1) : 0;
+  const curRutDay = days[curRutIdx];
+  const curDietIdx = dietDays.length ? Math.min(dietDayIdx, dietDays.length - 1) : 0;
+  const curDietDay = dietDays[curDietIdx];
+
+  // La pestaña Dieta aparece si el gimnasio es Elite o si el socio ya tiene una dieta asignada.
+  const showDiet = isElite || !!diet;
+
   const waHref = gym?.whatsapp
     ? `https://wa.me/${gym.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
         `Hola! Quiero abonar mi cuota${member!.plan_name ? ` del plan ${member!.plan_name}` : ""}.`
@@ -251,8 +273,8 @@ export default function PortalPage() {
       </header>
 
       {/* Tabs */}
-      <div className={`mb-5 grid gap-1 rounded-xl border border-white/10 bg-surface-2 p-1 ${isElite ? "grid-cols-4" : "grid-cols-3"}`}>
-        {BASE_TABS.filter((t) => t.key !== "dieta" || isElite).map((t) => (
+      <div className={`mb-5 grid gap-1 rounded-xl border border-white/10 bg-surface-2 p-1 ${showDiet ? "grid-cols-4" : "grid-cols-3"}`}>
+        {BASE_TABS.filter((t) => t.key !== "dieta" || showDiet).map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -265,28 +287,30 @@ export default function PortalPage() {
 
       {tab === "perfil" && (
         <div className="flex flex-col gap-4">
-          {/* Card 1: estado de cuenta */}
-          <div className="card">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted">Estado de cuenta</div>
-                <div className="mt-1 text-lg font-bold">{member!.plan_name || "Sin plan asignado"}</div>
-                {member!.plan_price != null && <div className="text-sm text-ink-2">{money(member!.plan_price)} / mes</div>}
-              </div>
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${memb.chip}`}>{memb.label}</span>
+          {/* Card 1: identidad del socio (centrada) */}
+          <div className="card text-center">
+            <div className="text-xs font-bold uppercase tracking-[2px] text-brand">{gym?.name || "Mi gimnasio"}</div>
+            <div className="mx-auto mt-4 grid h-24 w-24 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-3xl font-black text-black">
+              {initials}
             </div>
-            {member!.membership_expiry && (
-              <div className="mt-1 text-xs text-muted">
-                Vence el {new Date(member!.membership_expiry + "T00:00:00").toLocaleDateString("es-AR")}
-              </div>
-            )}
+            <div className="mt-4 text-xl font-bold">{member!.full_name}</div>
+            <div className="mt-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${memb.chip}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {membCentral}
+              </span>
+            </div>
+            <div className="mt-2 text-sm text-ink-2">
+              {fdateVence ? `Vence el ${fdateVence}` : "Sin vencimiento"}
+              {member!.plan_name ? ` · Plan ${member!.plan_name}` : ""}
+            </div>
             {waHref ? (
-              <a href={waHref} target="_blank" rel="noreferrer" className="btn btn-primary mt-4 w-full text-center">
+              <a href={waHref} target="_blank" rel="noreferrer" className="btn btn-primary mt-5 w-full text-center">
                 Pagar abono mensual
               </a>
             ) : (
               <button
-                className="btn btn-primary mt-4 w-full"
+                className="btn btn-primary mt-5 w-full"
                 onClick={() => alert("Todavía no hay un medio de pago online conectado. Contactá a tu gimnasio para abonar.")}
               >
                 Pagar abono mensual
@@ -312,16 +336,6 @@ export default function PortalPage() {
             </Link>
           </div>
 
-          {/* Card 3: ver mi progreso (entrenamiento) */}
-          <div className="card">
-            <div className="text-xs uppercase tracking-wide text-muted">Entrenamiento</div>
-            <p className="mt-1 text-sm text-ink-2">Marcá los ejercicios a medida que los hacés y mirá cómo venís con el entrenamiento y la dieta.</p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <Link href="/portal/entrenar" className="btn btn-primary flex-1 text-center">▶ Iniciar rutina</Link>
-              <Link href="/portal/progreso" className="btn btn-ghost flex-1 text-center">Ver mi progreso →</Link>
-            </div>
-          </div>
-
           {/* Card 4: QR de acceso */}
           <div className="card text-center">
             <div className="mb-3 text-xs uppercase tracking-wide text-muted">Código QR de acceso</div>
@@ -338,58 +352,67 @@ export default function PortalPage() {
 
       {tab === "rutina" && (
         <div className="flex flex-col gap-4">
-          {/* Tarjeta de entrenamiento arriba del detalle de la rutina */}
-          <div className="card">
-            <div className="text-xs uppercase tracking-wide text-muted">Entrenamiento</div>
-            <p className="mt-1 text-sm text-ink-2">Marcá los ejercicios a medida que los hacés y mirá tu progreso.</p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <Link href="/portal/entrenar" className="btn btn-primary flex-1 text-center">▶ Iniciar rutina</Link>
-              <Link href="/portal/progreso" className="btn btn-ghost flex-1 text-center">Ver mi progreso →</Link>
-            </div>
-          </div>
-
           <div className="card p-0">
-          <div className="border-b border-white/10 p-4">
-            <h2 className="font-semibold">Mi rutina{routine?.name ? ` · ${routine.name}` : ""}</h2>
-          </div>
-          {days.length === 0 ? (
-            <p className="p-6 text-center text-sm text-ink-2">Tu gimnasio todavía no te asignó una rutina.</p>
-          ) : (
-            <div className="flex flex-col gap-5 p-4">
-              {days.map((day, i) => (
-                <div key={i}>
-                  <div className="mb-2 text-sm font-semibold text-brand">{day.label}</div>
-                  <div className="flex flex-col gap-3">
-                    {day.blocks.map((block, bi) => (
-                      <div key={bi} className="rounded-lg border border-white/10 bg-black/20 p-2">
-                        {(day.blocks.length > 1 || block.name !== "Bloque 1") && (
-                          <div className="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-ink-2">{block.name}</div>
-                        )}
-                        <div className="overflow-hidden rounded-lg border border-white/10">
-                          {block.rows.map((re, j) => (
-                            <div key={j} className="flex items-center justify-between border-b border-white/5 px-3 py-2 last:border-0">
-                              <div>
-                                <div className="text-sm">{re.exercises?.name || "Ejercicio"}</div>
-                                {re.notes && <div className="text-xs text-muted">{re.notes}</div>}
-                              </div>
-                              <div className="text-sm text-ink-2">
-                                {re.sets || "-"} × {re.reps || "-"}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div className="border-b border-white/10 p-4">
+              <h2 className="font-semibold">Mi rutina{routine?.name ? ` · ${routine.name}` : ""}</h2>
             </div>
-          )}
+            {days.length === 0 ? (
+              <p className="p-6 text-center text-sm text-ink-2">Tu gimnasio todavía no te asignó una rutina.</p>
+            ) : (
+              <div className="p-4">
+                {/* Selector de días (uno al lado del otro) */}
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {days.map((day, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setRutDayIdx(i)}
+                      className={`rounded-lg border px-4 py-2 text-sm font-semibold transition ${
+                        curRutIdx === i
+                          ? "border-brand bg-[rgba(34,211,238,.12)] text-brand"
+                          : "border-white/10 bg-surface-2 text-ink-2 hover:text-ink"
+                      }`}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Ejercicios SOLO del día elegido */}
+                <div className="flex flex-col gap-3">
+                  {curRutDay?.blocks.map((block, bi) => (
+                    <div key={bi} className="rounded-lg border border-white/10 bg-black/20 p-2">
+                      {(curRutDay.blocks.length > 1 || block.name !== "Bloque 1") && (
+                        <div className="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-ink-2">{block.name}</div>
+                      )}
+                      <div className="overflow-hidden rounded-lg border border-white/10">
+                        {block.rows.map((re, j) => (
+                          <div key={j} className="flex items-center justify-between border-b border-white/5 px-3 py-2 last:border-0">
+                            <div>
+                              <div className="text-sm">{re.exercises?.name || "Ejercicio"}</div>
+                              {re.notes && <div className="text-xs text-muted">{re.notes}</div>}
+                            </div>
+                            <div className="text-sm text-ink-2">
+                              {re.sets || "-"} × {re.reps || "-"}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Iniciar rutina DEBAJO de los ejercicios */}
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                  <Link href="/portal/entrenar" className="btn btn-primary flex-1 text-center">▶ Iniciar rutina</Link>
+                  <Link href="/portal/progreso" className="btn btn-ghost flex-1 text-center">Ver mi progreso →</Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {tab === "dieta" && isElite && (
+      {tab === "dieta" && showDiet && (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-surface-2 p-1">
             <button onClick={() => setDietSub("plan")}
@@ -411,39 +434,52 @@ export default function PortalPage() {
               <div className="border-b border-white/10 p-4">
                 <h2 className="font-semibold">{diet.name || "Tu dieta"}</h2>
               </div>
-              <div className="flex flex-col gap-4 p-4">
-                {dietDays.map((day, i) => (
-                  <div key={i}>
-                    <div className="mb-2 text-sm font-semibold text-brand">{day.label}</div>
-                    <div className="space-y-2">
-                      {day.meals.map((m) => (
-                        <div key={m.id} className="flex items-center gap-3 rounded-lg border border-white/10 p-2">
-                          {m.photo_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={m.photo_url} alt="" className="h-12 w-12 rounded-lg object-cover" />
-                          ) : (
-                            <div className="grid h-12 w-12 place-items-center rounded-lg bg-white/5 text-lg">🍽️</div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs uppercase tracking-wide text-muted">{m.meal_type}</div>
-                            <div className="truncate text-sm font-medium">{m.title || "—"}</div>
-                            {m.detail && <div className="truncate text-xs text-ink-2">{m.detail}</div>}
-                          </div>
-                          <button
-                            className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border text-sm transition ${
-                              doneMealIds.has(m.id) ? "border-good bg-[rgba(34,197,94,.14)] text-good" : "border-white/15 text-ink-2 hover:text-ink"
-                            }`}
-                            disabled={busyMeal === m.id}
-                            title={doneMealIds.has(m.id) ? "Cumplida hoy" : "Marcar como cumplida hoy"}
-                            onClick={() => toggleMeal(m.id)}
-                          >
-                            ✓
-                          </button>
-                        </div>
-                      ))}
+              <div className="p-4">
+                {/* Selector de días (uno al lado del otro) */}
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {dietDays.map((day, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setDietDayIdx(i)}
+                      className={`rounded-lg border px-4 py-2 text-sm font-semibold transition ${
+                        curDietIdx === i
+                          ? "border-brand bg-[rgba(34,211,238,.12)] text-brand"
+                          : "border-white/10 bg-surface-2 text-ink-2 hover:text-ink"
+                      }`}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Comidas SOLO del día elegido */}
+                <div className="space-y-2">
+                  {curDietDay?.meals.map((m) => (
+                    <div key={m.id} className="flex items-start gap-3 rounded-lg border border-white/10 p-2">
+                      {m.photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.photo_url} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                      ) : (
+                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-white/5 text-lg">🍽️</div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs uppercase tracking-wide text-muted">{m.meal_type}</div>
+                        <div className="text-sm font-medium">{m.title || "—"}</div>
+                        {m.detail && <div className="mt-0.5 whitespace-pre-wrap text-xs text-ink-2">{m.detail}</div>}
+                      </div>
+                      <button
+                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border text-sm transition ${
+                          doneMealIds.has(m.id) ? "border-good bg-[rgba(34,197,94,.14)] text-good" : "border-white/15 text-ink-2 hover:text-ink"
+                        }`}
+                        disabled={busyMeal === m.id}
+                        title={doneMealIds.has(m.id) ? "Cumplida hoy" : "Marcar como cumplida hoy"}
+                        onClick={() => toggleMeal(m.id)}
+                      >
+                        ✓
+                      </button>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           ) : (

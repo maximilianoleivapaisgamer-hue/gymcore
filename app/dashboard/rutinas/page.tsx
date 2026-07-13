@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import AiGenerate from "@/components/AiGenerate";
 
 interface Exercise { id: string; name: string; notes: string | null; }
 interface Member { id: string; full_name: string; }
@@ -250,7 +251,8 @@ export default function RutinasPage() {
           <h1 className="text-2xl font-bold">Rutinas</h1>
           <p className="text-ink-2">{routines.length} rutinas · {exercises.length} ejercicios en biblioteca</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <AiGenerate kind="rutina" gymId={gymId} members={members} onDone={load} />
           <button className="btn btn-ghost" onClick={() => setLibOpen(true)}>Biblioteca</button>
           <button className="btn btn-primary" onClick={startNew}>+ Nueva rutina</button>
         </div>

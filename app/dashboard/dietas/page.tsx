@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import AiGenerate from "@/components/AiGenerate";
 
 interface Member { id: string; full_name: string; }
 interface DMeal {
@@ -197,7 +198,10 @@ export default function DietasPage() {
           <h1 className="text-2xl font-bold">Dietas</h1>
           <p className="text-ink-2">{diets.length} dietas cargadas</p>
         </div>
-        <button className="btn btn-primary" onClick={startNew}>+ Nueva dieta</button>
+        <div className="flex flex-wrap gap-2">
+          <AiGenerate kind="dieta" gymId={gymId} members={members} onDone={load} />
+          <button className="btn btn-primary" onClick={startNew}>+ Nueva dieta</button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[340px_1fr]">

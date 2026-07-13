@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import ThemeApply from "@/components/ThemeApply";
-import AppBackground from "@/components/AppBackground";
 
 interface NavItem {
   href: string;
@@ -200,7 +199,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       <ThemeApply theme={gym?.theme} />
-      <AppBackground style={gym?.bg_style} />
       {/* Sidebar */}
       <aside
         className={`fixed z-40 flex h-screen w-64 flex-col gap-1 overflow-y-auto border-r border-white/[.08] bg-gradient-to-b from-[#0c1017] to-bg px-3.5 py-5 transition-transform md:sticky md:top-0 md:translate-x-0 ${
