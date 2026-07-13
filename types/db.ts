@@ -78,4 +78,5 @@ export interface Member {
   observacion: string | null;
   reminder_whatsapp: boolean;
   reminder_email: boolean;
+  height_cm: number | null;
 }
