@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { redirectForRole } from "@/lib/roles";
 import type { UserRole } from "@/types/db";
+import AppBackground from "@/components/AppBackground";
 
 /** Login. Tras autenticar, redirige según el rol del usuario. */
 export default function AccesoPage() {
@@ -46,7 +47,7 @@ export default function AccesoPage() {
 
   return (
     <main className="grid min-h-screen place-items-center px-6">
-      <div className="aurora" aria-hidden="true" />
+      <AppBackground style="aurora" />
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 text-xl">

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import InstallAppButton from "@/components/InstallAppButton";
+import ThemeApply from "@/components/ThemeApply";
+import AppBackground from "@/components/AppBackground";
 
 interface Member {
   id: string; gym_id: string; full_name: string; dni: string | null;
@@ -59,7 +61,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string } | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
   const [classes, setClasses] = useState<Klass[]>([]);
@@ -83,7 +85,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("name, logo_url, whatsapp").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null }>(),
+      supabase.from("gyms").select("name, logo_url, whatsapp, theme, bg_style").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string }>(),
       supabase.from("routines").select("id, name, routine_exercises(day_number, block_name, position, sets, reps, notes, exercises(name))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -228,6 +230,8 @@ export default function PortalPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-6">
+      <ThemeApply theme={gym?.theme} />
+      <AppBackground style={gym?.bg_style} />
       <header className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {gym?.logo_url ? (

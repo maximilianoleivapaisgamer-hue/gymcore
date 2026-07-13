@@ -187,7 +187,7 @@ export default function DietasPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8">
+    <main className="p-5 md:p-7">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="mb-1 flex items-center gap-2 text-sm text-ink-2">

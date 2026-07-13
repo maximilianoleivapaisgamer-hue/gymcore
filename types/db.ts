@@ -65,6 +65,8 @@ export interface Gym {
   gallery: string[];
   landing_template: LandingTemplate;
   landing_sections: LandingSectionConfig[];
+  theme: string;
+  bg_style: string;
 }
 
 /** Planes de abono mensual de GymCore (lo que Maxi le cobra a cada dueño).

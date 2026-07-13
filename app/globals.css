@@ -3,12 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --accent: #22d3ee; /* color de marca del gimnasio (se sobreescribe por gimnasio) */
+  /* Color de marca por defecto (celeste). ThemeApply lo sobreescribe por gimnasio. */
+  --brand-rgb: 34 211 238;
+  --brand-2-rgb: 59 130 246;
+  --accent: #22d3ee;
 }
 
+html {
+  background: #0a0d12;
+}
 html,
 body {
-  background: #0a0d12;
+  min-height: 100%;
+}
+body {
+  /* transparente para dejar ver el fondo (.app-bg) que va detrás */
+  background: transparent;
   color: #f4f6f8;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -19,7 +29,7 @@ body {
   @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 font-semibold text-sm cursor-pointer transition;
 }
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #3b82f6);
+  background: linear-gradient(135deg, rgb(var(--brand-rgb)), rgb(var(--brand-2-rgb)));
   color: #04121a;
 }
 .btn-ghost {
@@ -32,41 +42,49 @@ body {
   @apply w-full bg-surface border border-white/10 rounded-[9px] px-3 py-2.5 text-ink text-sm outline-none focus:border-brand;
 }
 
-/* ── Fondo violeta animado (SOLO se usa en el login /acceso) ────────────
-   Capa fija a pantalla completa, detrás del contenido (que va en z-10). */
-.aurora {
+/* ── Fondo de la app (se tiñe con el color del gimnasio) ────────────────────
+   Capa fija a pantalla completa, detrás de todo el contenido. */
+.app-bg {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  background: radial-gradient(120% 90% at 50% 30%, #241046 0%, #12071f 55%, #07040d 100%);
+  background: #0a0d12;
 }
-.aurora::before,
-.aurora::after {
+.app-bg-solido {
+  background: radial-gradient(120% 90% at 50% 16%, rgb(var(--brand-rgb) / 0.10), #0a0d12 60%);
+}
+.app-bg-suave {
+  background: linear-gradient(160deg, rgb(var(--brand-rgb) / 0.16) 0%, #0a0d12 46%, rgb(var(--brand-2-rgb) / 0.16) 100%);
+}
+.app-bg-aurora {
+  background: radial-gradient(120% 90% at 50% 22%, rgb(var(--brand-2-rgb) / 0.12), #0a0d12 62%);
+}
+.app-bg-aurora::before,
+.app-bg-aurora::after {
   content: "";
   position: absolute;
   inset: -30%;
   background:
-    radial-gradient(35% 40% at 25% 25%, rgba(168, 85, 247, 0.55), transparent 60%),
-    radial-gradient(40% 42% at 75% 35%, rgba(217, 70, 239, 0.45), transparent 62%),
-    radial-gradient(45% 45% at 55% 80%, rgba(124, 58, 237, 0.50), transparent 60%),
-    radial-gradient(30% 35% at 15% 75%, rgba(99, 102, 241, 0.40), transparent 60%);
+    radial-gradient(34% 40% at 26% 26%, rgb(var(--brand-rgb) / 0.50), transparent 60%),
+    radial-gradient(38% 42% at 74% 36%, rgb(var(--brand-2-rgb) / 0.45), transparent 62%),
+    radial-gradient(42% 44% at 55% 82%, rgb(var(--brand-rgb) / 0.40), transparent 60%);
   filter: blur(70px);
-  animation: aurora-move 18s ease-in-out infinite alternate;
+  animation: aurora-move 20s ease-in-out infinite alternate;
   will-change: transform;
 }
-.aurora::after {
-  animation-duration: 26s;
+.app-bg-aurora::after {
+  animation-duration: 28s;
   animation-direction: alternate-reverse;
-  opacity: 0.75;
+  opacity: 0.7;
 }
 @keyframes aurora-move {
   0%   { transform: translate3d(-5%, -4%, 0) rotate(0deg)  scale(1.1); }
-  50%  { transform: translate3d(6%, 5%, 0)   rotate(10deg) scale(1.28); }
-  100% { transform: translate3d(-3%, 7%, 0)  rotate(-8deg) scale(1.18); }
+  50%  { transform: translate3d(6%, 5%, 0)   rotate(9deg)  scale(1.26); }
+  100% { transform: translate3d(-3%, 7%, 0)  rotate(-7deg) scale(1.18); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .aurora::before,
-  .aurora::after { animation: none; }
+  .app-bg-aurora::before,
+  .app-bg-aurora::after { animation: none; }
 }

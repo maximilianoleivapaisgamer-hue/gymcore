@@ -51,7 +51,7 @@ export default function ControlAccesoPage() {
   }
 
   return (
-    <main className="mx-auto max-w-[1400px] p-6 md:p-7">
+    <main className="p-5 md:p-7">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-1 flex items-center gap-2 text-sm text-ink-2">

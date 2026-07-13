@@ -146,7 +146,7 @@ export default function DashboardHome() {
   const dash = loading ? "…" : "";
 
   return (
-    <main className="mx-auto max-w-[1400px] p-6 md:p-7">
+    <main className="p-5 md:p-7">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-[-.5px]">Hola{name ? `, ${name}` : ""} 👋</h1>

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
+import ThemeApply from "@/components/ThemeApply";
+import AppBackground from "@/components/AppBackground";
 
 interface NavItem {
   href: string;
@@ -141,7 +143,7 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const pathname = usePathname();
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; theme: string; bg_style: string } | null>(null);
   const [email, setEmail] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
   const [open, setOpen] = useState(false);
@@ -161,8 +163,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setFullName(profile?.full_name || "");
       if (profile?.gym_id) {
         const [{ data: g }, { data: sub }] = await Promise.all([
-          supabase.from("gyms").select("name, logo_url, employees_see_finance").eq("id", profile.gym_id)
-            .single<{ name: string; logo_url: string | null; employees_see_finance: boolean }>(),
+          supabase.from("gyms").select("name, logo_url, employees_see_finance, theme, bg_style").eq("id", profile.gym_id)
+            .single<{ name: string; logo_url: string | null; employees_see_finance: boolean; theme: string; bg_style: string }>(),
           supabase.from("subscriptions").select("plan").eq("gym_id", profile.gym_id)
             .maybeSingle<{ plan: string }>(),
         ]);
@@ -196,7 +198,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const initials = (fullName || email || "G").slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex min-h-screen bg-bg">
+    <div className="flex min-h-screen">
+      <ThemeApply theme={gym?.theme} />
+      <AppBackground style={gym?.bg_style} />
       {/* Sidebar */}
       <aside
         className={`fixed z-40 flex h-screen w-64 flex-col gap-1 overflow-y-auto border-r border-white/[.08] bg-gradient-to-b from-[#0c1017] to-bg px-3.5 py-5 transition-transform md:sticky md:top-0 md:translate-x-0 ${
