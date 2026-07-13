@@ -18,6 +18,34 @@ export interface RealPlan {
   sync_landing: boolean;
 }
 
+/** Plantilla visual de la landing pública. El hero y el CTA final son fijos
+ * en las dos; lo que cambia es la disposición y el estilo de las secciones. */
+export type LandingTemplate = "clasica" | "moderna";
+export const LANDING_TEMPLATES: { key: LandingTemplate; label: string; description: string }[] = [
+  { key: "clasica", label: "Clásica", description: "Hero centrado con imagen de fondo. Cálida y directa." },
+  { key: "moderna", label: "Moderna", description: "Hero en dos columnas, tarjetas con acento de color. Look editorial." },
+];
+
+/** Secciones opcionales de la landing: el dueño elige orden y visibilidad.
+ * El hero y el CTA final no se listan acá porque siempre están presentes. */
+export type LandingSectionKey = "beneficios" | "galeria" | "planes" | "contacto";
+export interface LandingSectionConfig {
+  key: LandingSectionKey;
+  visible: boolean;
+}
+export const LANDING_SECTION_LABELS: Record<LandingSectionKey, string> = {
+  beneficios: "Beneficios",
+  galeria: "Galería",
+  planes: "Planes",
+  contacto: "Ubicación / Contacto",
+};
+export const DEFAULT_LANDING_SECTIONS: LandingSectionConfig[] = [
+  { key: "beneficios", visible: true },
+  { key: "galeria", visible: true },
+  { key: "planes", visible: true },
+  { key: "contacto", visible: true },
+];
+
 export interface Gym {
   id: string;
   owner_id: string;
@@ -35,6 +63,8 @@ export interface Gym {
   address: string | null;
   instagram: string | null;
   gallery: string[];
+  landing_template: LandingTemplate;
+  landing_sections: LandingSectionConfig[];
 }
 
 /** Planes de abono mensual de GymCore (lo que Maxi le cobra a cada dueño).
