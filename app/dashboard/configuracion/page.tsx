@@ -6,15 +6,17 @@ import { createClient } from "@/lib/supabase-browser";
 import type { Gym, LandingSectionConfig, LandingTemplate, MemberPlan } from "@/types/db";
 import { DEFAULT_LANDING_SECTIONS, LANDING_SECTION_LABELS, LANDING_TEMPLATES } from "@/types/db";
 import { combinedLandingPlans, visibleLandingSections } from "@/lib/landing";
+import { THEMES, BG_STYLES } from "@/lib/theme";
+import ThemeApply from "@/components/ThemeApply";
 
 /**
- * Editor de la pagina publica del gimnasio.
- * El dueno sube su logo, foto de portada y fotos estilo banner (galeria),
+ * Editor de la página pública del gimnasio.
+ * El dueño sube su logo, foto de portada y fotos estilo banner (galería),
  * elige color, edita textos, configura sus planes en una lista, elige entre
  * las plantillas de landing disponibles y define el orden/visibilidad de las
  * secciones opcionales. Ve el preview en vivo (ya filtrado y ordenado igual
- * que la pagina real) y guarda en Supabase. Las imagenes van al bucket
- * "gym-assets". La landing publica (/[slug]) lee estos mismos datos.
+ * que la página real) y guarda en Supabase. Las imágenes van al bucket
+ * "gym-assets". La landing pública (/[slug]) lee estos mismos datos.
  */
 export default function ConfiguracionPage() {
   const supabase = createClient();
@@ -34,11 +36,13 @@ export default function ConfiguracionPage() {
     hero_url: null,
     landing_template: "clasica",
     landing_sections: DEFAULT_LANDING_SECTIONS,
+    theme: "celeste",
+    bg_style: "aurora",
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // Cargar el gimnasio del dueno logueado
+  // Cargar el gimnasio del dueño logueado
   useEffect(() => {
     (async () => {
       const {
@@ -55,6 +59,8 @@ export default function ConfiguracionPage() {
           ...data,
           landing_template: data.landing_template || "clasica",
           landing_sections: data.landing_sections?.length ? data.landing_sections : DEFAULT_LANDING_SECTIONS,
+          theme: data.theme || "celeste",
+          bg_style: data.bg_style || "aurora",
         });
       }
     })();
@@ -76,7 +82,7 @@ export default function ConfiguracionPage() {
   }
 
   async function uploadGallery(files: FileList) {
-    setMsg("Subiendo fotos...");
+    setMsg("Subiendo fotos…");
     const urls: string[] = [];
     for (const file of Array.from(files)) {
       const path = `gallery/${crypto.randomUUID()}-${file.name}`;
@@ -171,10 +177,12 @@ export default function ConfiguracionPage() {
         hero_url: gym.hero_url,
         landing_template: gym.landing_template || "clasica",
         landing_sections: sectionList,
+        theme: gym.theme || "celeste",
+        bg_style: gym.bg_style || "aurora",
       })
       .eq("owner_id", user.id);
     setSaving(false);
-    setMsg(error ? "No se pudo guardar" : "Guardado! Tu pagina ya esta publicada.");
+    setMsg(error ? "No se pudo guardar" : "¡Guardado! Tu página ya está publicada.");
   }
 
   const accent = gym.accent_color || "#22d3ee";
@@ -184,12 +192,46 @@ export default function ConfiguracionPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[380px_1fr]">
+      {/* Aplica el color elegido en vivo mientras se edita */}
+      <ThemeApply theme={gym.theme} />
       {/* EDITOR */}
       <div className="border-r border-white/10 bg-[#0b0f16] p-5">
-        <h1 className="mb-4 text-lg font-bold">Configura tu pagina</h1>
+        <h1 className="mb-4 text-lg font-bold">Configurá tu página</h1>
+
+        {/* TEMA DE LA APP (color + fondo) */}
+        <label className="mb-2 block text-xs font-semibold text-ink-2">Color de la app</label>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {THEMES.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              title={t.label}
+              onClick={() => { set("theme", t.key); set("accent_color", t.hex); }}
+              className={`h-9 w-9 rounded-full border-2 transition ${gym.theme === t.key ? "scale-110 border-white" : "border-white/20 hover:border-white/50"}`}
+              style={{ background: t.hex }}
+            />
+          ))}
+        </div>
+        <label className="mb-2 block text-xs font-semibold text-ink-2">Fondo de la app</label>
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          {BG_STYLES.map((b) => (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => set("bg_style", b.key)}
+              className={`rounded-lg border p-2 text-left transition ${gym.bg_style === b.key ? "border-brand bg-white/5" : "border-white/10 hover:bg-white/5"}`}
+            >
+              <div className="text-xs font-semibold">{b.label}</div>
+              <div className="text-[10px] leading-snug text-muted">{b.desc}</div>
+            </button>
+          ))}
+        </div>
+        <p className="mb-4 text-[11px] text-muted">
+          El color tiñe los botones, los acentos y el fondo de todo el panel, el portal del socio y el login — así siempre combina.
+        </p>
 
         {/* PLANTILLA */}
-        <label className="mb-2 block text-xs font-semibold text-ink-2">Plantilla de la pagina</label>
+        <label className="mb-2 block text-xs font-semibold text-ink-2">Plantilla de la página</label>
         <div className="mb-4 grid grid-cols-2 gap-2">
           {LANDING_TEMPLATES.map((t) => {
             const active = template === t.key;
@@ -220,7 +262,7 @@ export default function ConfiguracionPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-1 text-xs font-semibold">
-                  {active && <span style={{ color: accent }}>OK</span>}
+                  {active && <span style={{ color: accent }}>✓</span>}
                   {t.label}
                 </div>
                 <p className="text-[11px] leading-snug text-muted">{t.description}</p>
@@ -246,7 +288,7 @@ export default function ConfiguracionPage() {
         />
 
         <label className="mb-1 block text-xs font-semibold text-ink-2">
-          Fotos estilo banner (galeria)
+          Fotos estilo banner (galería)
         </label>
         <input
           type="file"
@@ -266,7 +308,7 @@ export default function ConfiguracionPage() {
                   onClick={() => removeGalleryImg(i)}
                   className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-xs text-white opacity-0 transition group-hover:opacity-100"
                 >
-                  x
+                  ✕
                 </button>
               </div>
             ))}
@@ -287,10 +329,10 @@ export default function ConfiguracionPage() {
         <label className="mb-1 block text-xs font-semibold text-ink-2">Slug (URL)</label>
         <input className="input mb-3" value={gym.slug || ""} onChange={(e) => set("slug", e.target.value)} />
 
-        <label className="mb-1 block text-xs font-semibold text-ink-2">Titulo</label>
+        <label className="mb-1 block text-xs font-semibold text-ink-2">Título</label>
         <input className="input mb-3" value={gym.tagline || ""} onChange={(e) => set("tagline", e.target.value)} />
 
-        <label className="mb-1 block text-xs font-semibold text-ink-2">Descripcion</label>
+        <label className="mb-1 block text-xs font-semibold text-ink-2">Descripción</label>
         <textarea
           className="input mb-3"
           rows={3}
@@ -298,7 +340,7 @@ export default function ConfiguracionPage() {
           onChange={(e) => set("description", e.target.value)}
         />
 
-        <label className="mb-1 block text-xs font-semibold text-ink-2">Beneficios (uno por linea)</label>
+        <label className="mb-1 block text-xs font-semibold text-ink-2">Beneficios (uno por línea)</label>
         <textarea
           className="input mb-3"
           rows={3}
@@ -310,8 +352,8 @@ export default function ConfiguracionPage() {
         <div className="mb-4">
           <label className="mb-2 block text-xs font-semibold text-ink-2">Orden de las secciones</label>
           <p className="mb-2 text-[11px] text-muted">
-            El encabezado, la portada y el llamado a la accion final siempre se muestran. Aca elegis en que orden
-            aparece el resto, y podes ocultar las que no quieras usar.
+            El encabezado, la portada y el llamado a la acción final siempre se muestran. Acá elegís en qué orden
+            aparece el resto, y podés ocultar las que no quieras usar.
           </p>
           <div className="space-y-1.5">
             {sectionList.map((s, i) => (
@@ -324,7 +366,7 @@ export default function ConfiguracionPage() {
                     className="px-1 text-xs text-ink-2 hover:text-ink disabled:opacity-20"
                     aria-label="Subir"
                   >
-                    ^
+                    ▲
                   </button>
                   <button
                     type="button"
@@ -333,7 +375,7 @@ export default function ConfiguracionPage() {
                     className="px-1 text-xs text-ink-2 hover:text-ink disabled:opacity-20"
                     aria-label="Bajar"
                   >
-                    v
+                    ▼
                   </button>
                 </div>
                 <span className={`flex-1 text-sm ${s.visible ? "" : "text-muted line-through"}`}>
@@ -348,10 +390,10 @@ export default function ConfiguracionPage() {
           </div>
         </div>
 
-        {/* PLANES - lista editable */}
+        {/* PLANES — lista editable */}
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between">
-            <label className="block text-xs font-semibold text-ink-2">Planes de esta pagina</label>
+            <label className="block text-xs font-semibold text-ink-2">Planes de esta página</label>
             <button
               type="button"
               onClick={addPlan}
@@ -361,13 +403,13 @@ export default function ConfiguracionPage() {
             </button>
           </div>
           <p className="mb-2 text-xs text-muted">
-            Estos planes son solo para mostrar en tu pagina publica (podes poner precios promocionales). Para los
-            planes reales que le cobras a tus socios, configuralos en{" "}
-            <Link href="/dashboard/planes" className="text-brand">Planes</Link> - desde ahi tambien podes tildar cuales
-            sincronizar automaticamente aca.
+            Estos planes son solo para mostrar en tu página pública (podés poner precios promocionales). Para los
+            planes reales que le cobrás a tus socios, configuralos en{" "}
+            <Link href="/dashboard/planes" className="text-brand">Planes</Link> — desde ahí también podés tildar cuáles
+            sincronizar automáticamente acá.
           </p>
           {(gym.member_plans || []).length === 0 && (
-            <p className="mb-2 text-xs text-muted">Todavia no cargaste planes. Agrega al menos uno.</p>
+            <p className="mb-2 text-xs text-muted">Todavía no cargaste planes. Agregá al menos uno.</p>
           )}
           <div className="space-y-3">
             {(gym.member_plans || []).map((p, i) => (
@@ -384,7 +426,7 @@ export default function ConfiguracionPage() {
                     onClick={() => removePlan(i)}
                     className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/15 text-sm text-ink-2 hover:bg-white/5"
                   >
-                    x
+                    ✕
                   </button>
                 </div>
                 <div className="flex gap-2">
@@ -421,11 +463,11 @@ export default function ConfiguracionPage() {
           onChange={(e) => set("instagram", e.target.value)}
         />
 
-        <label className="mb-1 block text-xs font-semibold text-ink-2">Direccion</label>
+        <label className="mb-1 block text-xs font-semibold text-ink-2">Dirección</label>
         <input className="input mb-4" value={gym.address || ""} onChange={(e) => set("address", e.target.value)} />
 
         <button className="btn btn-primary w-full" onClick={save} disabled={saving}>
-          {saving ? "Guardando..." : "Guardar y publicar"}
+          {saving ? "Guardando…" : "Guardar y publicar"}
         </button>
         {msg && <p className="mt-3 text-sm text-brand">{msg}</p>}
       </div>
@@ -433,7 +475,7 @@ export default function ConfiguracionPage() {
       {/* PREVIEW EN VIVO */}
       <div className="overflow-auto p-6" style={{ "--accent": accent } as React.CSSProperties}>
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm text-ink-2">Vista previa - gymcore.app/{gym.slug || "tu-gym"}</p>
+          <p className="text-sm text-ink-2">Vista previa · gymcore.app/{gym.slug || "tu-gym"}</p>
           <span className="rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-muted">
             Plantilla {LANDING_TEMPLATES.find((t) => t.key === template)?.label}
           </span>
@@ -454,19 +496,19 @@ export default function ConfiguracionPage() {
                   <img src={gym.logo_url} alt="" className="mx-auto mb-4 h-16 w-16 rounded-2xl object-cover" />
                 ) : (
                   <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-black" style={{ background: accent }}>
-                    GYM
+                    💪
                   </div>
                 )}
                 <div className="text-xs font-bold uppercase tracking-[3px]" style={{ color: accent }}>
                   {gym.name || "Tu gimnasio"}
                 </div>
                 <h2 className="mx-auto my-3 max-w-lg text-3xl font-bold">
-                  {gym.tagline || "Entrena distinto."}
+                  {gym.tagline || "Entrená distinto."}
                 </h2>
                 <p className="mx-auto max-w-md text-ink-2">{gym.description}</p>
                 <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs text-ink-2">
-                  {gym.whatsapp && <span className="rounded-full border border-white/15 px-3 py-1">WhatsApp</span>}
-                  {gym.instagram && <span className="rounded-full border border-white/15 px-3 py-1">Instagram</span>}
+                  {gym.whatsapp && <span className="rounded-full border border-white/15 px-3 py-1">💬 WhatsApp</span>}
+                  {gym.instagram && <span className="rounded-full border border-white/15 px-3 py-1">📷 Instagram</span>}
                 </div>
               </div>
             </div>
@@ -485,11 +527,11 @@ export default function ConfiguracionPage() {
                 >
                   {gym.name || "Tu gimnasio"}
                 </div>
-                <h2 className="max-w-sm text-2xl font-bold">{gym.tagline || "Entrena distinto."}</h2>
+                <h2 className="max-w-sm text-2xl font-bold">{gym.tagline || "Entrená distinto."}</h2>
                 <p className="mt-2 max-w-sm text-sm text-ink-2">{gym.description}</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-2">
-                  {gym.whatsapp && <span className="rounded-full border border-white/15 px-3 py-1">WhatsApp</span>}
-                  {gym.instagram && <span className="rounded-full border border-white/15 px-3 py-1">Instagram</span>}
+                  {gym.whatsapp && <span className="rounded-full border border-white/15 px-3 py-1">💬 WhatsApp</span>}
+                  {gym.instagram && <span className="rounded-full border border-white/15 px-3 py-1">📷 Instagram</span>}
                 </div>
               </div>
               <div className="aspect-[4/3] overflow-hidden rounded-2xl border-2" style={{ borderColor: `${accent}55` }}>
@@ -501,7 +543,7 @@ export default function ConfiguracionPage() {
                     className="grid h-full w-full place-items-center text-4xl"
                     style={{ background: `linear-gradient(135deg, ${accent}55, rgba(255,255,255,.05))` }}
                   >
-                    GYM
+                    💪
                   </div>
                 )}
               </div>
@@ -516,8 +558,8 @@ export default function ConfiguracionPage() {
   );
 }
 
-/** Bloque condensado de preview para una seccion opcional, con un estilo
- * levemente distinto segun la plantilla activa (variant). */
+/** Bloque condensado de preview para una sección opcional, con un estilo
+ * levemente distinto según la plantilla activa (variant). */
 function PreviewSection({
   sectionKey,
   gym,
@@ -593,14 +635,14 @@ function PreviewSection({
   // contacto
   return (
     <div className="border-t border-white/10 p-4">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Ubicacion / Contacto</div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Ubicación / Contacto</div>
       <div
         className="rounded-lg p-3 text-xs text-ink-2"
         style={{ background: variant === "moderna" ? `${accent}1a` : "rgba(255,255,255,.05)" }}
       >
-        {gym.address && <div>{gym.address}</div>}
-        {gym.whatsapp && <div>{gym.whatsapp}</div>}
-        {gym.instagram && <div>{gym.instagram}</div>}
+        {gym.address && <div>📍 {gym.address}</div>}
+        {gym.whatsapp && <div>📱 {gym.whatsapp}</div>}
+        {gym.instagram && <div>📷 {gym.instagram}</div>}
       </div>
     </div>
   );

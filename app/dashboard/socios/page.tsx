@@ -217,7 +217,7 @@ export default function SociosPage() {
 
   function welcomeHref() {
     if (!welcome) return "#";
-    const link = `${window.location.origin}/acceso`;
+    const link = gymSlug ? `${window.location.origin}/g/${gymSlug}` : `${window.location.origin}/acceso`;
     const planTxt = welcome.planName
       ? `Tu plan: ${welcome.planName}${welcome.planPrice ? ` ($${welcome.planPrice})` : ""}.\n`
       : "";
