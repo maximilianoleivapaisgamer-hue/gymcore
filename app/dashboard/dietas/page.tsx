@@ -124,6 +124,17 @@ export default function DietasPage() {
     setEdit((e) => e ? { ...e, days: e.days.filter((_, i) => i !== di) } : e);
   const addMeal = (di: number) =>
     setEdit((e) => e ? { ...e, days: e.days.map((d, i) => i === di ? { ...d, meals: [...d.meals, emptyMeal(di + 1, "Otra comida", d.meals.length)] } : d) } : e);
+  const copyPreviousDay = (di: number) =>
+    setEdit((e) => {
+      if (!e || di === 0) return e;
+      const prev = e.days[di - 1];
+      return {
+        ...e,
+        days: e.days.map((d, i) => i === di
+          ? { ...d, meals: prev.meals.map((m, j) => ({ ...m, id: undefined, day_number: di + 1, position: j })) }
+          : d),
+      };
+    });
   const removeMeal = (di: number, mi: number) =>
     setEdit((e) => e ? { ...e, days: e.days.map((d, i) => i === di ? { ...d, meals: d.meals.filter((_, j) => j !== mi) } : d) } : e);
   const setMeal = (di: number, mi: number, k: keyof DMeal, v: string) =>
@@ -280,6 +291,11 @@ export default function DietasPage() {
                   <div className="mb-3 flex items-center gap-2">
                     <span className="font-semibold">{day.name}</span>
                     <div className="ml-auto flex gap-2">
+                      {di > 0 && (
+                        <button className="text-xs text-ink-2 hover:text-brand" onClick={() => copyPreviousDay(di)}>
+                          ⧉ Copiar día anterior
+                        </button>
+                      )}
                       <button className="text-xs text-ink-2 hover:text-brand" onClick={() => addMeal(di)}>+ Comida</button>
                       {edit.days.length > 1 && (
                         <button className="text-xs text-ink-2 hover:text-crit" onClick={() => removeDay(di)}>Quitar día</button>
