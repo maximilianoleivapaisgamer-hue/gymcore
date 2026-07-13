@@ -8,6 +8,7 @@ export function redirectForRole(role: UserRole | null | undefined): string {
     case "member":
       return "/portal";
     case "owner":
+    case "empleado":
     default:
       return "/dashboard";
   }
