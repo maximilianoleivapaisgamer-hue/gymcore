@@ -21,13 +21,18 @@ export default function AccesoPage() {
     setLoading(true);
     setError("");
 
+    // Los dueños/empleados entran con email; los socios con su DNI (que se
+    // convierte al email sintético con el que se creó su cuenta).
+    const id = email.trim();
+    const loginId = id.includes("@") ? id : `${id}@socios.gymcore.app`;
+
     const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginId,
       password,
     });
     if (authError || !data.user) {
       setLoading(false);
-      return setError("Email o contraseña incorrectos.");
+      return setError("Usuario/email o contraseña incorrectos.");
     }
 
     const { data: profile } = await supabase
@@ -52,8 +57,8 @@ export default function AccesoPage() {
         <form onSubmit={login} className="card flex flex-col gap-3">
           <input
             className="input"
-            type="email"
-            placeholder="Email"
+            type="text"
+            placeholder="Email o DNI"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required

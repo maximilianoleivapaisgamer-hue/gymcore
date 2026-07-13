@@ -13,9 +13,16 @@ interface Entry {
   method: PayMethod | null;
   date: string;
 }
-interface Member { id: string; full_name: string; plan_price: number | null; }
+interface Member { id: string; full_name: string; plan_price: number | null; membership_expiry: string | null; }
 
+/** Para los COBROS dejamos solo estos 3 medios (efectivo, transferencia, terminal/POS). */
+const COBRO_METHODS: { value: string; label: string }[] = [
+  { value: "efectivo", label: "Efectivo" },
+  { value: "transferencia", label: "Transferencia" },
+  { value: "terminal", label: "Terminal (POS)" },
+];
 const methodLabel = (m: string | null) =>
+  COBRO_METHODS.find((x) => x.value === m)?.label ||
   PAY_METHODS.find((x) => x.value === m)?.label || "—";
 
 const money = (n: number) =>
@@ -33,7 +40,7 @@ const emptyForm = () => ({
   type: "income" as "income" | "expense",
   concept: "",
   amount: "",
-  method: "efectivo" as PayMethod,
+  method: "efectivo" as string,
   date: new Date().toISOString().slice(0, 10),
   member_id: "",
 });
@@ -50,6 +57,7 @@ export default function FinanzasPage() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [dayDate, setDayDate] = useState(new Date().toISOString().slice(0, 10));
 
   async function load(y: number, m: number) {
     setLoading(true);
@@ -67,7 +75,7 @@ export default function FinanzasPage() {
       supabase.from("cashflow_entries").select("id, concept, type, amount, method, date")
         .gte("date", monthStart(y, m)).lt("date", nextMonthStart(y, m))
         .order("date", { ascending: false }),
-      supabase.from("members").select("id, full_name, plan_price").order("full_name"),
+      supabase.from("members").select("id, full_name, plan_price, membership_expiry").order("full_name"),
     ]);
     setEntries((ent as Entry[]) || []);
     setMembers((mem as Member[]) || []);
@@ -83,6 +91,34 @@ export default function FinanzasPage() {
     }
     return { income, expense, balance: income - expense };
   }, [entries]);
+
+  // Abonos a cobrar: socios con la membresía vencida (o venciendo hoy) → plata pendiente de cobro.
+  const abonosACobrar = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    let count = 0, sum = 0;
+    for (const m of members) {
+      if (m.membership_expiry && m.membership_expiry <= today) { count++; sum += Number(m.plan_price || 0); }
+    }
+    return { count, sum };
+  }, [members]);
+
+  // Ingresos del mes desglosados por medio de cobro.
+  const byMethod = useMemo(() => {
+    const acc: Record<string, number> = { efectivo: 0, transferencia: 0, terminal: 0 };
+    for (const e of entries) {
+      if (e.type === "income" && e.method && e.method in acc) acc[e.method] += Number(e.amount);
+    }
+    return acc;
+  }, [entries]);
+
+  // Ingresos / egresos de un día puntual (elegible con el date picker).
+  const dayTotals = useMemo(() => {
+    let income = 0, expense = 0;
+    for (const e of entries) {
+      if (e.date === dayDate) { if (e.type === "income") income += Number(e.amount); else expense += Number(e.amount); }
+    }
+    return { income, expense };
+  }, [entries, dayDate]);
 
   function prevMonth() { setCur((c) => c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }); }
   function nextMonth() { setCur((c) => c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }); }
@@ -166,7 +202,7 @@ export default function FinanzasPage() {
         <button className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 bg-surface-2 hover:border-white/25" onClick={nextMonth}>›</button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="card">
           <div className="text-xs uppercase tracking-wide text-muted">Ingresos</div>
           <div className="mt-1 text-3xl font-bold text-good">{loading ? "…" : money(totals.income)}</div>
@@ -181,6 +217,46 @@ export default function FinanzasPage() {
             {loading ? "…" : money(totals.balance)}
           </div>
         </div>
+        <div className="card">
+          <div className="text-xs uppercase tracking-wide text-muted">Abonos a cobrar</div>
+          <div className="mt-1 text-3xl font-bold text-warn">{loading ? "…" : money(abonosACobrar.sum)}</div>
+          <div className="mt-1 text-xs text-ink-2">{abonosACobrar.count} socio(s) con cuota vencida</div>
+        </div>
+      </div>
+
+      {/* Cobros por medio de pago (mes) */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="card">
+          <div className="text-xs uppercase tracking-wide text-muted">💵 Efectivo</div>
+          <div className="mt-1 text-2xl font-bold">{loading ? "…" : money(byMethod.efectivo)}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs uppercase tracking-wide text-muted">🏦 Transferencia</div>
+          <div className="mt-1 text-2xl font-bold">{loading ? "…" : money(byMethod.transferencia)}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs uppercase tracking-wide text-muted">💳 Terminal (POS)</div>
+          <div className="mt-1 text-2xl font-bold">{loading ? "…" : money(byMethod.terminal)}</div>
+        </div>
+      </div>
+
+      {/* Ingresos / egresos de un día puntual (con selector de fecha) */}
+      <div className="mt-4 card">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-semibold">Ingresos y egresos del día</div>
+          <input className="input max-w-[180px]" type="date" value={dayDate} onChange={(e) => setDayDate(e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+            <div className="text-xs uppercase tracking-wide text-muted">Ingresos del día</div>
+            <div className="mt-1 text-2xl font-bold text-good">{loading ? "…" : money(dayTotals.income)}</div>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+            <div className="text-xs uppercase tracking-wide text-muted">Egresos del día</div>
+            <div className="mt-1 text-2xl font-bold text-crit">{loading ? "…" : money(dayTotals.expense)}</div>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-muted">Elegí otra fecha (del mes que estás viendo) para controlar días anteriores.</p>
       </div>
 
       <div className="mt-6 card p-0">
@@ -269,7 +345,7 @@ export default function FinanzasPage() {
               <div>
                 <label className="mb-1 block text-xs text-ink-2">Medio de pago</label>
                 <select className="input" value={form.method} onChange={(e) => setF("method", e.target.value)}>
-                  {PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  {COBRO_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
             </div>

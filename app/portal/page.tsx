@@ -228,6 +228,7 @@ export default function PortalPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-6">
+      <div className="aurora" aria-hidden="true" />
       <header className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {gym?.logo_url ? (
@@ -246,8 +247,6 @@ export default function PortalPage() {
         <button className="text-sm text-ink-2 hover:text-crit" onClick={logout}>Salir</button>
       </header>
 
-      <InstallAppButton />
-
       {/* Tabs */}
       <div className={`mb-5 grid gap-1 rounded-xl border border-white/10 bg-surface-2 p-1 ${isElite ? "grid-cols-4" : "grid-cols-3"}`}>
         {BASE_TABS.filter((t) => t.key !== "dieta" || isElite).map((t) => (
@@ -263,35 +262,7 @@ export default function PortalPage() {
 
       {tab === "perfil" && (
         <div className="flex flex-col gap-4">
-          {/* Card 1: mis datos */}
-          <div className="card">
-            <div className="text-xs uppercase tracking-wide text-muted">Mis datos</div>
-            <div className="mt-2 grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs text-muted">Peso actual</div>
-                <div className="text-xl font-bold">{lastWeight ? `${lastWeight.weight_kg} kg` : "—"}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted">Altura</div>
-                <div className="text-xl font-bold">{member!.height_cm ? `${member!.height_cm} cm` : "—"}</div>
-              </div>
-            </div>
-            <Link href="/portal/peso" className="btn btn-ghost mt-4 w-full text-center">
-              {lastWeight ? "Ver evolución de peso →" : "Cargar mi peso inicial →"}
-            </Link>
-          </div>
-
-          {/* Card entrenamiento: iniciar rutina + progreso */}
-          <div className="card">
-            <div className="text-xs uppercase tracking-wide text-muted">Entrenamiento</div>
-            <p className="mt-1 text-sm text-ink-2">Marcá los ejercicios a medida que los hacés y mirá tu progreso.</p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <Link href="/portal/entrenar" className="btn btn-primary flex-1 text-center">▶ Iniciar rutina</Link>
-              <Link href="/portal/progreso" className="btn btn-ghost flex-1 text-center">Ver mi progreso →</Link>
-            </div>
-          </div>
-
-          {/* Card 2: estado de cuenta */}
+          {/* Card 1: estado de cuenta */}
           <div className="card">
             <div className="flex items-start justify-between">
               <div>
@@ -320,7 +291,35 @@ export default function PortalPage() {
             )}
           </div>
 
-          {/* Card 3: QR de acceso */}
+          {/* Card 2: mis datos */}
+          <div className="card">
+            <div className="text-xs uppercase tracking-wide text-muted">Mis datos</div>
+            <div className="mt-2 grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-muted">Peso actual</div>
+                <div className="text-xl font-bold">{lastWeight ? `${lastWeight.weight_kg} kg` : "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted">Altura</div>
+                <div className="text-xl font-bold">{member!.height_cm ? `${member!.height_cm} cm` : "—"}</div>
+              </div>
+            </div>
+            <Link href="/portal/peso" className="btn btn-ghost mt-4 w-full text-center">
+              {lastWeight ? "Ver evolución de peso →" : "Cargar mi peso inicial →"}
+            </Link>
+          </div>
+
+          {/* Card 3: ver mi progreso (entrenamiento) */}
+          <div className="card">
+            <div className="text-xs uppercase tracking-wide text-muted">Entrenamiento</div>
+            <p className="mt-1 text-sm text-ink-2">Marcá los ejercicios a medida que los hacés y mirá cómo venís con el entrenamiento y la dieta.</p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Link href="/portal/entrenar" className="btn btn-primary flex-1 text-center">▶ Iniciar rutina</Link>
+              <Link href="/portal/progreso" className="btn btn-ghost flex-1 text-center">Ver mi progreso →</Link>
+            </div>
+          </div>
+
+          {/* Card 4: QR de acceso */}
           <div className="card text-center">
             <div className="mb-3 text-xs uppercase tracking-wide text-muted">Código QR de acceso</div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -328,11 +327,25 @@ export default function PortalPage() {
             <div className="mt-2 text-xs text-muted">DNI: {member!.dni || "—"}</div>
             <div className="mt-1 text-xs text-ink-2">Presentá este código en recepción</div>
           </div>
+
+          {/* Al final de "Mi perfil": recomendación de bajar la webapp */}
+          <InstallAppButton />
         </div>
       )}
 
       {tab === "rutina" && (
-        <div className="card p-0">
+        <div className="flex flex-col gap-4">
+          {/* Tarjeta de entrenamiento arriba del detalle de la rutina */}
+          <div className="card">
+            <div className="text-xs uppercase tracking-wide text-muted">Entrenamiento</div>
+            <p className="mt-1 text-sm text-ink-2">Marcá los ejercicios a medida que los hacés y mirá tu progreso.</p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Link href="/portal/entrenar" className="btn btn-primary flex-1 text-center">▶ Iniciar rutina</Link>
+              <Link href="/portal/progreso" className="btn btn-ghost flex-1 text-center">Ver mi progreso →</Link>
+            </div>
+          </div>
+
+          <div className="card p-0">
           <div className="border-b border-white/10 p-4">
             <h2 className="font-semibold">Mi rutina{routine?.name ? ` · ${routine.name}` : ""}</h2>
           </div>
@@ -369,6 +382,7 @@ export default function PortalPage() {
               ))}
             </div>
           )}
+          </div>
         </div>
       )}
 
