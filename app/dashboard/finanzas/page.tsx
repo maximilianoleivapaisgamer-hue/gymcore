@@ -49,14 +49,20 @@ export default function FinanzasPage() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
   async function load(y: number, m: number) {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data: profile } = await supabase
-      .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
+      .from("profiles").select("gym_id, role").eq("id", user.id).single<{ gym_id: string; role: string }>();
     setGymId(profile?.gym_id ?? null);
+    if (profile?.role === "empleado" && profile.gym_id) {
+      const { data: g } = await supabase.from("gyms").select("employees_see_finance")
+        .eq("id", profile.gym_id).maybeSingle<{ employees_see_finance: boolean }>();
+      if (!g?.employees_see_finance) { setBlocked(true); setLoading(false); return; }
+    }
     const [{ data: ent }, { data: mem }] = await Promise.all([
       supabase.from("cashflow_entries").select("id, concept, type, amount, method, date")
         .gte("date", monthStart(y, m)).lt("date", nextMonthStart(y, m))
@@ -123,6 +129,17 @@ export default function FinanzasPage() {
   function openNew(type: "income" | "expense") {
     setForm({ ...emptyForm(), type });
     setModal(true);
+  }
+
+  if (blocked) {
+    return (
+      <main className="mx-auto max-w-2xl px-6 py-16 text-center">
+        <div className="mb-2 text-4xl">🔒</div>
+        <h1 className="text-2xl font-bold">Sin acceso a Finanzas</h1>
+        <p className="mt-2 text-ink-2">El dueño del gimnasio no habilitó a los empleados para ver este módulo.</p>
+        <Link href="/dashboard" className="btn btn-primary mt-5 inline-block">Volver al panel</Link>
+      </main>
+    );
   }
 
   return (
