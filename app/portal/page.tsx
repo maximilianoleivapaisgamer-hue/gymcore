@@ -5,54 +5,91 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 
 interface Member {
-  id: string; gym_id: string; full_name: string;
+  id: string; gym_id: string; full_name: string; dni: string | null;
   plan_name: string | null; plan_price: number | null; membership_expiry: string | null;
+  height_cm: number | null;
 }
 interface RExercise { day_number: number; block_name: string | null; position: number; sets: string | null; reps: string | null; notes: string | null; exercises: { name: string } | null; }
 interface Routine { id: string; name: string | null; routine_exercises: RExercise[]; }
-interface Booking { id: string; class_date: string; classes: { name: string; start_time: string | null; instructor: string | null } | null; }
+interface MyBooking { id: string; class_id: string; class_date: string; classes: { name: string; start_time: string | null; instructor: string | null } | null; }
+interface Klass { id: string; name: string; instructor: string | null; weekdays: string[]; start_time: string | null; duration: number | null; capacity: number | null; color: string | null; }
+interface BookingLite { id: string; class_id: string; member_id: string; class_date: string; }
+interface WeightLog { date: string; weight_kg: number; }
 
+const DAYS = [
+  { code: "lun", label: "Lun", js: 1 }, { code: "mar", label: "Mar", js: 2 }, { code: "mie", label: "Mié", js: 3 },
+  { code: "jue", label: "Jue", js: 4 }, { code: "vie", label: "Vie", js: 5 }, { code: "sab", label: "Sáb", js: 6 },
+  { code: "dom", label: "Dom", js: 0 },
+];
+
+function pad(n: number) { return String(n).padStart(2, "0"); }
+function iso(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function todayIso() { return iso(new Date()); }
+function nextOccurrence(weekdays: string[]): string | null {
+  if (!weekdays || weekdays.length === 0) return null;
+  const jsDays = weekdays.map((c) => DAYS.find((d) => d.code === c)?.js).filter((x) => x !== undefined) as number[];
+  const today = new Date();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+    if (jsDays.includes(d.getDay())) return iso(d);
+  }
+  return null;
+}
 function daysLeft(expiry: string | null): number | null {
   if (!expiry) return null;
   return Math.ceil((new Date(expiry + "T00:00:00").getTime() - Date.now()) / 86400000);
 }
 const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 const fmtTime = (t: string | null) => (t ? t.slice(0, 5) : "");
+const TABS = [
+  { key: "perfil", label: "Mi perfil" },
+  { key: "rutina", label: "Rutina" },
+  { key: "clases", label: "Clases" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
 
 export default function PortalPage() {
   const supabase = createClient();
+  const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null } | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
+  const [classes, setClasses] = useState<Klass[]>([]);
+  const [allBookings, setAllBookings] = useState<BookingLite[]>([]);
+  const [lastWeight, setLastWeight] = useState<WeightLog | null>(null);
+  const [busyClassKey, setBusyClassKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = "/acceso"; return; }
-      const { data: m } = await supabase
-        .from("members").select("id, gym_id, full_name, plan_name, plan_price, membership_expiry")
-        .eq("linked_user_id", user.id).maybeSingle<Member>();
-      if (!m) { setState("nomember"); return; }
-      setMember(m);
+  async function load() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { window.location.href = "/acceso"; return; }
+    const { data: m } = await supabase
+      .from("members").select("id, gym_id, full_name, dni, plan_name, plan_price, membership_expiry, height_cm")
+      .eq("linked_user_id", user.id).maybeSingle<Member>();
+    if (!m) { setState("nomember"); return; }
+    setMember(m);
 
-      const today = new Date();
-      const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-      const [{ data: g }, { data: r }, { data: b }] = await Promise.all([
-        supabase.from("gyms").select("name, logo_url").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null }>(),
-        supabase.from("routines").select("id, name, routine_exercises(day_number, block_name, position, sets, reps, notes, exercises(name))")
-          .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
-        supabase.from("bookings").select("id, class_date, classes(name, start_time, instructor)")
-          .eq("member_id", m.id).gte("class_date", iso).order("class_date"),
-      ]);
-      setGym(g ?? null);
-      setRoutine((r as Routine) ?? null);
-      setBookings((b as Booking[]) || []);
-      setState("ok");
-    })();
-    /* eslint-disable-next-line */
-  }, []);
+    const iso0 = todayIso();
+    const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }] = await Promise.all([
+      supabase.from("gyms").select("name, logo_url, whatsapp").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null }>(),
+      supabase.from("routines").select("id, name, routine_exercises(day_number, block_name, position, sets, reps, notes, exercises(name))")
+        .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
+      supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
+        .eq("member_id", m.id).gte("class_date", iso0).order("class_date"),
+      supabase.from("classes").select("*").order("start_time"),
+      supabase.from("bookings").select("id, class_id, member_id, class_date").gte("class_date", iso0),
+      supabase.from("weight_logs").select("date, weight_kg").eq("member_id", m.id).order("date", { ascending: false }).limit(1),
+    ]);
+    setGym(g ?? null);
+    setRoutine((r as Routine) ?? null);
+    setMyBookings((mb as MyBooking[]) || []);
+    setClasses((cl as Klass[]) || []);
+    setAllBookings((ab as BookingLite[]) || []);
+    setLastWeight(((wl as WeightLog[]) || [])[0] ?? null);
+    setState("ok");
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   async function logout() {
     await supabase.auth.signOut();
@@ -69,6 +106,26 @@ export default function PortalPage() {
       label: by[d][0]?.block_name || `Día ${d}`, rows: by[d],
     }));
   }, [routine]);
+
+  async function reservar(c: Klass, date: string) {
+    if (!member) return;
+    setBusyClassKey(c.id + date);
+    const { data, error } = await supabase.from("bookings")
+      .insert({ gym_id: member.gym_id, class_id: c.id, member_id: member.id, class_date: date })
+      .select("id, class_id, member_id, class_date").single<BookingLite>();
+    if (!error && data) {
+      setAllBookings((bs) => [...bs, data]);
+      setMyBookings((mb) => [...mb, { id: data.id, class_id: c.id, class_date: date, classes: { name: c.name, start_time: c.start_time, instructor: c.instructor } }]);
+    }
+    setBusyClassKey(null);
+  }
+  async function cancelar(bookingId: string) {
+    setBusyClassKey(bookingId);
+    await supabase.from("bookings").delete().eq("id", bookingId);
+    setAllBookings((bs) => bs.filter((b) => b.id !== bookingId));
+    setMyBookings((mb) => mb.filter((b) => b.id !== bookingId));
+    setBusyClassKey(null);
+  }
 
   if (state === "loading") return <main className="grid min-h-screen place-items-center text-ink-2">Cargando…</main>;
 
@@ -87,14 +144,23 @@ export default function PortalPage() {
 
   const d = daysLeft(member!.membership_expiry);
   const memb = d === null
-    ? { label: "Sin membresía activa", cls: "text-ink-2" }
-    : d < 0 ? { label: `Venció hace ${Math.abs(d)} días`, cls: "text-crit" }
-    : d <= 7 ? { label: `Vence en ${d} días`, cls: "text-warn" }
-    : { label: "Membresía activa", cls: "text-good" };
+    ? { label: "Sin membresía activa", cls: "text-ink-2", chip: "bg-white/5 text-muted" }
+    : d < 0 ? { label: `Venció hace ${Math.abs(d)} días`, cls: "text-crit", chip: "bg-[rgba(240,82,82,.14)] text-crit" }
+    : d <= 7 ? { label: `Vence en ${d} días`, cls: "text-warn", chip: "bg-[rgba(245,177,61,.14)] text-warn" }
+    : { label: "Activo", cls: "text-good", chip: "bg-[rgba(34,197,94,.14)] text-good" };
+
+  const waHref = gym?.whatsapp
+    ? `https://wa.me/${gym.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
+        `Hola! Quiero abonar mi cuota${member!.plan_name ? ` del plan ${member!.plan_name}` : ""}.`
+      )}`
+    : null;
+
+  const qrText = `SOCIO: ${member!.full_name} | DNI: ${member!.dni || "-"} | ${gym?.name || "GymCore"}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(qrText)}`;
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-6">
-      <header className="mb-6 flex items-center justify-between">
+      <header className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {gym?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -112,80 +178,193 @@ export default function PortalPage() {
         <button className="text-sm text-ink-2 hover:text-crit" onClick={logout}>Salir</button>
       </header>
 
-      {/* Membresía */}
-      <div className="card mb-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted">Mi membresía</div>
-            <div className="mt-1 text-lg font-bold">{member!.plan_name || "Sin plan asignado"}</div>
-            {member!.plan_price != null && <div className="text-sm text-ink-2">{money(member!.plan_price)} / mes</div>}
+      {/* Tabs */}
+      <div className="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-surface-2 p-1">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`rounded-lg py-2 text-sm font-semibold transition ${tab === t.key ? "bg-brand text-black" : "text-ink-2 hover:text-ink"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "perfil" && (
+        <div className="flex flex-col gap-4">
+          {/* Card 1: mis datos */}
+          <div className="card">
+            <div className="text-xs uppercase tracking-wide text-muted">Mis datos</div>
+            <div className="mt-2 grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-muted">Peso actual</div>
+                <div className="text-xl font-bold">{lastWeight ? `${lastWeight.weight_kg} kg` : "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted">Altura</div>
+                <div className="text-xl font-bold">{member!.height_cm ? `${member!.height_cm} cm` : "—"}</div>
+              </div>
+            </div>
+            <Link href="/portal/peso" className="btn btn-ghost mt-4 w-full text-center">
+              {lastWeight ? "Ver evolución de peso →" : "Cargar mi peso inicial →"}
+            </Link>
           </div>
-          <div className="text-right">
-            <div className={`font-semibold ${memb.cls}`}>{memb.label}</div>
+
+          {/* Card 2: estado de cuenta */}
+          <div className="card">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted">Estado de cuenta</div>
+                <div className="mt-1 text-lg font-bold">{member!.plan_name || "Sin plan asignado"}</div>
+                {member!.plan_price != null && <div className="text-sm text-ink-2">{money(member!.plan_price)} / mes</div>}
+              </div>
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${memb.chip}`}>{memb.label}</span>
+            </div>
             {member!.membership_expiry && (
-              <div className="text-xs text-muted">
+              <div className="mt-1 text-xs text-muted">
                 Vence el {new Date(member!.membership_expiry + "T00:00:00").toLocaleDateString("es-AR")}
               </div>
             )}
+            {waHref ? (
+              <a href={waHref} target="_blank" rel="noreferrer" className="btn btn-primary mt-4 w-full text-center">
+                Pagar abono mensual
+              </a>
+            ) : (
+              <button
+                className="btn btn-primary mt-4 w-full"
+                onClick={() => alert("Todavía no hay un medio de pago online conectado. Contactá a tu gimnasio para abonar.")}
+              >
+                Pagar abono mensual
+              </button>
+            )}
+          </div>
+
+          {/* Card 3: QR de acceso */}
+          <div className="card text-center">
+            <div className="mb-3 text-xs uppercase tracking-wide text-muted">Código QR de acceso</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qrUrl} alt="Código QR de acceso" className="mx-auto h-[180px] w-[180px] rounded-lg border-4 border-brand bg-white p-1" />
+            <div className="mt-2 text-xs text-muted">DNI: {member!.dni || "—"}</div>
+            <div className="mt-1 text-xs text-ink-2">Presentá este código en recepción</div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Rutina */}
-      <div className="card mb-4 p-0">
-        <div className="border-b border-white/10 p-4">
-          <h2 className="font-semibold">Mi rutina{routine?.name ? ` · ${routine.name}` : ""}</h2>
+      {tab === "rutina" && (
+        <div className="card p-0">
+          <div className="border-b border-white/10 p-4">
+            <h2 className="font-semibold">Mi rutina{routine?.name ? ` · ${routine.name}` : ""}</h2>
+          </div>
+          {days.length === 0 ? (
+            <p className="p-6 text-center text-sm text-ink-2">Tu gimnasio todavía no te asignó una rutina.</p>
+          ) : (
+            <div className="flex flex-col gap-4 p-4">
+              {days.map((day, i) => (
+                <div key={i}>
+                  <div className="mb-2 text-sm font-semibold text-brand">{day.label}</div>
+                  <div className="overflow-hidden rounded-lg border border-white/10">
+                    {day.rows.map((re, j) => (
+                      <div key={j} className="flex items-center justify-between border-b border-white/5 px-3 py-2 last:border-0">
+                        <div>
+                          <div className="text-sm">{re.exercises?.name || "Ejercicio"}</div>
+                          {re.notes && <div className="text-xs text-muted">{re.notes}</div>}
+                        </div>
+                        <div className="text-sm text-ink-2">
+                          {re.sets || "-"} × {re.reps || "-"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        {days.length === 0 ? (
-          <p className="p-6 text-center text-sm text-ink-2">Tu gimnasio todavía no te asignó una rutina.</p>
-        ) : (
-          <div className="flex flex-col gap-4 p-4">
-            {days.map((day, i) => (
-              <div key={i}>
-                <div className="mb-2 text-sm font-semibold text-brand">{day.label}</div>
-                <div className="overflow-hidden rounded-lg border border-white/10">
-                  {day.rows.map((re, j) => (
-                    <div key={j} className="flex items-center justify-between border-b border-white/5 px-3 py-2 last:border-0">
-                      <div>
-                        <div className="text-sm">{re.exercises?.name || "Ejercicio"}</div>
-                        {re.notes && <div className="text-xs text-muted">{re.notes}</div>}
-                      </div>
-                      <div className="text-sm text-ink-2">
-                        {re.sets || "-"} × {re.reps || "-"}
-                      </div>
+      )}
+
+      {tab === "clases" && (
+        <div className="flex flex-col gap-4">
+          <div className="card p-0">
+            <div className="border-b border-white/10 p-4">
+              <h2 className="font-semibold">Mis próximas clases</h2>
+            </div>
+            {myBookings.length === 0 ? (
+              <p className="p-6 text-center text-sm text-ink-2">No tenés clases reservadas.</p>
+            ) : (
+              <ul className="divide-y divide-white/5">
+                {myBookings.map((b) => (
+                  <li key={b.id} className="flex items-center justify-between px-4 py-3">
+                    <div>
+                      <div className="text-sm font-medium">{b.classes?.name || "Clase"}</div>
+                      {b.classes?.instructor && <div className="text-xs text-muted">{b.classes.instructor}</div>}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    <div className="flex items-center gap-3">
+                      <div className="text-right text-sm text-ink-2">
+                        <div>{new Date(b.class_date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
+                        {b.classes?.start_time && <div className="text-xs text-muted">{fmtTime(b.classes.start_time)}</div>}
+                      </div>
+                      <button
+                        className="text-xs text-ink-2 hover:text-crit"
+                        disabled={busyClassKey === b.id}
+                        onClick={() => cancelar(b.id)}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Próximas clases */}
-      <div className="card p-0">
-        <div className="border-b border-white/10 p-4">
-          <h2 className="font-semibold">Mis próximas clases</h2>
+          <div className="card p-0">
+            <div className="border-b border-white/10 p-4">
+              <h2 className="font-semibold">Todas las clases</h2>
+              <p className="text-xs text-muted">Tocá "Reservar" para anotarte a la próxima fecha.</p>
+            </div>
+            {classes.length === 0 ? (
+              <p className="p-6 text-center text-sm text-ink-2">Tu gimnasio todavía no cargó clases.</p>
+            ) : (
+              <ul className="divide-y divide-white/5">
+                {classes.map((c) => {
+                  const date = nextOccurrence(c.weekdays);
+                  if (!date) return null;
+                  const occupied = allBookings.filter((b) => b.class_id === c.id && b.class_date === date).length;
+                  const mine = allBookings.find((b) => b.class_id === c.id && b.class_date === date && b.member_id === member!.id);
+                  const full = c.capacity != null && occupied >= c.capacity;
+                  const key = c.id + date;
+                  return (
+                    <li key={key} className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color || "#22d3ee" }} />
+                        <div>
+                          <div className="text-sm font-medium">{c.name}</div>
+                          <div className="text-xs text-muted">
+                            {new Date(date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
+                            {c.start_time ? ` · ${fmtTime(c.start_time)}` : ""}
+                            {c.instructor ? ` · ${c.instructor}` : ""}
+                          </div>
+                          <div className="text-xs text-muted">{occupied}{c.capacity != null ? ` / ${c.capacity}` : ""} anotados</div>
+                        </div>
+                      </div>
+                      {mine ? (
+                        <button className="btn btn-ghost text-xs" disabled={busyClassKey === mine.id} onClick={() => cancelar(mine.id)}>
+                          Cancelar
+                        </button>
+                      ) : (
+                        <button className="btn btn-primary text-xs" disabled={full || busyClassKey === key} onClick={() => reservar(c, date)}>
+                          {full ? "Cupo lleno" : "Reservar"}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
-        {bookings.length === 0 ? (
-          <p className="p-6 text-center text-sm text-ink-2">No tenés clases reservadas.</p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {bookings.map((b) => (
-              <li key={b.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <div className="text-sm font-medium">{b.classes?.name || "Clase"}</div>
-                  {b.classes?.instructor && <div className="text-xs text-muted">{b.classes.instructor}</div>}
-                </div>
-                <div className="text-right text-sm text-ink-2">
-                  <div>{new Date(b.class_date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
-                  {b.classes?.start_time && <div className="text-xs text-muted">{fmtTime(b.classes.start_time)}</div>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      )}
 
       <p className="mt-6 text-center text-xs text-muted">GymCore · <Link href="/acceso" className="hover:text-brand">Cerrar sesión</Link></p>
     </main>
