@@ -20,10 +20,14 @@ const NAV: NavItem[] = [
   { href: "/dashboard/dietas", label: "Dietas", icon: "🥗", elite: true },
   { href: "/dashboard/finanzas", label: "Finanzas", icon: "◆" },
   { href: "/dashboard/clases", label: "Clases", icon: "◑" },
+  { href: "/dashboard/equipo", label: "Equipo", icon: "🧑‍🤝‍🧑" },
   { href: "/dashboard/planes", label: "Planes", icon: "💳" },
   { href: "/dashboard/configuracion", label: "Mi página", icon: "❖" },
   { href: "/dashboard/mi-plan", label: "Mi plan", icon: "★" },
 ];
+/** Ítems que un empleado (rol "empleado") no debería ver, salvo Finanzas que
+ * depende del flag employees_see_finance del gimnasio (se filtra aparte). */
+const OWNER_ONLY_HREFS = ["/dashboard/planes", "/dashboard/configuracion", "/dashboard/mi-plan"];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -33,6 +37,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [email, setEmail] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [isElite, setIsElite] = useState(false);
+  const [role, setRole] = useState<string>("owner");
+  const [seeFinance, setSeeFinance] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -40,20 +46,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!user) return;
       setEmail(user.email || "");
       const { data: profile } = await supabase
-        .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
+        .from("profiles").select("gym_id, role").eq("id", user.id).single<{ gym_id: string; role: string }>();
+      setRole(profile?.role || "owner");
       if (profile?.gym_id) {
         const [{ data: g }, { data: sub }] = await Promise.all([
-          supabase.from("gyms").select("name, logo_url").eq("id", profile.gym_id)
-            .single<{ name: string; logo_url: string | null }>(),
+          supabase.from("gyms").select("name, logo_url, employees_see_finance").eq("id", profile.gym_id)
+            .single<{ name: string; logo_url: string | null; employees_see_finance: boolean }>(),
           supabase.from("subscriptions").select("plan").eq("gym_id", profile.gym_id)
             .maybeSingle<{ plan: string }>(),
         ]);
         setGym(g ?? null);
         setIsElite(sub?.plan === "elite");
+        setSeeFinance(profile.role !== "empleado" || !!g?.employees_see_finance);
       }
     })();
     /* eslint-disable-next-line */
   }, []);
+
+  const visibleNav = NAV.filter((item) => {
+    if (role === "empleado") {
+      if (OWNER_ONLY_HREFS.includes(item.href)) return false;
+      if (item.href === "/dashboard/finanzas" && !seeFinance) return false;
+    }
+    return true;
+  });
 
   async function logout() {
     await supabase.auth.signOut();
@@ -87,7 +103,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
-          {NAV.map((item) =>
+          {visibleNav.map((item) =>
             item.soon ? (
               <div
                 key={item.href}
