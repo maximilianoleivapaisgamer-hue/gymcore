@@ -10,12 +10,14 @@ interface NavItem {
   label: string;
   icon: string;
   soon?: boolean;
+  elite?: boolean;
 }
 
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Panel", icon: "▚" },
   { href: "/dashboard/socios", label: "Socios", icon: "◉" },
   { href: "/dashboard/rutinas", label: "Rutinas", icon: "◈" },
+  { href: "/dashboard/dietas", label: "Dietas", icon: "🥗", elite: true },
   { href: "/dashboard/finanzas", label: "Finanzas", icon: "◆" },
   { href: "/dashboard/clases", label: "Clases", icon: "◑" },
   { href: "/dashboard/planes", label: "Planes", icon: "💳" },
@@ -30,6 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [gym, setGym] = useState<{ name: string; logo_url: string | null } | null>(null);
   const [email, setEmail] = useState<string>("");
   const [open, setOpen] = useState(false);
+  const [isElite, setIsElite] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -39,10 +42,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const { data: profile } = await supabase
         .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
       if (profile?.gym_id) {
-        const { data: g } = await supabase
-          .from("gyms").select("name, logo_url").eq("id", profile.gym_id)
-          .single<{ name: string; logo_url: string | null }>();
+        const [{ data: g }, { data: sub }] = await Promise.all([
+          supabase.from("gyms").select("name, logo_url").eq("id", profile.gym_id)
+            .single<{ name: string; logo_url: string | null }>(),
+          supabase.from("subscriptions").select("plan").eq("gym_id", profile.gym_id)
+            .maybeSingle<{ plan: string }>(),
+        ]);
         setGym(g ?? null);
+        setIsElite(sub?.plan === "elite");
       }
     })();
     /* eslint-disable-next-line */
@@ -105,7 +112,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }`}
               >
                 <span className={`text-base ${isActive(item.href) ? "text-brand" : ""}`}>{item.icon}</span>
-                <span>{item.label}</span>
+                <span className="flex-1">{item.label}</span>
+                {item.elite && !isElite && (
+                  <span className="rounded-full bg-[rgba(245,177,61,.14)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#f5b13d]">
+                    Elite
+                  </span>
+                )}
               </Link>
             )
           )}
