@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { PAY_METHODS, type PayMethod } from "@/types/db";
+import { PAY_METHODS, type PayMethod, type RealPlan } from "@/types/db";
 
 interface Member {
-  id: string; full_name: string; dni: string | null; email: string | null; whatsapp: string | null;
+  id: string; gym_id: string; member_number: number | null;
+  full_name: string; dni: string | null; email: string | null; whatsapp: string | null;
   plan_name: string | null; plan_price: number | null; membership_expiry: string | null;
   observacion: string | null; reminder_whatsapp: boolean; reminder_email: boolean;
+  height_cm: number | null; created_at: string;
 }
 interface Payment { id: string; date: string; concept: string | null; amount: number; method: PayMethod | null; plan_name: string | null; }
 interface Routine { id: string; name: string | null; is_template: boolean; created_at: string; }
+interface Diet { id: string; name: string | null; is_template: boolean; created_at: string; }
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 const methodLabel = (m: string | null) => PAY_METHODS.find((x) => x.value === m)?.label || "—";
@@ -32,24 +35,81 @@ export default function SocioDetallePage() {
   const [member, setMember] = useState<Member | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
+  const [diets, setDiets] = useState<Diet[]>([]);
+  const [isElite, setIsElite] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [gymPlans, setGymPlans] = useState<RealPlan[]>([]);
 
-  useEffect(() => {
-    (async () => {
-      const [{ data: m }, { data: pays }, { data: rout }] = await Promise.all([
-        supabase.from("members").select("*").eq("id", id).single<Member>(),
-        supabase.from("cashflow_entries").select("id, date, concept, amount, method, plan_name")
-          .eq("member_id", id).order("date", { ascending: false }),
-        supabase.from("routines").select("id, name, is_template, created_at")
-          .eq("member_id", id).order("created_at", { ascending: false }),
+  // Cambio de plan
+  const [planModal, setPlanModal] = useState(false);
+  const [newPlanName, setNewPlanName] = useState("");
+  const [newPlanPrice, setNewPlanPrice] = useState("");
+  const [planMethod, setPlanMethod] = useState<PayMethod>("efectivo");
+  const [savingPlan, setSavingPlan] = useState(false);
+
+  async function load() {
+    const [{ data: m }, { data: pays }, { data: rout }, { data: diet }] = await Promise.all([
+      supabase.from("members").select("*").eq("id", id).single<Member>(),
+      supabase.from("cashflow_entries").select("id, date, concept, amount, method, plan_name")
+        .eq("member_id", id).order("date", { ascending: false }),
+      supabase.from("routines").select("id, name, is_template, created_at")
+        .eq("member_id", id).order("created_at", { ascending: false }),
+      supabase.from("diets").select("id, name, is_template, created_at")
+        .eq("member_id", id).order("created_at", { ascending: false }),
+    ]);
+    setMember(m ?? null);
+    setPayments((pays as Payment[]) || []);
+    setRoutines((rout as Routine[]) || []);
+    setDiets((diet as Diet[]) || []);
+    if (m?.gym_id) {
+      const [{ data: sub }, { data: gym }] = await Promise.all([
+        supabase.from("subscriptions").select("plan").eq("gym_id", m.gym_id).maybeSingle<{ plan: string }>(),
+        supabase.from("gyms").select("real_plans").eq("id", m.gym_id).maybeSingle<{ real_plans: RealPlan[] }>(),
       ]);
-      setMember(m ?? null);
-      setPayments((pays as Payment[]) || []);
-      setRoutines((rout as Routine[]) || []);
-      setLoading(false);
-    })();
-    /* eslint-disable-next-line */
-  }, [id]);
+      setIsElite(sub?.plan === "elite");
+      setGymPlans(gym?.real_plans || []);
+    }
+    setLoading(false);
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  function openPlanModal() {
+    if (!member) return;
+    setNewPlanName(member.plan_name || "");
+    setNewPlanPrice(member.plan_price != null ? String(member.plan_price) : "");
+    setPlanMethod("efectivo");
+    setPlanModal(true);
+  }
+  function selectNewPlan(name: string) {
+    const p = gymPlans.find((x) => x.name === name);
+    setNewPlanName(name);
+    if (p) setNewPlanPrice(String(p.price));
+  }
+  const priceDiff = newPlanPrice && member?.plan_price != null
+    ? Number(newPlanPrice) - Number(member.plan_price)
+    : newPlanPrice ? Number(newPlanPrice) : 0;
+
+  async function confirmPlanChange() {
+    if (!member || !newPlanName) return;
+    setSavingPlan(true);
+    const price = newPlanPrice ? Number(newPlanPrice) : null;
+    await supabase.from("members").update({ plan_name: newPlanName, plan_price: price }).eq("id", member.id);
+    if (priceDiff > 0) {
+      await supabase.from("cashflow_entries").insert({
+        gym_id: member.gym_id,
+        member_id: member.id,
+        type: "income",
+        amount: priceDiff,
+        method: planMethod,
+        plan_name: newPlanName,
+        concept: `Cambio de plan (diferencia): ${member.plan_name || "sin plan"} → ${newPlanName} · ${member.full_name}`,
+        date: new Date().toISOString().slice(0, 10),
+      });
+    }
+    setSavingPlan(false);
+    setPlanModal(false);
+    load();
+  }
 
   if (loading) return <main className="p-8 text-center text-ink-2">Cargando…</main>;
   if (!member) return (
@@ -71,7 +131,10 @@ export default function SocioDetallePage() {
           <Link href="/dashboard/socios" className="hover:text-brand">Socios</Link>
           <span>/</span><span>{member.full_name}</span>
         </div>
-        <h1 className="text-2xl font-bold">{member.full_name}</h1>
+        <h1 className="text-2xl font-bold">
+          {member.full_name}
+          {member.member_number != null && <span className="ml-2 text-base font-normal text-muted">N° {member.member_number}</span>}
+        </h1>
       </div>
 
       {/* DATOS DEL SOCIO */}
@@ -96,6 +159,14 @@ export default function SocioDetallePage() {
               <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}>{st.label}</span>
             </div>
           </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted">Altura</div>
+            <div className="mt-0.5">{member.height_cm ? `${member.height_cm} cm` : "—"}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted">Fecha de alta</div>
+            <div className="mt-0.5">{member.created_at ? new Date(member.created_at).toLocaleDateString("es-AR") : "—"}</div>
+          </div>
           {member.observacion && (
             <div className="sm:col-span-2">
               <div className="text-xs uppercase tracking-wide text-muted">Observación</div>
@@ -107,8 +178,9 @@ export default function SocioDetallePage() {
             {!member.reminder_whatsapp && !member.reminder_email && "Desactivados"}
           </div>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/dashboard/socios" className="btn btn-ghost text-sm">✏️ Editar en Socios</Link>
+          <button className="btn btn-ghost text-sm" onClick={openPlanModal}>🔄 Cambiar plan</button>
         </div>
       </div>
 
@@ -147,7 +219,7 @@ export default function SocioDetallePage() {
       </div>
 
       {/* RUTINAS ASIGNADAS */}
-      <div className="card p-0">
+      <div className="card mb-6 p-0">
         <div className="border-b border-white/10 p-4 text-sm font-semibold">Rutinas asignadas</div>
         {routines.length === 0 ? (
           <p className="p-8 text-center text-ink-2">
@@ -165,6 +237,79 @@ export default function SocioDetallePage() {
           </ul>
         )}
       </div>
+
+      {/* DIETA ASIGNADA (solo plan Elite) */}
+      {isElite && (
+        <div className="card p-0">
+          <div className="border-b border-white/10 p-4 text-sm font-semibold">Dieta asignada</div>
+          {diets.length === 0 ? (
+            <p className="p-8 text-center text-ink-2">
+              Este socio todavía no tiene una dieta asignada. Andá a{" "}
+              <Link href="/dashboard/dietas" className="text-brand">Dietas</Link> para aplicarle una plantilla.
+            </p>
+          ) : (
+            <ul className="divide-y divide-white/10">
+              {diets.map((d) => (
+                <li key={d.id} className="flex items-center justify-between px-4 py-3">
+                  <span>{d.name || "Dieta sin nombre"}</span>
+                  <Link href="/dashboard/dietas" className="text-sm text-brand hover:underline">Ver / editar →</Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* MODAL: CAMBIAR PLAN */}
+      {planModal && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setPlanModal(false)}>
+          <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-lg font-bold">Cambiar plan</h3>
+            <p className="mb-4 text-sm text-ink-2">
+              Plan actual: <strong>{member.plan_name || "sin plan"}</strong>{member.plan_price ? ` · ${money(member.plan_price)}` : ""}
+            </p>
+            <div className="flex flex-col gap-3">
+              {gymPlans.length > 0 && (
+                <div>
+                  <label className="mb-1 block text-xs text-ink-2">Nuevo plan</label>
+                  <select className="input" value={gymPlans.some((p) => p.name === newPlanName) ? newPlanName : "__custom"}
+                    onChange={(e) => { if (e.target.value === "__custom") setNewPlanName(""); else selectNewPlan(e.target.value); }}>
+                    <option value="">Seleccioná un plan…</option>
+                    {gymPlans.map((p) => <option key={p.name} value={p.name}>{p.name} — ${p.price}</option>)}
+                    <option value="__custom">Otro / personalizado</option>
+                  </select>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <input className="input" placeholder="Nombre del plan" value={newPlanName} onChange={(e) => setNewPlanName(e.target.value)} />
+                <input className="input" type="number" placeholder="Precio ($)" value={newPlanPrice} onChange={(e) => setNewPlanPrice(e.target.value)} />
+              </div>
+
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
+                {priceDiff > 0 ? (
+                  <>
+                    <div className="font-semibold text-good">Diferencia a cobrar: {money(priceDiff)}</div>
+                    <label className="mt-2 mb-1 block text-xs text-ink-2">Medio de pago</label>
+                    <select className="input" value={planMethod} onChange={(e) => setPlanMethod(e.target.value as PayMethod)}>
+                      {PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </>
+                ) : priceDiff < 0 ? (
+                  <div className="text-ink-2">Este plan es más barato que el actual — no se registra ningún cobro. Diferencia: {money(Math.abs(priceDiff))}</div>
+                ) : (
+                  <div className="text-ink-2">Sin diferencia de precio.</div>
+                )}
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="btn btn-ghost" onClick={() => setPlanModal(false)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={confirmPlanChange} disabled={savingPlan || !newPlanName}>
+                {savingPlan ? "Guardando…" : priceDiff > 0 ? `Confirmar y cobrar ${money(priceDiff)}` : "Confirmar cambio"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
