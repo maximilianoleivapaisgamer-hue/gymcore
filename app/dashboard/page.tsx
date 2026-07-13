@@ -34,15 +34,21 @@ export default function DashboardHome() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [canSeeIncome, setCanSeeIncome] = useState(true);
 
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data: profile } = await supabase
-        .from("profiles").select("full_name").eq("id", user.id)
-        .single<{ full_name: string | null }>();
+        .from("profiles").select("full_name, role, gym_id").eq("id", user.id)
+        .single<{ full_name: string | null; role: string; gym_id: string | null }>();
       setName((profile?.full_name || "").split(" ")[0] || "");
+      if (profile?.role === "empleado" && profile.gym_id) {
+        const { data: g } = await supabase.from("gyms").select("employees_see_income_card")
+          .eq("id", profile.gym_id).maybeSingle<{ employees_see_income_card: boolean }>();
+        setCanSeeIncome(!!g?.employees_see_income_card);
+      }
       const { data } = await supabase
         .from("members").select("id, full_name, plan_name, plan_price, membership_expiry");
       setMembers((data as Member[]) || []);
@@ -86,7 +92,7 @@ export default function DashboardHome() {
         <Stat label="Socios" value={loading ? "…" : String(stats.total)} sub="en total" tone="brand" />
         <Stat label="Activos" value={loading ? "…" : String(stats.activos)} sub={`${stats.prontos} vencen esta semana`} tone="good" />
         <Stat label="Vencidos" value={loading ? "…" : String(stats.vencidos)} sub="a reactivar" tone="crit" />
-        <Stat label="Ingresos activos" value={loading ? "…" : money(stats.ingresos)} sub="por mes (estimado)" tone="indigo" />
+        <Stat label="Ingresos activos" value={loading ? "…" : canSeeIncome ? money(stats.ingresos) : "🔒"} sub={canSeeIncome ? "por mes (estimado)" : "oculto por el dueño"} tone="indigo" />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
