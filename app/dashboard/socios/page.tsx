@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { type RealPlan } from "@/types/db";
+import DatePicker from "@/components/DatePicker";
 
 interface Member {
   id: string;
@@ -390,7 +391,11 @@ export default function SociosPage() {
               </div>
 
               <label className="text-xs text-ink-2">Vencimiento de la membresía</label>
-              <input className="input" type="date" value={editing.membership_expiry || ""} onChange={(e) => setF("membership_expiry", e.target.value)} />
+              <DatePicker
+                value={editing.membership_expiry || ""}
+                onChange={(v) => setF("membership_expiry", v)}
+                placeholder="Elegí la fecha de vencimiento"
+              />
 
               <label className="text-xs text-ink-2">Observación (opcional)</label>
               <textarea className="input" rows={2} placeholder="Ej: con descuento por 3 meses"

@@ -138,7 +138,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      <div className="aurora" aria-hidden="true" />
       {/* Sidebar */}
       <aside
         className={`fixed z-40 flex h-screen w-64 flex-col border-r border-white/10 bg-surface transition-transform md:static md:translate-x-0 ${

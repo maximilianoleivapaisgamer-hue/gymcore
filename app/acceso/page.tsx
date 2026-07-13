@@ -46,7 +46,8 @@ export default function AccesoPage() {
 
   return (
     <main className="grid min-h-screen place-items-center px-6">
-      <div className="w-full max-w-sm">
+      <div className="aurora" aria-hidden="true" />
+      <div className="relative z-10 w-full max-w-sm">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 text-xl">
             💪
