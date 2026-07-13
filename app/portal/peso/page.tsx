@@ -24,6 +24,10 @@ export default function PesoPage() {
   const [newDate, setNewDate] = useState(todayIso());
   const [newWeight, setNewWeight] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editWeight, setEditWeight] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -67,6 +71,27 @@ export default function PesoPage() {
     if (!confirm("¿Eliminar este registro de peso?")) return;
     await supabase.from("weight_logs").delete().eq("id", id);
     setLogs((ls) => ls.filter((l) => l.id !== id));
+  }
+
+  function startEdit(l: WeightLog) {
+    setEditingId(l.id);
+    setEditDate(l.date);
+    setEditWeight(String(l.weight_kg));
+  }
+  function cancelEdit() {
+    setEditingId(null); setEditDate(""); setEditWeight("");
+  }
+  async function saveEdit() {
+    if (!editingId || !editWeight) return;
+    setSavingEdit(true);
+    const { data, error } = await supabase.from("weight_logs")
+      .update({ date: editDate, weight_kg: Number(editWeight) })
+      .eq("id", editingId).select("id, date, weight_kg").single<WeightLog>();
+    setSavingEdit(false);
+    if (!error && data) {
+      setLogs((ls) => ls.map((l) => (l.id === editingId ? data : l)).sort((a, b) => a.date.localeCompare(b.date)));
+      cancelEdit();
+    }
   }
 
   const chart = useMemo(() => {
@@ -168,15 +193,29 @@ export default function PesoPage() {
           <p className="p-8 text-center text-ink-2">Todavía no cargaste ningún registro. Empezá con tu peso de hoy.</p>
         ) : (
           <ul className="divide-y divide-white/5">
-            {logs.slice().reverse().map((l) => (
-              <li key={l.id} className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-ink-2">{fdate(l.date)}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold">{l.weight_kg} kg</span>
-                  <button className="text-ink-2 hover:text-crit" title="Eliminar" onClick={() => removeLog(l.id)}>×</button>
-                </div>
-              </li>
-            ))}
+            {logs.slice().reverse().map((l) =>
+              editingId === l.id ? (
+                <li key={l.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
+                  <input className="input h-9 w-36" type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+                  <input className="input h-9 w-24" type="number" step="0.1" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} />
+                  <div className="ml-auto flex gap-2">
+                    <button className="btn btn-ghost h-9 px-3 text-xs" onClick={cancelEdit}>Cancelar</button>
+                    <button className="btn btn-primary h-9 px-3 text-xs" disabled={savingEdit || !editWeight} onClick={saveEdit}>
+                      {savingEdit ? "Guardando…" : "Guardar"}
+                    </button>
+                  </div>
+                </li>
+              ) : (
+                <li key={l.id} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-ink-2">{fdate(l.date)}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold">{l.weight_kg} kg</span>
+                    <button className="text-ink-2 hover:text-brand" title="Editar" onClick={() => startEdit(l)}>✏️</button>
+                    <button className="text-ink-2 hover:text-crit" title="Eliminar" onClick={() => removeLog(l.id)}>×</button>
+                  </div>
+                </li>
+              )
+            )}
           </ul>
         )}
       </div>
