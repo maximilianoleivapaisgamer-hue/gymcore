@@ -17,6 +17,7 @@ export default function ClasicaLanding({
   const benefits = gym.benefits || [];
   const gallery = gym.gallery || [];
   const joinHref = `/portal/registro?gym=${gym.slug}`;
+  const loginHref = `/g/${gym.slug}`;
   const waHref = gym.whatsapp ? `https://wa.me/${gym.whatsapp.replace(/\D/g, "")}` : null;
   const mapsHref = gym.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gym.address)}`
@@ -171,7 +172,7 @@ export default function ClasicaLanding({
                 📷 Instagram
               </a>
             )}
-            <a href="/acceso" className="hidden text-sm text-ink-2 hover:text-ink sm:inline">
+            <a href={loginHref} className="hidden text-sm text-ink-2 hover:text-ink sm:inline">
               Ingresar
             </a>
             <a href={joinHref} className="btn btn-primary text-sm">
@@ -181,31 +182,43 @@ export default function ClasicaLanding({
         </div>
       </header>
 
-      {/* HERO */}
-      <section className="relative overflow-hidden">
+      {/* HERO / BANNER */}
+      <section className="relative min-h-[560px] overflow-hidden sm:min-h-[640px]">
         {gym.hero_url && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={gym.hero_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+          <img src={gym.hero_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
         )}
-        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, rgba(10,13,18,.55), rgba(10,13,18,.92))` }} />
+        {/* velo de color: el banner se tiñe con el color del gimnasio y el texto queda adelante */}
         <div
-          className="pointer-events-none absolute left-1/2 top-[-30%] h-[600px] w-[600px] -translate-x-1/2 rounded-full blur-2xl"
-          style={{ background: `radial-gradient(circle, ${accent}33, transparent 60%)` }}
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(115deg, ${accent}22 0%, rgba(10,13,18,.72) 45%, rgba(10,13,18,.95) 100%)` }}
         />
-        <div className="relative z-10 mx-auto max-w-3xl px-6 py-24 text-center sm:py-32">
+        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, rgba(10,13,18,.35), rgba(10,13,18,.9))` }} />
+        <div
+          className="pointer-events-none absolute left-1/2 top-[-30%] h-[600px] w-[600px] -translate-x-1/2 rounded-full blur-3xl"
+          style={{ background: `radial-gradient(circle, ${accent}44, transparent 60%)` }}
+        />
+        <div className="relative z-10 mx-auto flex min-h-[560px] max-w-3xl flex-col items-center justify-center px-6 py-24 text-center sm:min-h-[640px] sm:py-32">
           <div
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[2px]"
+            className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[2px] backdrop-blur"
             style={{ color: accent }}
           >
+            <span className="grid h-2 w-2 place-items-center rounded-full" style={{ background: accent }} />
             {gym.name}
           </div>
-          <h1 className="mx-auto max-w-2xl text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
+          <h1 className="mx-auto max-w-2xl text-4xl font-black leading-[1.03] tracking-tight sm:text-6xl">
             {gym.tagline || "Entrená distinto. Resultados de verdad."}
           </h1>
           {gym.description && <p className="mx-auto mt-5 max-w-xl text-lg text-ink-2">{gym.description}</p>}
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
             <a href={joinHref} className="btn btn-primary px-6 py-3 text-base">
               Sumate ahora
+            </a>
+            <a
+              href={loginHref}
+              className="btn btn-ghost border-white/20 px-6 py-3 text-base backdrop-blur"
+            >
+              Acceso miembros
             </a>
             {waHref && (
               <a href={waHref} target="_blank" rel="noreferrer" className="btn btn-ghost px-6 py-3 text-base">
@@ -213,9 +226,9 @@ export default function ClasicaLanding({
               </a>
             )}
           </div>
-          <p className="mt-4 text-xs text-muted">
+          <p className="mt-5 text-xs text-muted">
             ¿Ya sos socio?{" "}
-            <a href="/acceso" className="underline hover:text-ink">
+            <a href={loginHref} className="underline hover:text-ink">
               Ingresá a tu portal
             </a>
           </p>

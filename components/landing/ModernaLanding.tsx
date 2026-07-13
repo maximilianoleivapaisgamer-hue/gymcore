@@ -18,6 +18,7 @@ export default function ModernaLanding({
   const benefits = gym.benefits || [];
   const gallery = gym.gallery || [];
   const joinHref = `/portal/registro?gym=${gym.slug}`;
+  const loginHref = `/g/${gym.slug}`;
   const waHref = gym.whatsapp ? `https://wa.me/${gym.whatsapp.replace(/\D/g, "")}` : null;
   const mapsHref = gym.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gym.address)}`
@@ -164,7 +165,7 @@ export default function ModernaLanding({
             <span className="font-bold">{gym.name}</span>
           </div>
           <div className="flex items-center gap-3">
-            <a href="/acceso" className="hidden text-sm text-ink-2 hover:text-ink sm:inline">
+            <a href={loginHref} className="hidden text-sm text-ink-2 hover:text-ink sm:inline">
               Ingresar
             </a>
             <a href={joinHref} className="btn btn-primary text-sm">
@@ -191,6 +192,9 @@ export default function ModernaLanding({
             <a href={joinHref} className="btn btn-primary px-6 py-3 text-base">
               Sumate ahora
             </a>
+            <a href={loginHref} className="btn btn-ghost border-white/20 px-6 py-3 text-base">
+              Acceso miembros
+            </a>
             {waHref && (
               <a href={waHref} target="_blank" rel="noreferrer" className="btn btn-ghost px-6 py-3 text-base">
                 💬 Escribinos
@@ -199,7 +203,7 @@ export default function ModernaLanding({
           </div>
           <p className="mt-4 text-xs text-muted">
             ¿Ya sos socio?{" "}
-            <a href="/acceso" className="underline hover:text-ink">
+            <a href={loginHref} className="underline hover:text-ink">
               Ingresá a tu portal
             </a>
           </p>
