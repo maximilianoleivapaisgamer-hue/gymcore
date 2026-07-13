@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GymCore — Prototipo Premium</title>
+<style>
+  :root{
+    --bg:#0a0d12; --surface:#12161d; --surface-2:#171c25; --surface-3:#1d2431;
+    --border:rgba(255,255,255,0.08); --border-2:rgba(255,255,255,0.12);
+    --text:#f4f6f8; --text-2:#9aa3b2; --muted:#6b7280;
+    --brand:#22d3ee; --brand-2:#3b82f6; --indigo:#818cf8;
+    --good:#22c55e; --warn:#f5b13d; --crit:#f05252;
+    --s1:#3987e5; --s2:#199e70; --s3:#c98500;
+    --radius:16px; --radius-sm:10px;
+    --shadow:0 10px 30px rgba(0,0,0,0.35);
+    --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#232a36;border-radius:10px;border:2px solid var(--bg)}
+  .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+
+  /* Sidebar */
+  .sidebar{background:linear-gradient(180deg,#0c1017,#0a0d12);border-right:1px solid var(--border);padding:20px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px}
+  .brand{display:flex;align-items:center;gap:11px;padding:8px 10px 18px}
+  .brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand-2));display:grid;place-items:center;box-shadow:0 6px 16px rgba(34,211,238,.35)}
+  .brand .logo svg{width:20px;height:20px}
+  .brand b{font-size:17px;letter-spacing:-.3px}
+  .brand span{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-top:-2px}
+  .nav-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);padding:14px 12px 6px;font-weight:600}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:var(--text-2);cursor:pointer;font-weight:500;transition:.15s;border:1px solid transparent}
+  .nav-item svg{width:18px;height:18px;flex:none;opacity:.85}
+  .nav-item:hover{background:var(--surface);color:var(--text)}
+  .nav-item.active{background:linear-gradient(135deg,rgba(34,211,238,.16),rgba(59,130,246,.10));color:#fff;border-color:rgba(34,211,238,.25)}
+  .nav-item.active svg{opacity:1;color:var(--brand)}
+  .side-foot{margin-top:auto;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;gap:10px}
+  .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#334155,#475569);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+  .side-foot small{color:var(--muted);display:block}
+
+  /* Main */
+  .main{min-width:0;display:flex;flex-direction:column}
+  .topbar{height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;background:rgba(10,13,18,.8);backdrop-filter:blur(12px);z-index:20}
+  .topbar .search{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 13px;width:340px;color:var(--muted)}
+  .topbar .search input{background:none;border:none;outline:none;color:var(--text);width:100%;font-family:var(--font)}
+  .top-actions{display:flex;align-items:center;gap:12px}
+  .icon-btn{width:38px;height:38px;border-radius:10px;background:var(--surface);border:1px solid var(--border);display:grid;place-items:center;cursor:pointer;color:var(--text-2)}
+  .icon-btn:hover{color:#fff;border-color:var(--border-2)}
+  .view{padding:28px;display:none;animation:fade .35s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .page-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap}
+  .page-head h1{font-size:24px;letter-spacing:-.5px;font-weight:700}
+  .page-head p{color:var(--text-2);margin-top:3px}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;border:1px solid transparent;font-size:13.5px;font-family:var(--font);transition:.15s}
+  .btn svg{width:16px;height:16px}
+  .btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#04121a;box-shadow:0 8px 20px rgba(34,211,238,.28)}
+  .btn-primary:hover{filter:brightness(1.07)}
+  .btn-ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .btn-ghost:hover{border-color:var(--border-2)}
+
+  /* Cards & grids */
+  .grid{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+  .kpi{position:relative;overflow:hidden}
+  .kpi .k-top{display:flex;align-items:center;justify-content:space-between;color:var(--text-2);font-weight:500;font-size:12.5px}
+  .kpi .k-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--surface-3)}
+  .kpi .k-ico svg{width:18px;height:18px}
+  .kpi .k-val{font-size:30px;font-weight:700;letter-spacing:-1px;margin-top:14px;font-variant-numeric:tabular-nums}
+  .kpi .k-sub{margin-top:6px;font-size:12.5px;display:flex;align-items:center;gap:6px}
+  .up{color:var(--good)} .down{color:var(--crit)}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
+  .badge.ok{background:rgba(34,197,94,.14);color:#4ade80}
+  .badge.warn{background:rgba(245,177,61,.14);color:#f5b13d}
+  .badge.crit{background:rgba(240,82,82,.14);color:#f87171}
+  .badge.info{background:rgba(34,211,238,.14);color:var(--brand)}
+  .badge.dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  .section-title{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px}
+  .section-title h3{font-size:16px;font-weight:650}
+  .section-title a{color:var(--brand);font-size:13px;font-weight:600;cursor:pointer}
+
+  /* Table */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding:0 14px 12px}
+  td{padding:13px 14px;border-top:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .u-cell{display:flex;align-items:center;gap:11px}
+  .u-cell .avatar{width:36px;height:36px;font-size:12px}
+  .u-cell small{color:var(--muted);display:block;font-size:12px}
+  .row-actions{display:flex;gap:6px}
+  .mini{width:30px;height:30px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);display:grid;place-items:center;cursor:pointer;color:var(--text-2)}
+  .mini:hover{color:#fff;border-color:var(--border-2)}
+  .mini.wa:hover{color:#25d366;border-color:rgba(37,211,102,.4)}
+
+  /* Chart */
+  .bars{display:flex;align-items:flex-end;gap:16px;height:200px;padding-top:10px}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+  .bar-pair{display:flex;gap:5px;align-items:flex-end;height:100%;width:100%;justify-content:center}
+  .bar{width:16px;border-radius:4px 4px 0 0;transition:.3s}
+  .bar.ing{background:linear-gradient(180deg,var(--brand),#1596b0)}
+  .bar.gas{background:linear-gradient(180deg,#3b4b63,#2a3547)}
+  .bar-col span{font-size:11.5px;color:var(--muted)}
+  .legend{display:flex;gap:18px;margin-top:6px}
+  .legend div{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2)}
+  .legend i{width:10px;height:10px;border-radius:3px;display:block}
+
+  /* Routine builder */
+  .day-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .day-tab{padding:9px 16px;border-radius:10px;background:var(--surface);border:1px solid var(--border);cursor:pointer;font-weight:600;color:var(--text-2)}
+  .day-tab.active{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#04121a;border-color:transparent}
+  .picker{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:18px}
+  .sel{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);min-width:150px;font-family:var(--font);font-size:13px}
+  .sel.small{min-width:90px}
+  .block{border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;background:var(--surface)}
+  .block-h{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,rgba(34,211,238,.14),rgba(59,130,246,.05));border-bottom:1px solid var(--border)}
+  .block-h b{font-size:14.5px}
+  .ex-row{display:grid;grid-template-columns:1fr 70px 70px 90px;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border)}
+  .ex-row:first-child{border-top:none}
+  .ex-row .exn{display:flex;align-items:center;gap:10px}
+  .ex-thumb{width:38px;height:38px;border-radius:8px;background:var(--surface-3);display:grid;place-items:center;color:var(--brand);flex:none}
+  .ex-row small{color:var(--muted);display:block;font-size:12px;margin-top:2px}
+  .ex-row .exn>div{line-height:1.25}
+  .pill{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 0;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* Phone */
+  .phone-wrap{display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap}
+  .phone{width:340px;height:710px;background:#000;border-radius:44px;padding:11px;box-shadow:var(--shadow),0 0 0 2px #22272f;flex:none}
+  .phone-screen{width:100%;height:100%;border-radius:34px;overflow:hidden;background:linear-gradient(180deg,#0e1218,#0a0d12);position:relative;display:flex;flex-direction:column}
+  .ph-notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#000;border-radius:0 0 16px 16px;z-index:5}
+  .ph-scroll{flex:1;overflow-y:auto;padding:38px 18px 90px}
+  .ph-hero{background:linear-gradient(135deg,rgba(34,211,238,.18),rgba(59,130,246,.06));border:1px solid var(--border);border-radius:20px;padding:22px;text-align:center}
+  .ph-gymname{font-size:12px;color:var(--brand);font-weight:700;letter-spacing:1px;text-transform:uppercase}
+  .ph-av{width:74px;height:74px;border-radius:50%;margin:14px auto 10px;background:linear-gradient(135deg,var(--brand),var(--brand-2));display:grid;place-items:center;font-size:26px;font-weight:700;color:#04121a}
+  .ph-nav{position:absolute;bottom:0;left:0;right:0;height:74px;background:rgba(12,16,22,.94);backdrop-filter:blur(10px);border-top:1px solid var(--border);display:flex;justify-content:space-around;align-items:center;padding-bottom:8px}
+  .ph-nav div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;color:var(--muted)}
+  .ph-nav div.on{color:var(--brand)}
+  .ph-nav svg{width:22px;height:22px}
+  .ph-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-top:14px}
+
+  /* Pricing */
+  .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1000px;margin:0 auto}
+  .plan{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;position:relative;display:flex;flex-direction:column}
+  .plan.pop{border-color:rgba(34,211,238,.5);box-shadow:0 0 0 1px rgba(34,211,238,.3),0 20px 50px rgba(34,211,238,.12);background:linear-gradient(180deg,rgba(34,211,238,.06),var(--surface))}
+  .plan .tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#04121a;font-size:11px;font-weight:700;padding:5px 14px;border-radius:999px;letter-spacing:.5px}
+  .plan h3{font-size:18px}
+  .plan .price{font-size:40px;font-weight:800;letter-spacing:-1.5px;margin:14px 0 2px}
+  .plan .price small{font-size:14px;color:var(--muted);font-weight:500}
+  .plan .desc{color:var(--text-2);font-size:13px;margin-bottom:20px}
+  .plan ul{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:24px;flex:1}
+  .plan li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--text-2)}
+  .plan li svg{width:18px;height:18px;color:var(--brand);flex:none;margin-top:1px}
+
+  .two-col{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+  .list-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)}
+  .list-item:first-child{border-top:none}
+  .progress{height:7px;background:var(--surface-3);border-radius:99px;overflow:hidden;margin-top:8px}
+  .progress i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--brand),var(--brand-2))}
+  .class-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .quick{display:flex;gap:12px;flex-wrap:wrap}
+  .quick .qa{flex:1;min-width:160px;display:flex;align-items:center;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;cursor:pointer}
+  .quick .qa:hover{border-color:rgba(34,211,238,.35)}
+  .quick .qa .qi{width:40px;height:40px;border-radius:11px;background:var(--surface-3);display:grid;place-items:center;color:var(--brand)}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;display:flex;align-items:center;gap:6px}
+  @media(max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}.plans{grid-template-columns:1fr}.class-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-palette="#3987e5,#199e70,#c98500">
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#04121a" stroke-width="2.2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M4 9v6M20 9v6M6.5 12h11"/></svg></div>
+      <div><b>GymCore</b><span>Panel del gimnasio</span></div>
+    </div>
+    <div class="nav-label">Gestión</div>
+    <div class="nav-item active" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</div>
+    <div class="nav-item" data-view="socios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0111 0M16 5.5a3 3 0 010 5.8M18.5 20a5.2 5.2 0 00-3-4.7"/></svg>Socios</div>
+    <div class="nav-item" data-view="rutinas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M4 9v6M20 9v6M6.5 12h11"/></svg>Rutinas</div>
+    <div class="nav-item" data-view="finanzas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M7 15l4-5 3 3 5-7"/></svg>Finanzas</div>
+    <div class="nav-item" data-view="clases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>Clases</div>
+    <div class="nav-item" data-view="acceso-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="4" y="15" width="4" height="4" rx="1"/><rect x="13" y="4" width="4" height="4" rx="1"/><path d="M13 13h3v3M20 4v6M20 15v5M13 20h7"/></svg>Control de acceso</div>
+    <div class="nav-label">Experiencia socio</div>
+    <div class="nav-item" data-view="portal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>Portal del socio</div>
+    <div class="nav-item" data-view="landing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>Página pública</div>
+    <div class="nav-label">Tu negocio (SaaS)</div>
+    <div class="nav-item" data-view="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.5l8 3.5v5c0 5-3.5 8.5-8 10.5-4.5-2-8-5.5-8-10.5v-5z"/><path d="M9 12l2 2 4-4.5"/></svg>Super Admin</div>
+    <div class="nav-item" data-view="planes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 7v6l8 4 8-4V7M4 13l8 4 8-4"/></svg>Planes y precios</div>
+    <div class="side-foot">
+      <div class="avatar">MV</div>
+      <div><b style="font-size:13px">Marce V.</b><small>PowerZone Gym</small></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Buscar socios, clases, movimientos…"></div>
+      <div class="top-actions">
+        <div class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.5 21a2 2 0 01-3 0"/></svg></div>
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nuevo</button>
+      </div>
+    </div>
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="view active" id="dashboard">
+      <div class="page-head">
+        <div><h1>Hola, Marce 👋</h1><p>Esto es lo que pasa hoy en <b style="color:var(--text)">PowerZone Gym</b> · Vie 10 de julio</p></div>
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Agregar socio</button>
+      </div>
+      <div class="grid kpis" style="margin-bottom:20px">
+        <div class="card kpi"><div class="k-top">Socios activos <span class="k-ico" style="color:var(--brand)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0111 0"/></svg></span></div><div class="k-val">248</div><div class="k-sub up">▲ +12 este mes</div></div>
+        <div class="card kpi"><div class="k-top">Ingresos del mes <span class="k-ico" style="color:var(--good)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span></div><div class="k-val">$1.24M</div><div class="k-sub up">▲ +8,3% vs junio</div></div>
+        <div class="card kpi"><div class="k-top">Vencen esta semana <span class="k-ico" style="color:var(--warn)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div><div class="k-val">17</div><div class="k-sub" style="color:var(--warn)">Requieren seguimiento</div></div>
+        <div class="card kpi"><div class="k-top">Asistencias hoy <span class="k-ico" style="color:var(--indigo)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></span></div><div class="k-val">86</div><div class="k-sub up">▲ Pico 19–21h</div></div>
+      </div>
+      <div class="two-col" style="margin-bottom:20px">
+        <div class="card">
+          <div class="section-title"><h3>Ingresos vs Gastos</h3><a>Últimos 6 meses</a></div>
+          <div class="bars" id="dashBars"></div>
+          <div class="legend"><div><i style="background:var(--brand)"></i>Ingresos</div><div><i style="background:#3b4b63"></i>Gastos</div></div>
+        </div>
+        <div class="card">
+          <div class="section-title"><h3>Próximos a vencer</h3><a>Ver todos</a></div>
+          <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">CR</div><div>Carlos Ramírez<small>Plan Full · $9.500</small></div></div><span class="badge warn dot">2 días</span></div>
+          <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">LM</div><div>Lucía Méndez<small>Plan Básico · $6.000</small></div></div><span class="badge warn dot">4 días</span></div>
+          <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#ca8a04,#eab308)">DF</div><div>Diego Fernández<small>Plan Full · $9.500</small></div></div><span class="badge crit dot">Vencido</span></div>
+          <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#059669,#10b981)">SP</div><div>Sofía Paz<small>Plan Full · $9.500</small></div></div><span class="badge warn dot">6 días</span></div>
+        </div>
+      </div>
+      <div class="section-title"><h3>Acciones rápidas</h3></div>
+      <div class="quick">
+        <div class="qa" data-goto="socios"><div class="qi"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></div><div><b>Agregar socio</b><br><small style="color:var(--muted)">Alta con onboarding WhatsApp</small></div></div>
+        <div class="qa" data-goto="rutinas"><div class="qi"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M6.5 12h11"/></svg></div><div><b>Cargar rutina</b><br><small style="color:var(--muted)">Constructor por socio</small></div></div>
+        <div class="qa" data-goto="finanzas"><div class="qi"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div><b>Registrar movimiento</b><br><small style="color:var(--muted)">Ingreso o gasto</small></div></div>
+        <div class="qa" data-goto="clases"><div class="qi"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18"/></svg></div><div><b>Nueva clase</b><br><small style="color:var(--muted)">Con cupos y reservas</small></div></div>
+      </div>
+    </section>
+
+    <!-- ============ SOCIOS ============ -->
+    <section class="view" id="socios">
+      <div class="page-head">
+        <div><h1>Socios</h1><p>248 socios activos · 17 por vencer · 9 vencidos</p></div>
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Agregar socio</button>
+      </div>
+      <div class="card" style="padding:0">
+        <div style="display:flex;gap:10px;padding:16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+          <div class="search" style="width:300px;background:var(--surface-2)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Buscar por nombre o DNI…"></div>
+          <select class="sel small">Todos</select>
+          <select class="sel small">Plan</select>
+          <div style="flex:1"></div>
+          <button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filtros</button>
+        </div>
+        <table>
+          <thead><tr><th>Socio</th><th>DNI</th><th>Plan</th><th>Vencimiento</th><th>Estado</th><th style="text-align:right">Acciones</th></tr></thead>
+          <tbody id="sociosBody"></tbody>
+        </table>
+      </div>
+      <div class="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>El estado y el vencimiento se calculan automáticamente. Al dar de alta, el socio recibe su acceso por WhatsApp.</div>
+    </section>
+
+    <!-- ============ RUTINAS ============ -->
+    <section class="view" id="rutinas">
+      <div class="page-head">
+        <div><h1>Constructor de rutinas</h1><p>Rutina de <b style="color:var(--text)">Carlos Ramírez</b> · Editá por día y bloque, con video y foto de cada ejercicio</p></div>
+        <div style="display:flex;gap:10px"><button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 7v6l8 4 8-4V7"/></svg>Usar plantilla</button><button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>Guardar rutina</button></div>
+      </div>
+      <div class="day-tabs">
+        <div class="day-tab active">Día 1 · Pecho/Tríceps</div><div class="day-tab">Día 2 · Espalda</div><div class="day-tab">Día 3 · Piernas</div><div class="day-tab">Día 4 · Hombros</div><div class="day-tab">Día 5 · Brazos</div><div class="day-tab" style="color:var(--muted)">Día 6 +</div>
+      </div>
+      <div class="picker">
+        <select class="sel">Bloque: Fuerza</select>
+        <select class="sel">Grupo muscular</select>
+        <select class="sel">Ejercicio</select>
+        <input class="sel small" placeholder="Series" style="width:80px">
+        <input class="sel small" placeholder="Reps" style="width:80px">
+        <button class="btn btn-primary" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Agregar</button>
+      </div>
+      <div class="block">
+        <div class="block-h"><b>🔥 Bloque A · Fuerza</b><span class="badge info">4 ejercicios</span></div>
+        <div class="ex-row"><div class="exn"><div class="ex-thumb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div>Press banca plano<small>Pecho · con video</small></div></div><div class="pill">4</div><div class="pill">10</div><div class="row-actions"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4zM8 3v4M16 3v4"/></svg></div><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div></div></div>
+        <div class="ex-row"><div class="exn"><div class="ex-thumb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div>Press inclinado mancuernas<small>Pecho superior</small></div></div><div class="pill">4</div><div class="pill">12</div><div class="row-actions"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4zM8 3v4M16 3v4"/></svg></div><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div></div></div>
+        <div class="ex-row"><div class="exn"><div class="ex-thumb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div>Aperturas en polea<small>Pecho · aislamiento</small></div></div><div class="pill">3</div><div class="pill">15</div><div class="row-actions"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4zM8 3v4M16 3v4"/></svg></div><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div></div></div>
+      </div>
+      <div class="block">
+        <div class="block-h"><b>💪 Bloque B · Tríceps</b><span class="badge info">2 ejercicios</span></div>
+        <div class="ex-row"><div class="exn"><div class="ex-thumb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div>Extensión en polea<small>Tríceps</small></div></div><div class="pill">4</div><div class="pill">12</div><div class="row-actions"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4zM8 3v4M16 3v4"/></svg></div><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div></div></div>
+      </div>
+    </section>
+
+    <!-- ============ FINANZAS ============ -->
+    <section class="view" id="finanzas">
+      <div class="page-head">
+        <div><h1>Finanzas</h1><p>Registro financiero de tu gimnasio</p></div>
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nueva entrada</button>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+        <div class="card kpi"><div class="k-top">Total ingresos <span class="k-ico" style="color:var(--good)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H9M17 7v8"/></svg></span></div><div class="k-val" style="color:#4ade80">$1.248.500</div><div class="k-sub">Suma del período</div></div>
+        <div class="card kpi"><div class="k-top">Total gastos <span class="k-ico" style="color:var(--crit)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 7L7 17M7 17h8M7 17V9"/></svg></span></div><div class="k-val" style="color:#f87171">$412.000</div><div class="k-sub">Suma del período</div></div>
+        <div class="card kpi"><div class="k-top">Balance neto <span class="k-ico" style="color:var(--brand)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg></span></div><div class="k-val">$836.500</div><div class="k-sub up">▲ +8,3%</div></div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="section-title"><h3>Flujo mensual</h3><a>2026</a></div>
+        <div class="bars" id="finBars"></div>
+        <div class="legend"><div><i style="background:var(--brand)"></i>Ingresos</div><div><i style="background:#3b4b63"></i>Gastos</div></div>
+      </div>
+      <div class="card" style="padding:0">
+        <div style="padding:16px;border-bottom:1px solid var(--border)"><b>Movimientos recientes</b></div>
+        <table>
+          <thead><tr><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th style="text-align:right">Acciones</th></tr></thead>
+          <tbody>
+            <tr><td>Cuota mensual · Carlos Ramírez</td><td><span class="badge ok">Ingreso</span></td><td style="color:#4ade80;font-weight:600">+$9.500</td><td>10/07/2026</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div></div></td></tr>
+            <tr><td>Compra mancuernas</td><td><span class="badge crit">Gasto</span></td><td style="color:#f87171;font-weight:600">−$85.000</td><td>09/07/2026</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div></div></td></tr>
+            <tr><td>Cuota mensual · Sofía Paz</td><td><span class="badge ok">Ingreso</span></td><td style="color:#4ade80;font-weight:600">+$9.500</td><td>09/07/2026</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div></div></td></tr>
+            <tr><td>Servicio de limpieza</td><td><span class="badge crit">Gasto</span></td><td style="color:#f87171;font-weight:600">−$40.000</td><td>08/07/2026</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ CLASES ============ -->
+    <section class="view" id="clases">
+      <div class="page-head">
+        <div><h1>Clases y reservas</h1><p>Vos armás la grilla a tu manera. El sistema no impone plantillas.</p></div>
+        <button class="btn btn-primary" onclick="openClase()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nueva clase</button>
+      </div>
+      <div class="class-grid">
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">Funcional</b><span class="badge ok">Casi lleno</span></div><p style="color:var(--text-2);margin:6px 0 14px">Lun/Mié/Vie · 19:00 · Prof. Ana</p><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2)"><span>Cupos</span><span style="color:var(--text);font-weight:600">18 / 20</span></div><div class="progress"><i style="width:90%"></i></div></div>
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">Spinning</b><span class="badge info">Disponible</span></div><p style="color:var(--text-2);margin:6px 0 14px">Mar/Jue · 20:00 · Prof. Leo</p><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2)"><span>Cupos</span><span style="color:var(--text);font-weight:600">12 / 25</span></div><div class="progress"><i style="width:48%"></i></div></div>
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">Yoga</b><span class="badge info">Disponible</span></div><p style="color:var(--text-2);margin:6px 0 14px">Sáb · 10:00 · Prof. Mora</p><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2)"><span>Cupos</span><span style="color:var(--text);font-weight:600">8 / 15</span></div><div class="progress"><i style="width:53%"></i></div></div>
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">Boxeo</b><span class="badge crit">Completo</span></div><p style="color:var(--text-2);margin:6px 0 14px">Lun/Mié · 21:00 · Prof. Nico</p><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2)"><span>Cupos</span><span style="color:var(--text);font-weight:600">16 / 16</span></div><div class="progress"><i style="width:100%;background:var(--crit)"></i></div></div>
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">Zumba</b><span class="badge ok">Casi lleno</span></div><p style="color:var(--text-2);margin:6px 0 14px">Mar/Jue · 18:00 · Prof. Cami</p><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2)"><span>Cupos</span><span style="color:var(--text);font-weight:600">22 / 25</span></div><div class="progress"><i style="width:88%"></i></div></div>
+        <div class="card" style="border-style:dashed;display:grid;place-items:center;min-height:150px;cursor:pointer;color:var(--muted)" onclick="openClase()"><div style="text-align:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><br>Crear nueva clase</div></div>
+      </div>
+      <p class="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>Tocá "Nueva clase" para ver el formulario de creación a medida.</p>
+    </section>
+
+    <!-- ============ CONTROL DE ACCESO ============ -->
+    <section class="view" id="acceso-control">
+      <div class="page-head">
+        <div><h1>Control de acceso</h1><p>Check-in en la puerta por QR o DNI. El sistema valida la membresía en el momento.</p></div>
+        <span class="badge ok dot">Escáner activo</span>
+      </div>
+      <div class="two-col">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="text-align:center;padding:32px">
+            <div style="width:190px;height:190px;margin:0 auto 18px;border-radius:20px;background:#fff;padding:14px;position:relative">
+              <svg viewBox="0 0 100 100" width="100%" height="100%" shape-rendering="crispEdges">
+                <rect width="100" height="100" fill="#fff"/>
+                <g fill="#0a0d12">
+                  <rect x="6" y="6" width="22" height="22"/><rect x="12" y="12" width="10" height="10" fill="#fff"/>
+                  <rect x="72" y="6" width="22" height="22"/><rect x="78" y="12" width="10" height="10" fill="#fff"/>
+                  <rect x="6" y="72" width="22" height="22"/><rect x="12" y="78" width="10" height="10" fill="#fff"/>
+                  <rect x="36" y="6" width="6" height="6"/><rect x="48" y="6" width="6" height="6"/><rect x="60" y="12" width="6" height="6"/>
+                  <rect x="36" y="18" width="6" height="6"/><rect x="54" y="18" width="6" height="6"/>
+                  <rect x="36" y="36" width="6" height="6"/><rect x="48" y="42" width="6" height="6"/><rect x="60" y="36" width="6" height="6"/><rect x="72" y="42" width="6" height="6"/><rect x="84" y="36" width="6" height="6"/>
+                  <rect x="6" y="42" width="6" height="6"/><rect x="18" y="48" width="6" height="6"/><rect x="6" y="60" width="6" height="6"/>
+                  <rect x="42" y="54" width="6" height="6"/><rect x="54" y="60" width="6" height="6"/><rect x="66" y="54" width="6" height="6"/><rect x="78" y="60" width="6" height="6"/><rect x="90" y="54" width="6" height="6"/>
+                  <rect x="36" y="66" width="6" height="6"/><rect x="48" y="72" width="6" height="6"/><rect x="66" y="72" width="6" height="6"/><rect x="84" y="72" width="6" height="6"/>
+                  <rect x="42" y="84" width="6" height="6"/><rect x="60" y="84" width="6" height="6"/><rect x="72" y="90" width="6" height="6"/><rect x="90" y="84" width="6" height="6"/>
+                </g>
+              </svg>
+            </div>
+            <b style="font-size:16px">Escaneá el QR del socio</b>
+            <p style="color:var(--text-2);margin-top:6px">Cada socio tiene su QR en el portal. O ingresá el DNI manualmente.</p>
+            <div style="display:flex;gap:10px;margin-top:16px"><input class="sel" style="flex:1" placeholder="DNI del socio…"><button class="btn btn-primary">Validar</button></div>
+          </div>
+          <div class="card" style="border-color:rgba(34,197,94,.4);background:linear-gradient(135deg,rgba(34,197,94,.10),var(--surface))">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="width:52px;height:52px;border-radius:50%;background:var(--good);display:grid;place-items:center;color:#04121a"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div style="flex:1"><b style="font-size:17px">Acceso permitido · Martín Gómez</b><br><small style="color:var(--text-2)">Plan Full · vence 28/07/2026 · ingreso 20:14</small></div>
+              <span class="badge ok dot">Al día</span>
+            </div>
+          </div>
+          <div class="card" style="border-color:rgba(240,82,82,.35);background:linear-gradient(135deg,rgba(240,82,82,.08),var(--surface))">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="width:52px;height:52px;border-radius:50%;background:var(--crit);display:grid;place-items:center;color:#fff"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+              <div style="flex:1"><b style="font-size:17px">Acceso bloqueado · Diego Fernández</b><br><small style="color:var(--text-2)">Membresía vencida el 05/07/2026</small></div>
+              <button class="btn btn-ghost" style="padding:8px 12px;font-size:12px">Cobrar y habilitar</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:0">
+          <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"><b>Ingresos de hoy</b><span class="badge info">86</span></div>
+          <div style="padding:6px 16px 16px">
+            <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#ca8a04,#eab308)">MG</div><div>Martín Gómez<small>20:14</small></div></div><span class="badge ok dot">OK</span></div>
+            <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#4f46e5,#818cf8)">VR</div><div>Valentina Ruiz<small>20:09</small></div></div><span class="badge ok dot">OK</span></div>
+            <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#dc2626,#f05252)">DF</div><div>Diego Fernández<small>20:02</small></div></div><span class="badge crit dot">Vencido</span></div>
+            <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#0d9488,#2dd4bf)">NT</div><div>Nicolás Torres<small>19:58</small></div></div><span class="badge ok dot">OK</span></div>
+            <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">LM</div><div>Lucía Méndez<small>19:47</small></div></div><span class="badge ok dot">OK</span></div>
+            <div class="list-item"><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">SP</div><div>Sofía Paz<small>19:31</small></div></div><span class="badge ok dot">OK</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LANDING PÚBLICA ============ -->
+    <section class="view" id="landing">
+      <div class="page-head">
+        <div><h1>Página pública del gimnasio</h1><p>La landing white-label que genera el sistema en <b style="color:var(--brand)">gymcore.app/powerzone</b>. El dueño la edita desde su configuración.</p></div>
+        <button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2 2 0 013 3L7 19l-4 1 1-4z"/></svg>Editar contenido</button>
+      </div>
+      <div style="max-width:1080px;margin:0 auto;border-radius:20px;overflow:hidden;border:1px solid var(--border)">
+        <!-- browser chrome -->
+        <div style="background:var(--surface-2);padding:11px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)"><span style="width:11px;height:11px;border-radius:50%;background:#f05252"></span><span style="width:11px;height:11px;border-radius:50%;background:#f5b13d"></span><span style="width:11px;height:11px;border-radius:50%;background:#22c55e"></span><div style="flex:1;background:var(--bg);border-radius:7px;padding:5px 12px;color:var(--muted);font-size:12px;margin-left:8px">🔒 gymcore.app/powerzone</div></div>
+        <!-- hero -->
+        <div style="position:relative;padding:70px 40px;text-align:center;background:radial-gradient(120% 120% at 50% 0%,rgba(34,211,238,.18),transparent 55%),linear-gradient(180deg,#0b0f16,#0a0d12)">
+          <div style="width:60px;height:60px;border-radius:16px;margin:0 auto 18px;background:linear-gradient(135deg,var(--brand),var(--brand-2));display:grid;place-items:center;box-shadow:0 10px 30px rgba(34,211,238,.4)"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#04121a" stroke-width="2.2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M4 9v6M20 9v6M6.5 12h11"/></svg></div>
+          <div style="font-size:13px;letter-spacing:3px;color:var(--brand);font-weight:700;text-transform:uppercase">PowerZone Gym</div>
+          <h2 style="font-size:38px;letter-spacing:-1px;margin:10px 0 8px;max-width:620px;margin-inline:auto">Entrená distinto. Resultados de verdad.</h2>
+          <p style="color:var(--text-2);max-width:480px;margin:0 auto 26px">Equipamiento de última generación, entrenadores certificados y clases para todos los niveles en el corazón de Buenos Aires.</p>
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn btn-primary">Acceso miembros</button><button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 2a10 10 0 00-8.5 15.3L2 22l4.8-1.5A10 10 0 1012 2z"/></svg>Escribinos por WhatsApp</button></div>
+        </div>
+        <!-- benefits -->
+        <div style="padding:44px 40px;background:var(--bg)">
+          <h3 style="text-align:center;margin-bottom:26px;font-size:20px">¿Por qué elegirnos?</h3>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div class="card" style="text-align:center"><div style="width:44px;height:44px;border-radius:12px;background:var(--surface-3);display:grid;place-items:center;margin:0 auto 12px;color:var(--brand)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M6.5 12h11"/></svg></div><b>Equipamiento premium</b><p style="color:var(--text-2);font-size:13px;margin-top:5px">Máquinas y peso libre de última generación.</p></div>
+            <div class="card" style="text-align:center"><div style="width:44px;height:44px;border-radius:12px;background:var(--surface-3);display:grid;place-items:center;margin:0 auto 12px;color:var(--brand)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg></div><b>Entrenadores certificados</b><p style="color:var(--text-2);font-size:13px;margin-top:5px">Plan y seguimiento personalizado.</p></div>
+            <div class="card" style="text-align:center"><div style="width:44px;height:44px;border-radius:12px;background:var(--surface-3);display:grid;place-items:center;margin:0 auto 12px;color:var(--brand)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18"/></svg></div><b>Clases grupales</b><p style="color:var(--text-2);font-size:13px;margin-top:5px">Funcional, spinning, yoga, boxeo y más.</p></div>
+          </div>
+        </div>
+        <!-- pricing public -->
+        <div style="padding:10px 40px 44px;background:var(--bg)">
+          <h3 style="text-align:center;margin-bottom:22px;font-size:20px">Planes de socio</h3>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:760px;margin:0 auto">
+            <div class="card" style="text-align:center"><b>Básico</b><div style="font-size:28px;font-weight:800;margin:8px 0">$6.000<small style="font-size:12px;color:var(--muted)">/mes</small></div><p style="color:var(--text-2);font-size:13px">Acceso a sala</p></div>
+            <div class="card" style="text-align:center;border-color:rgba(34,211,238,.4)"><span class="badge info" style="margin-bottom:8px">Popular</span><b>Full</b><div style="font-size:28px;font-weight:800;margin:8px 0">$9.500<small style="font-size:12px;color:var(--muted)">/mes</small></div><p style="color:var(--text-2);font-size:13px">Sala + clases</p></div>
+            <div class="card" style="text-align:center"><b>Premium</b><div style="font-size:28px;font-weight:800;margin:8px 0">$13.000<small style="font-size:12px;color:var(--muted)">/mes</small></div><p style="color:var(--text-2);font-size:13px">Todo + nutrición</p></div>
+          </div>
+        </div>
+        <!-- footer -->
+        <div style="padding:22px 40px;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div style="color:var(--text-2);font-size:13px">📍 Av. Corrientes 1234, Buenos Aires · 📱 +54 911 1234 5678</div>
+          <div style="color:var(--muted);font-size:12px">Powered by <b style="color:var(--brand)">GymCore</b></div>
+        </div>
+      </div>
+      <p class="note" style="justify-content:center;margin-top:16px">Todo el contenido (nombre, colores, logo, beneficios, planes, WhatsApp) sale de la configuración del gimnasio — el dueño la edita sin tocar código.</p>
+    </section>
+
+    <!-- ============ PORTAL SOCIO ============ -->
+    <section class="view" id="portal">
+      <div class="page-head">
+        <div><h1>Portal del socio (PWA)</h1><p>Así ve la app tu socio en el celular — con el branding de cada gimnasio. Instalable, sin pasar por la tienda de apps.</p></div>
+      </div>
+      <div class="phone-wrap">
+        <div class="phone"><div class="phone-screen"><div class="ph-notch"></div>
+          <div class="ph-scroll">
+            <div class="ph-hero">
+              <div class="ph-gymname">PowerZone Gym</div>
+              <div class="ph-av">CM</div>
+              <div style="font-size:20px;font-weight:700">Carlos Méndez</div>
+              <div style="margin-top:12px"><span class="badge ok dot">Membresía activa</span></div>
+              <div style="color:var(--text-2);font-size:12.5px;margin-top:8px">Vence el 31/12/2026 · Plan Full</div>
+            </div>
+            <div class="ph-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b>Rutina de hoy</b><span class="badge info">Día 1 · Pecho</span></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div class="ex-thumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div style="flex:1"><b style="font-size:13px">Press banca</b><br><small style="color:var(--muted)">4 series · 10 reps</small></div></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div class="ex-thumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div style="flex:1"><b style="font-size:13px">Press inclinado</b><br><small style="color:var(--muted)">4 series · 12 reps</small></div></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 0"><div class="ex-thumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg></div><div style="flex:1"><b style="font-size:13px">Aperturas en polea</b><br><small style="color:var(--muted)">3 series · 15 reps</small></div></div>
+            </div>
+            <div class="ph-card">
+              <b>Próxima clase</b>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><div><b style="font-size:14px">Funcional</b><br><small style="color:var(--muted)">Hoy · 19:00</small></div><button class="btn btn-primary" style="padding:8px 14px;font-size:12px">Reservar</button></div>
+            </div>
+          </div>
+          <div class="ph-nav">
+            <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg>Mi perfil</div>
+            <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M6.5 12h11"/></svg>Mi rutina</div>
+            <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18"/></svg>Clases</div>
+          </div>
+        </div></div>
+        <div style="max-width:340px">
+          <h3 style="margin-bottom:12px">Lo que suma en la versión premium</h3>
+          <div class="card" style="margin-bottom:12px"><b>🎨 Branding por gimnasio</b><p style="color:var(--text-2);margin-top:5px">Logo, colores y nombre de cada gimnasio, igual que hoy pero unificado.</p></div>
+          <div class="card" style="margin-bottom:12px"><b>📲 App instalable (PWA)</b><p style="color:var(--text-2);margin-top:5px">El socio la agrega a su pantalla de inicio. Sin App Store ni Play Store.</p></div>
+          <div class="card" style="margin-bottom:12px"><b>🔔 Notificaciones</b><p style="color:var(--text-2);margin-top:5px">Aviso de vencimiento, nueva rutina cargada y recordatorio de clases.</p></div>
+          <div class="card"><b>✅ Check-in de entrenamiento</b><p style="color:var(--text-2);margin-top:5px">Marca series completadas y registra su progreso en el tiempo.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SUPER ADMIN ============ -->
+    <section class="view" id="admin">
+      <div class="page-head">
+        <div><h1>Panel de administración · GymCore SaaS</h1><p>Tu negocio: gimnasios clientes, facturación y crecimiento. <span class="badge info">Solo vos</span></p></div>
+        <button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>Exportar</button>
+      </div>
+      <div class="grid kpis" style="margin-bottom:20px">
+        <div class="card kpi"><div class="k-top">MRR (ingreso mensual) <span class="k-ico" style="color:var(--good)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 15l4-5 3 3 5-7"/></svg></span></div><div class="k-val">$1.86M</div><div class="k-sub up">▲ +14% MoM</div></div>
+        <div class="card kpi"><div class="k-top">Gimnasios activos <span class="k-ico" style="color:var(--brand)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg></span></div><div class="k-val">42</div><div class="k-sub up">▲ +6 este mes</div></div>
+        <div class="card kpi"><div class="k-top">En prueba gratis <span class="k-ico" style="color:var(--warn)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div><div class="k-val">11</div><div class="k-sub" style="color:var(--warn)">5 vencen esta semana</div></div>
+        <div class="card kpi"><div class="k-top">Churn mensual <span class="k-ico" style="color:var(--crit)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 9l4 5 3-3 5 7"/></svg></span></div><div class="k-val">2,4%</div><div class="k-sub up">▼ Mejoró 0,6pt</div></div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="section-title"><h3>Crecimiento de MRR</h3><a>Últimos 6 meses</a></div>
+        <div class="bars" id="mrrBars"></div>
+        <div class="legend"><div><i style="background:var(--brand)"></i>MRR mensual</div></div>
+      </div>
+      <div class="card" style="padding:0">
+        <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"><b>Gimnasios clientes</b><span class="badge info">42 cuentas</span></div>
+        <table>
+          <thead><tr><th>Gimnasio</th><th>Plan</th><th>Socios</th><th>Estado abono</th><th>Próx. cobro</th><th style="text-align:right">Acciones</th></tr></thead>
+          <tbody>
+            <tr><td><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#04121a">PZ</div><div>PowerZone Gym<small>Buenos Aires</small></div></div></td><td><span class="badge info">Pro</span></td><td>248</td><td><span class="badge ok dot">Al día</span></td><td>01/08/2026</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg></div></div></td></tr>
+            <tr><td><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">IF</div><div>Iron Fit<small>Córdoba</small></div></div></td><td><span class="badge" style="background:rgba(129,140,248,.14);color:var(--indigo)">Elite</span></td><td>512</td><td><span class="badge ok dot">Al día</span></td><td>03/08/2026</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg></div></div></td></tr>
+            <tr><td><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#0891b2,#06b6d4);color:#04121a">FZ</div><div>FitZone<small>Rosario</small></div></div></td><td><span class="badge">Básico</span></td><td>96</td><td><span class="badge warn dot">Vence en 3d</span></td><td>13/07/2026</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg></div></div></td></tr>
+            <tr><td><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#ca8a04,#eab308);color:#04121a">MG</div><div>MegaGym<small>Mendoza</small></div></div></td><td><span class="badge info">Pro</span></td><td>187</td><td><span class="badge info dot">Prueba (7d)</span></td><td>—</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg></div></div></td></tr>
+            <tr><td><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,#dc2626,#f05252)">BX</div><div>BoxClub<small>La Plata</small></div></div></td><td><span class="badge">Básico</span></td><td>54</td><td><span class="badge crit dot">Moroso</span></td><td>Vencido</td><td><div class="row-actions" style="justify-content:flex-end"><div class="mini"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ PLANES ============ -->
+    <section class="view" id="planes">
+      <div class="page-head" style="justify-content:center;text-align:center;flex-direction:column;align-items:center">
+        <div><h1>Planes para dueños de gimnasio</h1><p>Lo que le cobrás a cada gimnasio por usar GymCore. Todos con 14 días de prueba gratis.</p></div>
+      </div>
+      <div class="plans">
+        <div class="plan">
+          <h3>Básico</h3>
+          <div class="price">$29.900<small>/mes</small></div>
+          <div class="desc">Para gimnasios chicos que arrancan.</div>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Hasta 150 socios</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Gestión de socios y cobros</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Rutinas y finanzas</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Portal del socio</li>
+          </ul>
+          <button class="btn btn-ghost" style="justify-content:center">Empezar prueba</button>
+        </div>
+        <div class="plan pop">
+          <div class="tag">MÁS ELEGIDO</div>
+          <h3>Pro</h3>
+          <div class="price">$49.900<small>/mes</small></div>
+          <div class="desc">Para gimnasios en crecimiento.</div>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Hasta 500 socios</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Todo lo del Básico</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Clases y reservas</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Control de acceso por QR</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Página pública white-label</li>
+          </ul>
+          <button class="btn btn-primary" style="justify-content:center">Empezar prueba</button>
+        </div>
+        <div class="plan">
+          <h3>Elite</h3>
+          <div class="price">$89.900<small>/mes</small></div>
+          <div class="desc">Para cadenas y multi-sede.</div>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Socios ilimitados</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Todo lo del Pro</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Múltiples sedes</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Reportes avanzados</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Soporte prioritario</li>
+          </ul>
+          <button class="btn btn-ghost" style="justify-content:center">Contactar</button>
+        </div>
+      </div>
+      <p class="note" style="justify-content:center;margin-top:24px">Precios de ejemplo — los definimos juntos. El cobro se automatiza con Stripe / Mercado Pago.</p>
+    </section>
+
+  </div>
+</div>
+
+<!-- MODAL NUEVA CLASE -->
+<div id="claseModal" style="display:none;position:fixed;inset:0;background:rgba(4,7,11,.7);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="width:560px;max-width:100%;max-height:92vh;overflow:auto;padding:0" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+      <div><h3 style="font-size:18px">Nueva clase</h3><p style="color:var(--text-2);font-size:13px;margin-top:2px">Diseñala como quieras — vos definís todo</p></div>
+      <div class="mini" onclick="closeClase()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+    </div>
+    <div style="padding:22px 24px;display:flex;flex-direction:column;gap:16px">
+      <div><label style="font-size:12.5px;color:var(--text-2);font-weight:600;display:block;margin-bottom:7px">Nombre de la clase</label><input class="sel" style="width:100%" placeholder="Ej: Funcional intensivo" value="Funcional"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div><label style="font-size:12.5px;color:var(--text-2);font-weight:600;display:block;margin-bottom:7px">Tipo</label><select class="sel" style="width:100%"><option>Funcional</option><option>Spinning</option><option>Yoga</option><option>Boxeo</option><option>Crossfit</option><option>Personalizada…</option></select></div>
+        <div><label style="font-size:12.5px;color:var(--text-2);font-weight:600;display:block;margin-bottom:7px">Profesor</label><select class="sel" style="width:100%"><option>Ana Torres</option><option>Leo Díaz</option><option>Mora Ruiz</option><option>Nico Paz</option></select></div>
+      </div>
+      <div><label style="font-size:12.5px;color:var(--text-2);font-weight:600;display:block;margin-bottom:7px">Días</label>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <span class="day-pick on">Lun</span><span class="day-pick">Mar</span><span class="day-pick on">Mié</span><span class="day-pick">Jue</span><span class="day-pick on">Vie</span><span class="day-pick">Sáb</span><span class="day-pick">Dom</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+        <div><label style="font-size:12.5px;color:var(--text-2);font-weight:600;display:block;margin-bottom:7px">Horario</label><input class="sel" style="width:100%" value="19:00" type="time"></div>
+        <div><label style="font-size:12.5px;color:var(--text-2);font-weight:600;display:block;margin-bottom:7px">Duración (min)</label><input class="sel" style="width:100%" value="60"></div>
+        <div><label style="font-size:12.5px;color:var(--text-2);font-weight:600;display:block;margin-bottom:7px">Cupo máx.</label><input class="sel" style="width:100%" value="20"></div>
+      </div>
+      <div><label style="font-size:12.5px;color:var(--text-2);font-weight:600;display:block;margin-bottom:7px">Color / ícono</label>
+        <div style="display:flex;gap:9px;align-items:center">
+          <span class="col-pick on" style="background:#22d3ee"></span><span class="col-pick" style="background:#818cf8"></span><span class="col-pick" style="background:#22c55e"></span><span class="col-pick" style="background:#f5b13d"></span><span class="col-pick" style="background:#f05252"></span>
+          <div style="flex:1"></div>
+          <select class="sel small">🔥</select>
+        </div>
+      </div>
+    </div>
+    <div style="padding:18px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
+      <button class="btn btn-ghost" onclick="closeClase()">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeClase()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 13l4 4L19 7"/></svg>Crear clase</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openClase(){document.getElementById('claseModal').style.display='flex';}
+  function closeClase(){document.getElementById('claseModal').style.display='none';}
+  document.getElementById('claseModal').addEventListener('click',closeClase);
+  document.addEventListener('click',e=>{
+    if(e.target.classList?.contains('day-pick')||e.target.classList?.contains('col-pick')){
+      if(e.target.classList.contains('col-pick'))document.querySelectorAll('.col-pick').forEach(c=>c.classList.remove('on'));
+      e.target.classList.toggle('on');
+    }
+  });
+</script>
+<style>
+  .day-pick{padding:8px 13px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;font-weight:600;font-size:13px;color:var(--text-2);user-select:none}
+  .day-pick.on{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#04121a;border-color:transparent}
+  .col-pick{width:30px;height:30px;border-radius:9px;cursor:pointer;border:2px solid transparent}
+  .col-pick.on{border-color:#fff;box-shadow:0 0 0 2px var(--bg),0 0 0 4px currentColor}
+</style>
+
+<script>
+  // Navegación entre vistas
+  const items=document.querySelectorAll('.nav-item');
+  function show(view){
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===view));
+    items.forEach(i=>i.classList.toggle('active',i.dataset.view===view));
+    document.querySelector('.main').scrollTo?.(0,0);
+    window.scrollTo(0,0);
+  }
+  items.forEach(i=>i.addEventListener('click',()=>show(i.dataset.view)));
+  document.querySelectorAll('[data-goto]').forEach(q=>q.addEventListener('click',()=>show(q.dataset.goto)));
+
+  // Barras chart helper
+  function makeBars(el,data,max){
+    el.innerHTML=data.map(d=>{
+      const ih=Math.round(d.ing/max*100), gh=d.gas!=null?Math.round(d.gas/max*100):0;
+      const g=d.gas!=null?`<div class="bar gas" style="height:${gh}%"></div>`:'';
+      return `<div class="bar-col"><div class="bar-pair"><div class="bar ing" style="height:${ih}%"></div>${g}</div><span>${d.m}</span></div>`;
+    }).join('');
+  }
+  const d6=[{m:'Feb',ing:820,gas:340},{m:'Mar',ing:910,gas:360},{m:'Abr',ing:880,gas:300},{m:'May',ing:1020,gas:390},{m:'Jun',ing:1150,gas:410},{m:'Jul',ing:1248,gas:412}];
+  makeBars(document.getElementById('dashBars'),d6,1300);
+  makeBars(document.getElementById('finBars'),d6,1300);
+  const mrr=[{m:'Feb',ing:1120},{m:'Mar',ing:1290},{m:'Abr',ing:1410},{m:'May',ing:1560},{m:'Jun',ing:1680},{m:'Jul',ing:1860}];
+  makeBars(document.getElementById('mrrBars'),mrr,1950);
+
+  // Socios table
+  const socios=[
+    {n:'Carlos Ramírez',e:'carlos@email.com',dni:'34.221.870',plan:'Full',venc:'12/07/2026',st:'warn',stt:'Vence pronto',c:'#7c3aed,#a855f7',i:'CR'},
+    {n:'Lucía Méndez',e:'lucia@email.com',dni:'38.910.442',plan:'Básico',venc:'14/07/2026',st:'warn',stt:'Vence pronto',c:'#0891b2,#06b6d4',i:'LM'},
+    {n:'Diego Fernández',e:'diego@email.com',dni:'30.117.665',plan:'Full',venc:'05/07/2026',st:'crit',stt:'Vencido',c:'#dc2626,#f05252',i:'DF'},
+    {n:'Sofía Paz',e:'sofia@email.com',dni:'40.556.201',plan:'Full',venc:'16/07/2026',st:'warn',stt:'Vence pronto',c:'#059669,#10b981',i:'SP'},
+    {n:'Martín Gómez',e:'martin@email.com',dni:'33.482.119',plan:'Full',venc:'28/07/2026',st:'ok',stt:'Activo',c:'#ca8a04,#eab308',i:'MG'},
+    {n:'Valentina Ruiz',e:'vale@email.com',dni:'41.203.887',plan:'Básico',venc:'02/08/2026',st:'ok',stt:'Activo',c:'#4f46e5,#818cf8',i:'VR'},
+    {n:'Nicolás Torres',e:'nico@email.com',dni:'36.774.010',plan:'Full',venc:'09/08/2026',st:'ok',stt:'Activo',c:'#0d9488,#2dd4bf',i:'NT'},
+  ];
+  document.getElementById('sociosBody').innerHTML=socios.map(s=>`
+    <tr>
+      <td><div class="u-cell"><div class="avatar" style="background:linear-gradient(135deg,${s.c})">${s.i}</div><div>${s.n}<small>${s.e}</small></div></div></td>
+      <td style="font-variant-numeric:tabular-nums;color:var(--text-2)">${s.dni}</td>
+      <td>${s.plan}</td>
+      <td style="color:var(--text-2)">${s.venc}</td>
+      <td><span class="badge ${s.st} dot">${s.stt}</span></td>
+      <td><div class="row-actions" style="justify-content:flex-end">
+        <div class="mini wa" title="WhatsApp"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.5 15.3L2 22l4.8-1.5A10 10 0 1012 2zm0 18a8 8 0 01-4.1-1.1l-.3-.2-2.8.9.9-2.7-.2-.3A8 8 0 1112 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1l-.7.9c-.1.2-.3.2-.5.1a6.5 6.5 0 01-3.2-2.8c-.1-.2 0-.4.1-.5l.4-.5.2-.4v-.4l-.8-1.8c-.2-.5-.4-.4-.5-.4h-.5a1 1 0 00-.7.3A2.8 2.8 0 006 8.9c0 1.7 1.2 3.3 1.4 3.5s2.5 3.8 6 5.1c2.1.8 2.5.6 3 .6s1.4-.6 1.6-1.1.2-1 .1-1.1z"/></svg></div>
+        <div class="mini" title="Rutina"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M6.5 12h11"/></svg></div>
+        <div class="mini" title="Editar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2 2 0 013 3L7 19l-4 1 1-4z"/></svg></div>
+      </div></td>
+    </tr>`).join('');
+</script>
+</body>
+</html>
