@@ -8,6 +8,7 @@ import { PAY_METHODS, type PayMethod, type RealPlan } from "@/types/db";
 interface Member {
   id: string;
   gym_id: string;
+  member_number: number | null;
   full_name: string;
   dni: string | null;
   email: string | null;
@@ -18,12 +19,15 @@ interface Member {
   observacion: string | null;
   reminder_whatsapp: boolean;
   reminder_email: boolean;
+  height_cm: number | null;
+  created_at: string;
 }
 
 const EMPTY: Partial<Member> = {
   full_name: "", dni: "", email: "", whatsapp: "",
   plan_name: "", plan_price: null, membership_expiry: "",
   observacion: "", reminder_whatsapp: true, reminder_email: false,
+  height_cm: null,
 };
 
 const BADGE_BASE = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ";
@@ -49,7 +53,9 @@ function statusOf(expiry: string | null): { label: string; cls: string } {
 export default function SociosPage() {
   const supabase = createClient();
   const [gymId, setGymId] = useState<string | null>(null);
+  const [gymSlug, setGymSlug] = useState<string | null>(null);
   const [plans, setPlans] = useState<RealPlan[]>([]);
+  const [welcome, setWelcome] = useState<{ name: string; whatsapp: string; planName: string | null; planPrice: number | null } | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -59,6 +65,8 @@ export default function SociosPage() {
   // Cobro al alta
   const [charge, setCharge] = useState(false);
   const [method, setMethod] = useState<PayMethod>("efectivo");
+  // Peso inicial (solo se usa al guardar; se carga como primer registro en weight_logs)
+  const [initialWeight, setInitialWeight] = useState("");
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -68,9 +76,10 @@ export default function SociosPage() {
     setGymId(profile?.gym_id ?? null);
     if (profile?.gym_id) {
       const { data: gym } = await supabase
-        .from("gyms").select("real_plans").eq("id", profile.gym_id)
-        .single<{ real_plans: RealPlan[] }>();
+        .from("gyms").select("real_plans, slug").eq("id", profile.gym_id)
+        .single<{ real_plans: RealPlan[]; slug: string }>();
       setPlans(gym?.real_plans || []);
+      setGymSlug(gym?.slug || null);
     }
     const { data } = await supabase
       .from("members").select("*").order("created_at", { ascending: false });
@@ -86,8 +95,8 @@ export default function SociosPage() {
       m.full_name.toLowerCase().includes(q) || (m.dni || "").includes(q));
   }, [members, search]);
 
-  function openNew() { setEditing({ ...EMPTY }); setCharge(false); setMethod("efectivo"); setModal(true); }
-  function openEdit(m: Member) { setEditing({ ...m }); setCharge(false); setMethod("efectivo"); setModal(true); }
+  function openNew() { setEditing({ ...EMPTY }); setCharge(false); setMethod("efectivo"); setInitialWeight(""); setModal(true); }
+  function openEdit(m: Member) { setEditing({ ...m }); setCharge(false); setMethod("efectivo"); setInitialWeight(""); setModal(true); }
 
   // Al elegir un plan del listado, autocompleta nombre y precio.
   function selectPlan(name: string) {
@@ -99,6 +108,24 @@ export default function SociosPage() {
 
   async function save() {
     if (!editing || !gymId) return;
+
+    // Aviso de posible duplicado (mismo DNI o email ya cargado en este gym) antes de crear un socio nuevo.
+    if (!editing.id) {
+      const dni = (editing.dni || "").trim();
+      const email = (editing.email || "").trim().toLowerCase();
+      const dup = members.find((m) =>
+        (dni && (m.dni || "").trim() === dni) ||
+        (email && (m.email || "").trim().toLowerCase() === email)
+      );
+      if (dup) {
+        const ok = confirm(
+          `Ya existe un socio con ese ${dup.dni === dni && dni ? "DNI" : "email"} cargado: "${dup.full_name}" (N° ${dup.member_number ?? "-"}).\n\n¿Seguro que querés crear un socio nuevo de todas formas? Si es la misma persona, mejor buscalo y editalo en vez de duplicarlo.`
+        );
+        if (!ok) return;
+      }
+    }
+
+    const isNew = !editing.id;
     setSaving(true);
     const price = editing.plan_price ? Number(editing.plan_price) : null;
     const payload = {
@@ -113,6 +140,7 @@ export default function SociosPage() {
       observacion: editing.observacion || null,
       reminder_whatsapp: editing.reminder_whatsapp ?? true,
       reminder_email: editing.reminder_email ?? false,
+      height_cm: editing.height_cm ? Number(editing.height_cm) : null,
     };
     let memberId = editing.id || null;
     if (memberId) {
@@ -134,7 +162,37 @@ export default function SociosPage() {
         date: new Date().toISOString().slice(0, 10),
       });
     }
+    // Peso inicial → primer registro de evolución de peso del socio
+    if (initialWeight && Number(initialWeight) > 0 && memberId) {
+      await supabase.from("weight_logs").insert({
+        gym_id: gymId, member_id: memberId,
+        date: new Date().toISOString().slice(0, 10),
+        weight_kg: Number(initialWeight),
+      });
+    }
+    // Bienvenida automática → después de dar de alta a un socio nuevo, ofrece
+    // mandarle por WhatsApp el detalle de su plan + el link para bajar la app.
+    if (isNew && editing.whatsapp) {
+      setWelcome({
+        name: editing.full_name || "tu nuevo socio",
+        whatsapp: editing.whatsapp,
+        planName: editing.plan_name || null,
+        planPrice: price,
+      });
+    }
     setSaving(false); setModal(false); setEditing(null); load();
+  }
+
+  function welcomeHref() {
+    if (!welcome) return "#";
+    const link = gymSlug ? `${window.location.origin}/portal/registro?gym=${gymSlug}` : window.location.origin;
+    const planTxt = welcome.planName
+      ? `Tu plan: ${welcome.planName}${welcome.planPrice ? ` ($${welcome.planPrice})` : ""}.\n`
+      : "";
+    const text =
+      `¡Hola ${welcome.name}! 👋 Bienvenido/a. ${planTxt}` +
+      `Para ver tu rutina, tus clases y pagar tu cuota, creá tu cuenta acá: ${link}`;
+    return `https://wa.me/${welcome.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
   }
 
   async function remove(id: string) {
@@ -162,6 +220,19 @@ export default function SociosPage() {
         <button className="btn btn-primary" onClick={openNew}>+ Agregar socio</button>
       </div>
 
+      {welcome && (
+        <div className="card mb-4 flex flex-wrap items-center justify-between gap-3 border-brand/30 bg-[rgba(34,211,238,.06)]">
+          <div>
+            <div className="font-semibold">✅ {welcome.name} fue dado de alta</div>
+            <div className="text-sm text-ink-2">Mandale por WhatsApp el detalle de su plan y el link para crear su cuenta.</div>
+          </div>
+          <div className="flex gap-2">
+            <a href={welcomeHref()} target="_blank" rel="noreferrer" className="btn btn-primary">💬 Enviar bienvenida</a>
+            <button className="btn btn-ghost" onClick={() => setWelcome(null)}>Ahora no</button>
+          </div>
+        </div>
+      )}
+
       <div className="card p-0">
         <div className="border-b border-white/10 p-4">
           <input className="input max-w-sm" placeholder="Buscar por nombre o DNI…"
@@ -181,6 +252,7 @@ export default function SociosPage() {
             <table className="w-full">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-muted">
+                  <th className="px-4 pb-3 pt-1">N°</th>
                   <th className="px-4 pb-3 pt-1">Socio</th>
                   <th className="px-4 pb-3 pt-1">DNI</th>
                   <th className="px-4 pb-3 pt-1">Plan</th>
@@ -194,6 +266,7 @@ export default function SociosPage() {
                   const st = statusOf(m.membership_expiry);
                   return (
                     <tr key={m.id} className="border-t border-white/10 hover:bg-white/[.02]">
+                      <td className="px-4 py-3 text-ink-2">#{m.member_number ?? "—"}</td>
                       <td className="px-4 py-3">
                         <Link href={`/dashboard/socios/${m.id}`} className="flex items-center gap-3 hover:opacity-80">
                           <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-xs font-bold text-black">
@@ -234,7 +307,9 @@ export default function SociosPage() {
       {modal && editing && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setModal(false)}>
           <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 text-lg font-bold">{editing.id ? "Editar socio" : "Nuevo socio"}</h3>
+            <h3 className="mb-4 text-lg font-bold">
+              {editing.id ? `Editar socio${editing.member_number ? ` · N° ${editing.member_number}` : ""}` : "Nuevo socio"}
+            </h3>
             <div className="flex flex-col gap-3">
               <input className="input" placeholder="Nombre completo" value={editing.full_name || ""} onChange={(e) => setF("full_name", e.target.value)} />
               <div className="grid grid-cols-2 gap-3">
@@ -242,6 +317,17 @@ export default function SociosPage() {
                 <input className="input" placeholder="WhatsApp" value={editing.whatsapp || ""} onChange={(e) => setF("whatsapp", e.target.value)} />
               </div>
               <input className="input" type="email" placeholder="Email" value={editing.email || ""} onChange={(e) => setF("email", e.target.value)} />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-ink-2">Altura (cm)</label>
+                  <input className="input" type="number" step="0.1" placeholder="Ej: 172" value={editing.height_cm ?? ""} onChange={(e) => setF("height_cm", e.target.value)} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-ink-2">{editing.id ? "Registrar peso (kg)" : "Peso inicial (kg)"}</label>
+                  <input className="input" type="number" step="0.1" placeholder="Ej: 78.5" value={initialWeight} onChange={(e) => setInitialWeight(e.target.value)} />
+                </div>
+              </div>
 
               <label className="text-xs text-ink-2">Plan</label>
               {plans.length > 0 ? (
