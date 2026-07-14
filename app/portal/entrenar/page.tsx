@@ -123,7 +123,7 @@ export default function EntrenarPage() {
         <Link href="/portal" className="hover:text-brand">← Mi perfil</Link>
       </div>
       <h1 className="mb-1 text-2xl font-bold">Iniciar rutina</h1>
-      <p className="mb-6 text-ink-2">{routine?.name || "Tu rutina"}</p>
+      <p className="mb-6 text-ink-2">{routine?.name ? routine.name.split(" — ")[0] : "Tu rutina"}</p>
 
       {!session ? (
         <div className="card">

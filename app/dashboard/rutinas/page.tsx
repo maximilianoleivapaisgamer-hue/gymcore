@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import AiGenerate from "@/components/AiGenerate";
+import AiChat from "@/components/AiChat";
 
 interface Exercise { id: string; name: string; notes: string | null; }
 interface Member { id: string; full_name: string; }
@@ -425,6 +426,9 @@ export default function RutinasPage() {
           </div>
         )}
       </div>
+
+      {/* Chat con el asistente IA — arma la rutina charlando */}
+      <AiChat kind="rutina" gymId={gymId} members={members} onDone={load} />
 
       {/* Modal biblioteca de ejercicios */}
       {libOpen && (

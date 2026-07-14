@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import AiGenerate from "@/components/AiGenerate";
+import AiChat from "@/components/AiChat";
 
 interface Member { id: string; full_name: string; }
 interface DMeal {
@@ -345,6 +346,9 @@ export default function DietasPage() {
           </div>
         )}
       </div>
+
+      {/* Chat con el asistente IA — arma el plan de comidas charlando */}
+      <AiChat kind="dieta" gymId={gymId} members={members} onDone={load} />
     </main>
   );
 }

@@ -93,3 +93,85 @@ export async function generateJSON<T = unknown>(opts: GenerateJSONOpts): Promise
   }
   return block.input as T;
 }
+
+export interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatToolOpts {
+  /** Instrucciones de sistema (la skill del agente). */
+  system: string;
+  /** Historial de la conversación. */
+  messages: ChatMsg[];
+  /** Herramienta que el agente usa cuando ya puede armar el resultado. */
+  toolName: string;
+  toolDescription: string;
+  schema: Record<string, unknown>;
+  maxTokens?: number;
+}
+
+/**
+ * Turno de chat: el agente puede responder con TEXTO (una pregunta más) o,
+ * cuando ya tiene todo, LLAMAR a la herramienta y devolver el resultado
+ * estructurado. Devuelve { text, result }: uno de los dos viene con contenido.
+ */
+export async function chatWithTool<T = unknown>(
+  opts: ChatToolOpts
+): Promise<{ text: string | null; result: T | null }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "Falta ANTHROPIC_API_KEY en el servidor. Cargala en Vercel → Project Settings → Environment Variables."
+    );
+  }
+  const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+
+  let res: Response;
+  try {
+    res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: opts.maxTokens ?? 4096,
+        system: opts.system,
+        tools: [
+          {
+            name: opts.toolName,
+            description: opts.toolDescription,
+            input_schema: opts.schema,
+          },
+        ],
+        messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+      }),
+    });
+  } catch {
+    throw new Error("No se pudo conectar con la IA. Probá de nuevo en un momento.");
+  }
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`La IA respondió con error ${res.status}. ${t.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as {
+    content?: Array<{ type: string; text?: string; input?: unknown }>;
+  };
+  const blocks = Array.isArray(data.content) ? data.content : [];
+  const toolBlock = blocks.find((c) => c.type === "tool_use" && c.input);
+  const text = blocks
+    .filter((c) => c.type === "text" && c.text)
+    .map((c) => c.text as string)
+    .join("\n")
+    .trim();
+
+  return {
+    text: text || null,
+    result: (toolBlock?.input as T) ?? null,
+  };
+}
