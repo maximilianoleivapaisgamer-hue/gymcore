@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { PAY_METHODS, type PayMethod } from "@/types/db";
+import { resolveActiveSede, type Sede } from "@/lib/sede";
 
 interface Entry {
   id: string;
@@ -49,6 +50,8 @@ export default function FinanzasPage() {
   const supabase = createClient();
   const today = new Date();
   const [gymId, setGymId] = useState<string | null>(null);
+  const [sedeId, setSedeId] = useState<string | null>(null);
+  const [sedeName, setSedeName] = useState<string>("");
   const [cur, setCur] = useState(ym(today));
   const [entries, setEntries] = useState<Entry[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -71,14 +74,28 @@ export default function FinanzasPage() {
     if (profile?.role === "empleado" && !(profile?.permissions || []).includes("finanzas")) {
       setBlocked(true); setLoading(false); return;
     }
+    // Sucursal activa: la caja se divide por sede.
+    let activeSede: string | null = null;
+    if (profile?.gym_id) {
+      const { data: sedeList } = await supabase.from("sedes")
+        .select("id, gym_id, name, address, created_at").eq("gym_id", profile.gym_id)
+        .order("created_at", { ascending: true });
+      const arr = (sedeList as Sede[]) || [];
+      activeSede = resolveActiveSede(profile.gym_id, arr);
+      setSedeId(activeSede);
+      setSedeName(arr.find((s) => s.id === activeSede)?.name || "");
+    }
     const c6 = new Date(y, m - 5, 1);
     const c6Iso = `${c6.getFullYear()}-${pad(c6.getMonth() + 1)}-01`;
+    let qMonth = supabase.from("cashflow_entries").select("id, concept, type, amount, method, date")
+      .gte("date", monthStart(y, m)).lt("date", nextMonthStart(y, m));
+    let q6 = supabase.from("cashflow_entries").select("date, type, amount")
+      .gte("date", c6Iso).lt("date", nextMonthStart(y, m));
+    if (activeSede) { qMonth = qMonth.eq("sede_id", activeSede); q6 = q6.eq("sede_id", activeSede); }
     const [{ data: ent }, { data: mem }, { data: cf6 }] = await Promise.all([
-      supabase.from("cashflow_entries").select("id, concept, type, amount, method, date")
-        .gte("date", monthStart(y, m)).lt("date", nextMonthStart(y, m))
-        .order("date", { ascending: false }),
+      qMonth.order("date", { ascending: false }),
       supabase.from("members").select("id, full_name, plan_price, membership_expiry").order("full_name"),
-      supabase.from("cashflow_entries").select("date, type, amount").gte("date", c6Iso).lt("date", nextMonthStart(y, m)),
+      q6,
     ]);
     setEntries((ent as Entry[]) || []);
     setMembers((mem as Member[]) || []);
@@ -161,6 +178,7 @@ export default function FinanzasPage() {
     setSaving(true);
     const { error } = await supabase.from("cashflow_entries").insert({
       gym_id: gymId,
+      sede_id: sedeId,
       member_id: form.member_id || null,
       concept: form.concept || (form.type === "income" ? "Ingreso" : "Egreso"),
       type: form.type,
@@ -207,7 +225,9 @@ export default function FinanzasPage() {
             <span>/</span><span>Finanzas</span>
           </div>
           <h1 className="text-2xl font-bold">Finanzas</h1>
-          <p className="text-ink-2">Caja del gimnasio — ingresos y egresos por mes.</p>
+          <p className="text-ink-2">
+            Caja {sedeName ? <>de <span className="font-semibold text-ink">{sedeName}</span></> : "del gimnasio"} — ingresos y egresos por mes.
+          </p>
         </div>
         <div className="flex gap-2">
           <button className="btn btn-ghost" onClick={() => openNew("expense")}>− Egreso</button>

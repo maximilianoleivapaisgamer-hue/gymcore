@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { resolveActiveSede, type Sede } from "@/lib/sede";
 
 interface Member {
   id: string;
@@ -59,6 +60,7 @@ export default function DashboardHome() {
   const [name, setName] = useState("");
   const [gymName, setGymName] = useState("");
   const [canSeeIncome, setCanSeeIncome] = useState(true);
+  const [asistenciasHoy, setAsistenciasHoy] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -75,14 +77,31 @@ export default function DashboardHome() {
           .eq("id", profile.gym_id).maybeSingle<{ name: string }>();
         setGymName(g?.name || "");
       }
+      // Sucursal activa: la caja (ingresos/gastos) se divide por sede. Los socios son compartidos.
+      let activeSede: string | null = null;
+      if (profile?.gym_id) {
+        const { data: sedeList } = await supabase.from("sedes")
+          .select("id, gym_id, name, address, created_at").eq("gym_id", profile.gym_id)
+          .order("created_at", { ascending: true });
+        activeSede = resolveActiveSede(profile.gym_id, (sedeList as Sede[]) || []);
+      }
       const now = new Date();
       const start6 = iso(new Date(now.getFullYear(), now.getMonth() - 5, 1));
-      const [{ data: mem }, { data: cf }] = await Promise.all([
+      let qCash = supabase.from("cashflow_entries").select("date, type, amount").gte("date", start6);
+      if (activeSede) qCash = qCash.eq("sede_id", activeSede);
+      // Asistencias de hoy (control de acceso) de la sucursal activa.
+      const startDay = new Date(); startDay.setHours(0, 0, 0, 0);
+      let qAtt = supabase.from("attendances").select("id", { count: "exact", head: true })
+        .gte("entered_at", startDay.toISOString());
+      if (activeSede) qAtt = qAtt.eq("sede_id", activeSede);
+      const [{ data: mem }, { data: cf }, { count: attCount }] = await Promise.all([
         supabase.from("members").select("id, full_name, whatsapp, plan_name, plan_price, membership_expiry, created_at"),
-        supabase.from("cashflow_entries").select("date, type, amount").gte("date", start6),
+        qCash,
+        qAtt,
       ]);
       setMembers((mem as Member[]) || []);
       setCash((cf as CashRow[]) || []);
+      setAsistenciasHoy(attCount ?? 0);
       setLoading(false);
     })();
     /* eslint-disable-next-line */
@@ -173,8 +192,8 @@ export default function DashboardHome() {
             : <span className="text-muted">oculto por el dueño</span>} />
         <Kpi label="Vencen esta semana" icon="clock" tone="text-warn" value={dash || String(stats.prontos)}
           sub={<span className="text-warn">Requieren seguimiento</span>} />
-        <Kpi label="Asistencias hoy" icon="check" tone="text-indigo" value={dash || "—"}
-          sub={<span className="text-muted">Se activa con Control de acceso</span>} />
+        <Kpi label="Asistencias hoy" icon="check" tone="text-indigo" value={dash || String(asistenciasHoy ?? 0)}
+          sub={<span className="text-muted">Check-in por control de acceso</span>} />
       </div>
 
       {/* Chart + próximos */}

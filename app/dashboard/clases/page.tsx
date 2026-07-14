@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { resolveActiveSede, type Sede } from "@/lib/sede";
 
 interface Klass {
   id: string;
@@ -56,6 +57,8 @@ const emptyForm = () => ({
 export default function ClasesPage() {
   const supabase = createClient();
   const [gymId, setGymId] = useState<string | null>(null);
+  const [sedeId, setSedeId] = useState<string | null>(null);
+  const [sedeName, setSedeName] = useState<string>("");
   const [classes, setClasses] = useState<Klass[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,10 +78,24 @@ export default function ClasesPage() {
     const { data: profile } = await supabase
       .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
     setGymId(profile?.gym_id ?? null);
+    // Sucursal activa: las clases y sus reservas se dividen por sede.
+    let activeSede: string | null = null;
+    if (profile?.gym_id) {
+      const { data: sedeList } = await supabase.from("sedes")
+        .select("id, gym_id, name, address, created_at").eq("gym_id", profile.gym_id)
+        .order("created_at", { ascending: true });
+      const arr = (sedeList as Sede[]) || [];
+      activeSede = resolveActiveSede(profile.gym_id, arr);
+      setSedeId(activeSede);
+      setSedeName(arr.find((s) => s.id === activeSede)?.name || "");
+    }
+    let qClasses = supabase.from("classes").select("*").order("start_time");
+    let qBookings = supabase.from("bookings").select("class_id, class_date").gte("class_date", iso(new Date()));
+    if (activeSede) { qClasses = qClasses.eq("sede_id", activeSede); qBookings = qBookings.eq("sede_id", activeSede); }
     const [{ data: cl }, { data: mem }, { data: bk }] = await Promise.all([
-      supabase.from("classes").select("*").order("start_time"),
+      qClasses,
       supabase.from("members").select("id, full_name").order("full_name"),
-      supabase.from("bookings").select("class_id, class_date").gte("class_date", iso(new Date())),
+      qBookings,
     ]);
     setClasses((cl as Klass[]) || []);
     setMembers((mem as Member[]) || []);
@@ -121,7 +138,7 @@ export default function ClasesPage() {
       color: form.color,
     };
     if (form.id) await supabase.from("classes").update(payload).eq("id", form.id);
-    else await supabase.from("classes").insert(payload);
+    else await supabase.from("classes").insert({ ...payload, sede_id: sedeId });
     setSaving(false); setModal(false); load();
   }
 
@@ -146,7 +163,7 @@ export default function ClasesPage() {
     if (!gymId || !resFor || !resDate || !addMember) return;
     if (bookings.some((b) => b.member_id === addMember)) { setAddMember(""); return; }
     const { data } = await supabase.from("bookings")
-      .insert({ gym_id: gymId, class_id: resFor.id, member_id: addMember, class_date: resDate })
+      .insert({ gym_id: gymId, sede_id: sedeId, class_id: resFor.id, member_id: addMember, class_date: resDate })
       .select("id, member_id, class_date, members(full_name)").single();
     if (data) setBookings((bs) => [...bs, data as Booking]);
     setAddMember("");
@@ -181,7 +198,9 @@ export default function ClasesPage() {
             <span>/</span><span>Clases</span>
           </div>
           <h1 className="text-2xl font-bold">Clases y reservas</h1>
-          <p className="text-ink-2">Armá la grilla a tu manera. Tocá una clase para ver y anotar reservas.</p>
+          <p className="text-ink-2">
+            Grilla{sedeName ? <> de <span className="font-semibold text-ink">{sedeName}</span></> : ""}. Tocá una clase para ver y anotar reservas.
+          </p>
         </div>
         <button className="btn btn-primary" onClick={openNew}>+ Nueva clase</button>
       </div>

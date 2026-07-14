@@ -78,6 +78,9 @@ export interface Gym {
   landing_sections: LandingSectionConfig[];
   theme: string;
   bg_style: string;
+  /** Ediciones de la landing pública (plantilla definitiva). Se combina con los
+   *  defaults de lib/landing-config.ts. Null = sin ediciones. */
+  landing_config: unknown;
 }
 
 /** Planes de abono mensual de GymCore (lo que Maxi le cobra a cada dueño).

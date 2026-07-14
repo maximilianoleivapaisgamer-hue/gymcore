@@ -8,6 +8,7 @@ import { allows, minPlanLabel, loadPlans, DEFAULT_PLANS, type PlanFeature, type 
 import { staffCanAccess } from "@/lib/staff";
 import ThemeApply from "@/components/ThemeApply";
 import { BrandMark, BrandWordmark } from "@/components/BrandMark";
+import SedeSwitcher from "@/components/SedeSwitcher";
 
 interface NavItem {
   href: string;
@@ -31,6 +32,7 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/finanzas", label: "Finanzas", icon: "chart" },
       { href: "/dashboard/clases", label: "Clases", icon: "calendar" },
       { href: "/dashboard/equipo", label: "Equipo", icon: "staff" },
+      { href: "/dashboard/sedes", label: "Sucursales", icon: "building" },
       { href: "/dashboard/control-acceso", label: "Control de acceso", icon: "acceso", feature: "control_acceso" },
       { href: "/dashboard/planes", label: "Planes", icon: "layers" },
     ],
@@ -130,6 +132,12 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
     plus: <path d="M12 5v14M5 12h14" />,
     logo: <path d="M6.5 6.5v11M17.5 6.5v11M4 9v6M20 9v6M6.5 12h11" />,
     logout: <path d="M15 12H3m0 0l4-4m-4 4l4 4M11 3h6a2 2 0 012 2v14a2 2 0 01-2 2h-6" />,
+    building: (
+      <>
+        <path d="M3 21h18M5 21V7l7-4 7 4v14" />
+        <path d="M9 21v-6h6v6M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
+      </>
+    ),
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -313,6 +321,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <SedeSwitcher role={role} />
             <button className="grid h-[38px] w-[38px] place-items-center rounded-[10px] border border-white/[.08] bg-surface text-ink-2 transition hover:border-white/20 hover:text-white" aria-label="Notificaciones">
               <Icon name="bell" className="h-[18px] w-[18px]" />
             </button>

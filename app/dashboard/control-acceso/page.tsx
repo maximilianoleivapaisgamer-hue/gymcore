@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
+import { resolveActiveSede, type Sede } from "@/lib/sede";
 
 interface Member {
   id: string;
@@ -33,6 +34,9 @@ export default function ControlAccesoPage() {
   const [plan, setPlan] = useState<string | null>(null);
   const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
   const [loadingPlan, setLoadingPlan] = useState(true);
+  const [gymId, setGymId] = useState<string | null>(null);
+  const [sedeId, setSedeId] = useState<string | null>(null);
+  const [sedeName, setSedeName] = useState<string>("");
 
   useEffect(() => {
     (async () => {
@@ -41,10 +45,32 @@ export default function ControlAccesoPage() {
       const { data: profile } = await supabase
         .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
       if (profile?.gym_id) {
+        setGymId(profile.gym_id);
         const { data: sub } = await supabase
           .from("subscriptions").select("plan").eq("gym_id", profile.gym_id).maybeSingle<{ plan: string }>();
         setPlan(sub?.plan ?? null);
         setPlans(await loadPlans(supabase));
+        // Sucursal activa: cada ingreso se registra en la sede desde la que se valida.
+        const { data: sedeList } = await supabase.from("sedes")
+          .select("id, gym_id, name, address, created_at").eq("gym_id", profile.gym_id)
+          .order("created_at", { ascending: true });
+        const arr = (sedeList as Sede[]) || [];
+        const active = resolveActiveSede(profile.gym_id, arr);
+        setSedeId(active);
+        setSedeName(arr.find((s) => s.id === active)?.name || "");
+        // Ingresos de hoy de esta sede (persistidos).
+        const start = new Date(); start.setHours(0, 0, 0, 0);
+        let qAtt = supabase.from("attendances")
+          .select("entered_at, status, members(full_name)")
+          .gte("entered_at", start.toISOString())
+          .order("entered_at", { ascending: false }).limit(50);
+        if (active) qAtt = qAtt.eq("sede_id", active);
+        const { data: att } = await qAtt;
+        setToday(((att as { entered_at: string; status: string | null; members?: { full_name: string } | null }[]) || []).map((a) => ({
+          name: a.members?.full_name || "Socio",
+          time: new Date(a.entered_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
+          ok: a.status === "ok",
+        })));
       }
       setLoadingPlan(false);
     })();
@@ -65,9 +91,18 @@ export default function ControlAccesoPage() {
     const d = daysLeft(data.membership_expiry);
     const ok = d !== null && d >= 0;
     setResult(ok ? { kind: "ok", m: data, expiry: data.membership_expiry } : { kind: "blocked", m: data, expiry: data.membership_expiry });
-    // registro local de ingresos de hoy (visual — todavía no se guarda en la base)
+    // Registrar el ingreso en la base, asociado a la sucursal activa.
+    if (gymId) {
+      await supabase.from("attendances").insert({
+        gym_id: gymId,
+        sede_id: sedeId,
+        member_id: data.id,
+        entered_at: new Date().toISOString(),
+        status: ok ? "ok" : "vencido",
+      });
+    }
     const time = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-    setToday((t) => [{ name: data.full_name, time, ok }, ...t].slice(0, 20));
+    setToday((t) => [{ name: data.full_name, time, ok }, ...t].slice(0, 50));
     setDni("");
   }
 
@@ -92,7 +127,9 @@ export default function ControlAccesoPage() {
             <Link href="/dashboard" className="hover:text-brand">Panel</Link><span>/</span><span>Control de acceso</span>
           </div>
           <h1 className="text-2xl font-bold tracking-[-.5px]">Control de acceso</h1>
-          <p className="mt-1 text-ink-2">Check-in en la puerta por DNI. El sistema valida la membresía en el momento.</p>
+          <p className="mt-1 text-ink-2">
+            Check-in por DNI{sedeName ? <> en <span className="font-semibold text-ink">{sedeName}</span></> : ""}. El sistema valida la membresía en el momento.
+          </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(34,197,94,.14)] px-3 py-1 text-xs font-semibold text-good">
           <i className="h-1.5 w-1.5 rounded-full bg-current" /> Escáner activo
@@ -189,7 +226,7 @@ export default function ControlAccesoPage() {
             </ul>
           )}
           <p className="border-t border-white/[.08] p-3 text-xs text-muted">
-            Los ingresos de hoy se muestran mientras validás. Guardar el histórico en la base lo activamos más adelante.
+            Cada ingreso queda registrado en {sedeName || "esta sucursal"}. La lista muestra los check-in de hoy.
           </p>
         </div>
       </div>
