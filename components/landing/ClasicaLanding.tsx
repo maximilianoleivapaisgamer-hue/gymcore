@@ -36,7 +36,7 @@ export default function ClasicaLanding({
   const Logo = () =>
     gym.logo_url ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={gym.logo_url} alt={gym.name} className="h-10 w-10 rounded-xl object-cover" />
+      <img src={gym.logo_url} alt={gym.name} className="h-10 w-10 rounded-xl bg-white/5 object-contain p-0.5" />
     ) : (
       <div className="grid h-10 w-10 place-items-center rounded-xl text-lg text-black" style={{ background: accent }}>
         💪

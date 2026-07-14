@@ -34,12 +34,11 @@ const NAV: NavGroup[] = [
   {
     label: "Experiencia socio",
     items: [
-      { href: "/portal", label: "Portal del socio", icon: "phone", external: true },
       { href: "/dashboard/configuracion", label: "Página pública", icon: "globe" },
     ],
   },
   {
-    label: "Tu negocio (SaaS)",
+    label: "Tu negocio",
     items: [
       { href: "/admin", label: "Super Admin", icon: "shield", superAdmin: true },
       { href: "/dashboard/mi-plan", label: "Mi plan", icon: "star" },
@@ -209,7 +208,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex items-center gap-3 px-2.5 pb-4 pt-2">
           {gym?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={gym.logo_url} alt="" className="h-[34px] w-[34px] rounded-[10px] object-cover" />
+            <img src={gym.logo_url} alt="" className="h-[34px] w-[34px] rounded-[10px] bg-white/5 object-contain p-0.5" />
           ) : (
             <div className="grid h-[34px] w-[34px] place-items-center rounded-[10px] bg-gradient-to-br from-brand to-brand-2 shadow-[0_6px_16px_rgba(34,211,238,.35)]">
               <Icon name="logo" className="h-5 w-5 text-[#04121a]" />

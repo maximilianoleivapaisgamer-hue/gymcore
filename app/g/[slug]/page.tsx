@@ -76,7 +76,7 @@ export default function GymLoginPage({ params }: { params: { slug: string } }) {
         <div className="mb-6 text-center">
           {gym?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={gym.logo_url} alt="" className="mx-auto mb-3 h-16 w-16 rounded-2xl object-cover" />
+            <img src={gym.logo_url} alt="" className="mx-auto mb-3 h-16 w-16 rounded-2xl bg-white/5 object-contain p-1" />
           ) : (
             <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 text-2xl text-[#04121a]">
               💪

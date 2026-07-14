@@ -572,7 +572,7 @@ export default function ConfiguracionPage() {
             <div className="relative z-10">
               {gym.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={gym.logo_url} alt="" className="mx-auto mb-4 h-16 w-16 rounded-2xl object-cover" />
+                <img src={gym.logo_url} alt="" className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-white/5 object-contain p-1" />
               ) : (
                 <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-black" style={{ background: accent }}>
                   💪

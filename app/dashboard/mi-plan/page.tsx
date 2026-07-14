@@ -46,7 +46,7 @@ export default function MiPlanPage() {
   const vence = sub ? (sub.status === "trial" ? sub.trial_ends_at : sub.current_period_end) : null;
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-8">
+    <main className="p-5 md:p-7">
       <div className="mb-6">
         <div className="mb-1 flex items-center gap-2 text-sm text-ink-2">
           <Link href="/dashboard" className="hover:text-brand">Panel</Link>
@@ -91,26 +91,69 @@ export default function MiPlanPage() {
           <p className="mb-4 text-sm text-muted">
             Estos planes los administra el equipo de GymCore. Si querés cambiar de plan, contactanos.
           </p>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid items-start gap-5 md:grid-cols-3">
             {SUB_PLANS.map((p) => {
               const isCurrent = sub?.plan === p.key;
+              const highlight = isCurrent || p.featured;
               return (
                 <div
                   key={p.key}
-                  className={`relative flex flex-col rounded-2xl border p-5 ${isCurrent ? "border-brand bg-[rgba(34,211,238,.06)]" : "border-white/10 bg-surface"}`}
+                  className={`relative flex flex-col rounded-2xl border p-6 ${
+                    isCurrent
+                      ? "border-brand bg-[rgba(34,211,238,.06)]"
+                      : p.featured
+                        ? "border-brand/60 bg-surface"
+                        : "border-white/10 bg-surface"
+                  }`}
                 >
-                  {isCurrent && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-black">
-                      Tu plan actual
+                  {(isCurrent || p.featured) && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-brand px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-black">
+                      {isCurrent ? "Tu plan actual" : "Más elegido"}
                     </span>
                   )}
+
                   <b className="text-lg">{p.label}</b>
-                  <div className="my-2 text-3xl font-black tracking-tight">
-                    {money(p.price)}<span className="text-sm font-normal text-muted">/mes</span>
+                  <p className="mt-0.5 text-xs text-muted">{p.tagline}</p>
+
+                  {/* Precio (con promo si corresponde) */}
+                  <div className="my-3">
+                    {p.promoPrice ? (
+                      <>
+                        <div className="text-3xl font-black tracking-tight">
+                          {money(p.promoPrice)}
+                          <span className="text-sm font-normal text-muted"> 1er mes</span>
+                        </div>
+                        <div className="text-sm text-muted">
+                          luego <span className="line-through">{money(p.price)}</span> /mes
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-3xl font-black tracking-tight">
+                        {money(p.price)}<span className="text-sm font-normal text-muted">/mes</span>
+                      </div>
+                    )}
                   </div>
-                  <ul className="mt-2 flex-1 space-y-1.5 text-sm text-ink-2">
-                    {p.features.map((f, i) => <li key={i}>✓ {f}</li>)}
+
+                  {/* Cartel de IA */}
+                  {p.ai && (
+                    <div className="mb-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-3 py-2 text-xs font-semibold text-brand">
+                      <span>🤖</span> IA que genera rutinas y dietas
+                    </div>
+                  )}
+
+                  <ul className="mt-1 flex-1 space-y-2 text-sm text-ink-2">
+                    {p.features.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="mt-0.5 text-good">✓</span>
+                        <span>{f}</span>
+                      </li>
+                    ))}
                   </ul>
+
+                  {p.promoNote && <p className="mt-4 text-[11px] text-muted">{p.promoNote}</p>}
+                  {highlight && !isCurrent && (
+                    <p className="mt-4 text-[11px] text-muted">Para cambiar de plan, escribinos.</p>
+                  )}
                 </div>
               );
             })}

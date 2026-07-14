@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { PLANS_WITH_DIET, type SubPlanKey } from "@/types/db";
 import AiChat from "@/components/AiChat";
 
 interface Member { id: string; full_name: string; }
@@ -174,13 +175,13 @@ export default function DietasPage() {
 
   const memberName = (id: string | null) => members.find((m) => m.id === id)?.full_name;
 
-  if (!loading && plan !== "elite") {
+  if (!loading && !(plan && PLANS_WITH_DIET.includes(plan as SubPlanKey))) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-16 text-center">
         <div className="mb-2 text-4xl">🥗</div>
-        <h1 className="text-2xl font-bold">Dietas es una función Elite</h1>
+        <h1 className="text-2xl font-bold">Dietas está en los planes Pro y Elite</h1>
         <p className="mt-2 text-ink-2">
-          Armar dietas para tus socios (con plantillas y progreso) está disponible en el plan Elite de GymCore.
+          Armar dietas para tus socios (con plantillas, IA y progreso) está disponible a partir del plan Pro de GymCore.
         </p>
         <Link href="/dashboard/mi-plan" className="btn btn-primary mt-5 inline-block">Ver planes</Link>
       </main>

@@ -104,7 +104,7 @@ export default function PortalPage() {
     setClasses((cl as Klass[]) || []);
     setAllBookings((ab as BookingLite[]) || []);
     setLastWeight(((wl as WeightLog[]) || [])[0] ?? null);
-    setIsElite(sub?.plan === "elite");
+    setIsElite(sub?.plan === "elite" || sub?.plan === "pro");
     setDiet((dt as Diet) ?? null);
     if (dt) {
       const { data: dp } = await supabase.from("diet_progress").select("meal_id, date")
@@ -258,7 +258,7 @@ export default function PortalPage() {
         <div className="flex items-center gap-3">
           {gym?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={gym.logo_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
+            <img src={gym.logo_url} alt="" className="h-10 w-10 rounded-xl bg-white/5 object-contain p-0.5" />
           ) : (
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand to-brand-2 text-black font-black">
               {(gym?.name || "G").slice(0, 1).toUpperCase()}

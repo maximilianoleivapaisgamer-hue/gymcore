@@ -9,7 +9,7 @@ interface Sub { gym_id: string; plan: "basico" | "pro" | "elite"; status: "trial
 interface Profile { id: string; full_name: string | null; }
 
 /** Precios de TU abono mensual por plan (lo que cobrás a cada dueño de gimnasio). Editá estos valores. */
-const PLAN_PRICES: Record<string, number> = { basico: 15000, pro: 25000, elite: 40000 };
+const PLAN_PRICES: Record<string, number> = { basico: 49000, pro: 79000, elite: 119000 };
 const PLAN_LABEL: Record<string, string> = { basico: "Básico", pro: "Pro", elite: "Elite" };
 
 const STATUS: Record<string, { label: string; cls: string }> = {

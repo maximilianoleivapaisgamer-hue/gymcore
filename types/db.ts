@@ -84,11 +84,42 @@ export interface Gym {
  * Se configuran/activan desde /admin (panel de super-admin); acá solo se
  * usan para mostrarle al dueño su plan y estado en /dashboard/mi-plan. */
 export type SubPlanKey = "basico" | "pro" | "elite";
-export const SUB_PLANS: { key: SubPlanKey; label: string; price: number; features: string[] }[] = [
-  { key: "basico", label: "Básico", price: 15000, features: ["Socios ilimitados", "Landing pública", "Caja / finanzas"] },
-  { key: "pro", label: "Pro", price: 25000, features: ["Todo lo de Básico", "Rutinas y clases", "Recordatorios automáticos"] },
-  { key: "elite", label: "Elite", price: 40000, features: ["Todo lo de Pro", "Cobros online (Mercado Pago)", "Soporte prioritario"] },
+export interface SubPlan {
+  key: SubPlanKey;
+  label: string;
+  price: number;
+  /** Precio promocional del primer mes (si aplica). */
+  promoPrice?: number;
+  /** Aclaración del descuento. */
+  promoNote?: string;
+  /** Bajada corta para las tarjetas. */
+  tagline: string;
+  features: string[];
+  /** Resalta la tarjeta como la más elegida. */
+  featured?: boolean;
+  /** Muestra el cartel de "IA que genera rutinas". */
+  ai?: boolean;
+}
+export const SUB_PLANS: SubPlan[] = [
+  {
+    key: "basico", label: "Básico", price: 49000,
+    tagline: "Para gimnasios que arrancan.",
+    features: ["Una sola sucursal", "Socios ilimitados", "Gestión de socios y cobros", "Rutinas y finanzas", "Portal del socio", "Página pública white-label"],
+  },
+  {
+    key: "pro", label: "Pro", price: 79000, featured: true,
+    tagline: "Para gimnasios en crecimiento.",
+    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Clases y reservas", "Recordatorios automáticos"],
+  },
+  {
+    key: "elite", label: "Elite", price: 119000, promoPrice: 90000,
+    promoNote: "Primer mes a $90.000 para gimnasios que contraten ahora.",
+    tagline: "Para cadenas y multi-sede.", ai: true,
+    features: ["Sucursales ilimitadas", "Todo lo del Pro", "Control de acceso por QR", "Cobros online (Mercado Pago)", "Soporte prioritario"],
+  },
 ];
+/** Planes cuyo abono habilita el módulo de Dietas / nutrición. */
+export const PLANS_WITH_DIET: SubPlanKey[] = ["pro", "elite"];
 export const SUB_STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   active: { label: "Al día", cls: "bg-[rgba(34,197,94,.14)] text-good" },
   trial: { label: "En prueba", cls: "bg-[rgba(34,211,238,.14)] text-brand" },
