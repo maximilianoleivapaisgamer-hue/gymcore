@@ -122,7 +122,7 @@ export async function POST(req: Request) {
   let body: {
     nombre?: string; instagram?: string; ciudad?: string; website?: string; infoLibre?: string;
     images?: { mediaType: string; data: string }[]; logoUrl?: string; heroUrl?: string;
-    galleryUrls?: string[];
+    galleryUrls?: string[]; brandColor?: string;
     ownerEmail?: string; ownerPassword?: string;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
@@ -164,7 +164,12 @@ export async function POST(req: Request) {
     heroImagen: body.heroUrl || null,
     heroLogo: !!logoUrl,
     tituloColor: null,
-    marca: { primary: ai.marca.primary, secondary: ai.marca.secondary, dark: ai.marca.dark },
+    // El color de marca real (detectado del logo/perfil) manda sobre lo que adivine la IA.
+    marca: {
+      primary: /^#[0-9a-fA-F]{6}$/.test(body.brandColor || "") ? (body.brandColor as string) : ai.marca.primary,
+      secondary: ai.marca.secondary,
+      dark: ai.marca.dark,
+    },
     whatsapp: (ai.whatsapp || "").replace(/\D/g, ""),
     email: "",
     telefono: "",

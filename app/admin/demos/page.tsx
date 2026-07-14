@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { removeWhiteBackground } from "@/lib/remove-white-bg";
+import { dominantColor } from "@/lib/dominant-color";
 import { STOCK_GYM } from "@/lib/stock-images";
 
 interface DemoGym { id: string; name: string; slug: string; created_at: string | null; }
@@ -64,6 +65,7 @@ export default function DemosPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoNoBg, setLogoNoBg] = useState(true);
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
+  const [brandColor, setBrandColor] = useState<string>("");
 
   // Google (Apify) + galería
   const [gUrl, setGUrl] = useState("");
@@ -94,7 +96,12 @@ export default function DemosPage() {
 
   async function uploadImg(file: File, kind: "logo" | "hero") {
     let f = file;
-    if (kind === "logo" && logoNoBg) f = await removeWhiteBackground(file);
+    if (kind === "logo") {
+      // Detectar el color de marca del logo original (antes de quitar el fondo).
+      const c = await dominantColor(file);
+      if (c) setBrandColor(c);
+      if (logoNoBg) f = await removeWhiteBackground(file);
+    }
     const path = `demos/${kind}/${crypto.randomUUID()}-${f.name}`;
     const { error } = await supabase.storage.from("gym-assets").upload(path, f, { upsert: true });
     if (error) { setErr("No se pudo subir la imagen."); return; }
@@ -105,8 +112,23 @@ export default function DemosPage() {
   const addStock = () => setGallery((prev) => Array.from(new Set([...prev, ...STOCK_GYM.slice(0, 5)])));
   const removeImg = (u: string) => setGallery((prev) => prev.filter((x) => x !== u));
 
+  async function eliminar(d: DemoGym) {
+    if (!confirm(`¿Eliminar la demo "${d.name}"? Se borra el gimnasio, sus datos y los accesos. No se puede deshacer.`)) return;
+    try {
+      const res = await fetch("/api/admin/demo/eliminar", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gymId: d.id }),
+      });
+      const data = await res.json();
+      if (data.ok) setDemos((ds) => ds.filter((x) => x.id !== d.id));
+      else alert(data.error || "No se pudo eliminar.");
+    } catch { alert("Falló la conexión."); }
+  }
+
   async function addFiles(files: File[]) {
     const imgs = files.filter((f) => f.type.startsWith("image/"));
+    // Si todavía no hay color de marca, lo sacamos de la primera captura.
+    if (imgs[0]) { const c = await dominantColor(imgs[0]); if (c) setBrandColor((prev) => prev || c); }
     const arr: ImgData[] = [];
     for (const f of imgs.slice(0, MAX_IMAGES)) {
       const b = await fileToBase64(f);
@@ -174,6 +196,7 @@ export default function DemosPage() {
           images: images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
           galleryUrls: gallery,
           logoUrl, heroUrl,
+          brandColor: brandColor || undefined,
         }),
       });
       const data = await res.json();
@@ -288,6 +311,13 @@ export default function DemosPage() {
             </Field>
           </div>
 
+          <Field label={`Color de marca ${brandColor ? "(detectado del logo/captura — ajustalo si querés)" : "(se detecta del logo/captura, o elegilo a mano)"}`}>
+            <div className="flex items-center gap-2">
+              <input type="color" value={brandColor || "#22d3ee"} onChange={(e) => setBrandColor(e.target.value)} className="h-9 w-14 rounded" />
+              <span className="rounded-md px-2 py-1 text-xs font-semibold" style={{ background: brandColor || "#22d3ee", color: "#000" }}>{brandColor || "sin detectar"}</span>
+            </div>
+          </Field>
+
           {err && <p className="mt-3 text-sm text-crit">{err}</p>}
           <button className="btn btn-primary mt-4 w-full" onClick={generar} disabled={gen}>
             {gen ? "Generando con IA… (puede tardar ~20s)" : "🤖 Generar demo con IA"}
@@ -339,7 +369,10 @@ export default function DemosPage() {
                       <div className="truncate text-sm font-semibold">{d.name}</div>
                       <div className="truncate text-[11px] text-muted">/{d.slug}</div>
                     </div>
-                    <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-semibold text-brand hover:underline">Ver web</a>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-brand hover:underline">Ver web</a>
+                      <button onClick={() => eliminar(d)} className="text-xs font-semibold text-crit hover:underline">Eliminar</button>
+                    </div>
                   </li>
                 ))}
               </ul>
