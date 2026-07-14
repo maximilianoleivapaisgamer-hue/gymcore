@@ -34,6 +34,8 @@ export interface GenerateJSONOpts {
   schema: Record<string, unknown>;
   /** Tope de tokens de salida. Por defecto 4096. */
   maxTokens?: number;
+  /** Imágenes (base64) para análisis con visión, ej: capturas de Instagram. */
+  images?: { mediaType: string; data: string }[];
 }
 
 /**
@@ -70,7 +72,20 @@ export async function generateJSON<T = unknown>(opts: GenerateJSONOpts): Promise
           },
         ],
         tool_choice: { type: "tool", name: opts.toolName },
-        messages: [{ role: "user", content: opts.prompt }],
+        messages: [
+          {
+            role: "user",
+            content: opts.images?.length
+              ? [
+                  { type: "text", text: opts.prompt },
+                  ...opts.images.map((img) => ({
+                    type: "image",
+                    source: { type: "base64", media_type: img.mediaType, data: img.data },
+                  })),
+                ]
+              : opts.prompt,
+          },
+        ],
       }),
     });
   } catch {

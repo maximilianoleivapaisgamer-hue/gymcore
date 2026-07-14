@@ -47,6 +47,7 @@ const NAV: NavGroup[] = [
     label: "Tu negocio",
     items: [
       { href: "/admin", label: "Super Admin", icon: "shield", superAdmin: true },
+      { href: "/admin/demos", label: "Demos", icon: "sparkles", superAdmin: true },
       { href: "/dashboard/mi-plan", label: "Mi plan", icon: "star" },
     ],
   },
@@ -138,6 +139,7 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
         <path d="M9 21v-6h6v6M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
       </>
     ),
+    sparkles: <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 14l.9 2.4 2.4.9-2.4.9L19 21l-.9-2.4-2.4-.9 2.4-.9z" />,
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
