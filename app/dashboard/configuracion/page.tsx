@@ -44,13 +44,19 @@ export default function ConfiguracionPage() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from("gyms").select("*").eq("owner_id", user.id).single<Gym>();
-      if (data) {
-        setGymId(data.id);
-        setSlug(data.slug || "");
-        setTheme(data.theme || "celeste");
-        setBgStyle(data.bg_style || "aurora");
-        setCfg(resolveLandingConfig(data));
+      // Cargamos el gimnasio por el gym_id del perfil (igual que el layout), no por
+      // owner_id, para que funcione en cualquier caso (incluidas las demos).
+      const { data: profile } = await supabase
+        .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string | null }>();
+      if (profile?.gym_id) {
+        const { data } = await supabase.from("gyms").select("*").eq("id", profile.gym_id).single<Gym>();
+        if (data) {
+          setGymId(data.id);
+          setSlug(data.slug || "");
+          setTheme(data.theme || "celeste");
+          setBgStyle(data.bg_style || "aurora");
+          setCfg(resolveLandingConfig(data));
+        }
       }
       setLoading(false);
     })();

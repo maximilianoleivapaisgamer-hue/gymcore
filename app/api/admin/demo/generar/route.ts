@@ -78,7 +78,20 @@ async function createDemoSocio(
     const userId = created?.user?.id;
     if (!userId) return null;
     await admin.from("profiles").upsert({ id: userId, role: "member", gym_id: gymId, full_name: mem.full_name }, { onConflict: "id" });
-    await admin.from("members").update({ dni, linked_user_id: userId }).eq("id", mem.id);
+    await admin.from("members").update({ dni, linked_user_id: userId, height_cm: 172 }).eq("id", mem.id);
+
+    // 10 registros de peso (para que ande el gráfico), con tendencia descendente.
+    const weights: Record<string, unknown>[] = [];
+    let w = 84;
+    for (let i = 9; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i * 7);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      weights.push({ gym_id: gymId, member_id: mem.id, date: iso, weight_kg: Math.round(w * 10) / 10 });
+      w -= 0.4 + Math.random() * 0.5;
+    }
+    await admin.from("weight_logs").insert(weights).then(() => {}, () => {});
+
     return { dni, name: mem.full_name };
   }
   return null;

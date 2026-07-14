@@ -9,6 +9,38 @@ import { STOCK_GYM } from "@/lib/stock-images";
 
 interface DemoGym { id: string; name: string; slug: string; created_at: string | null; }
 interface ImgData { mediaType: string; data: string; name: string; }
+interface AccInfo { slug: string; name: string; owner: { user: string; url: string }; socio: { name: string; user: string; url: string } | null; }
+
+function origin() { return typeof window !== "undefined" ? window.location.origin : "https://turnogym.app"; }
+function messageFor(info: AccInfo): string {
+  const o = origin();
+  const lines = [
+    "¡Hola! Te dejo tu gimnasio ya armado en turnogym 💪",
+    "",
+    `🌐 Tu web: ${o}/${info.slug}`,
+    "",
+    `🖥️ Panel de gestión (para vos): ${o}${info.owner.url}`,
+    `Usuario y contraseña: ${info.owner.user}`,
+  ];
+  if (info.socio) {
+    lines.push("", `📲 App para tus socios: ${o}${info.socio.url}`, `Usuario y contraseña: ${info.socio.user}`);
+  }
+  lines.push("", "Entrá, probalo y cualquier duda me escribís. ¡Que lo disfrutes!");
+  return lines.join("\n");
+}
+
+function CopyBtn({ text, label = "Copiar", full = false }: { text: string; label?: string; full?: boolean }) {
+  const [ok, setOk] = useState(false);
+  const cls = full
+    ? "btn btn-primary w-full text-xs"
+    : "shrink-0 rounded-md border border-white/15 px-2 py-0.5 text-[11px] font-semibold hover:bg-white/5";
+  return (
+    <button type="button" className={cls}
+      onClick={() => navigator.clipboard?.writeText(text).then(() => { setOk(true); setTimeout(() => setOk(false), 1400); })}>
+      {ok ? "✓ Copiado" : label}
+    </button>
+  );
+}
 
 const MAX_IMAGES = 10;
 
@@ -72,6 +104,11 @@ export default function DemosPage() {
   const [gBusy, setGBusy] = useState(false);
   const [gallery, setGallery] = useState<string[]>([]);
 
+  // Accesos por demo (panel desplegable en la lista)
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [acc, setAcc] = useState<Record<string, AccInfo>>({});
+  const [accBusy, setAccBusy] = useState<string | null>(null);
+
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState<{ slug: string; url: string; owner: { user: string; loginUrl: string }; socio: { name: string; user: string; loginUrl: string } | null } | null>(null);
@@ -111,6 +148,23 @@ export default function DemosPage() {
 
   const addStock = () => setGallery((prev) => Array.from(new Set([...prev, ...STOCK_GYM.slice(0, 5)])));
   const removeImg = (u: string) => setGallery((prev) => prev.filter((x) => x !== u));
+
+  async function toggleAcc(d: DemoGym) {
+    if (openId === d.id) { setOpenId(null); return; }
+    setOpenId(d.id);
+    if (!acc[d.id]) {
+      setAccBusy(d.id);
+      try {
+        const res = await fetch("/api/admin/demo/acceso", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ gymId: d.id }),
+        });
+        const data = await res.json();
+        if (data.ok) setAcc((a) => ({ ...a, [d.id]: data as AccInfo }));
+      } catch { /* noop */ }
+      setAccBusy(null);
+    }
+  }
 
   async function eliminar(d: DemoGym) {
     if (!confirm(`¿Eliminar la demo "${d.name}"? Se borra el gimnasio, sus datos y los accesos. No se puede deshacer.`)) return;
@@ -364,15 +418,66 @@ export default function DemosPage() {
             ) : (
               <ul className="divide-y divide-white/10">
                 {demos.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between gap-2 p-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold">{d.name}</div>
-                      <div className="truncate text-[11px] text-muted">/{d.slug}</div>
+                  <li key={d.id}>
+                    <div className="flex items-center justify-between gap-2 p-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">{d.name}</div>
+                        <div className="truncate text-[11px] text-muted">/{d.slug}</div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <button onClick={() => toggleAcc(d)} className="text-xs font-semibold text-brand hover:underline">{openId === d.id ? "Ocultar" : "Accesos"}</button>
+                        <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-brand hover:underline">Ver web</a>
+                        <button onClick={() => eliminar(d)} className="text-xs font-semibold text-crit hover:underline">Eliminar</button>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-brand hover:underline">Ver web</a>
-                      <button onClick={() => eliminar(d)} className="text-xs font-semibold text-crit hover:underline">Eliminar</button>
-                    </div>
+
+                    {openId === d.id && (
+                      <div className="border-t border-white/10 bg-white/[.02] p-3">
+                        {accBusy === d.id && !acc[d.id] ? (
+                          <p className="text-xs text-muted">Cargando accesos…</p>
+                        ) : acc[d.id] ? (
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 p-2">
+                              <div className="min-w-0">
+                                <div className="font-semibold text-ink-2">🌐 Web pública</div>
+                                <a href={`/${acc[d.id].slug}`} target="_blank" rel="noreferrer" className="block truncate text-brand hover:underline">{origin()}/{acc[d.id].slug}</a>
+                              </div>
+                              <CopyBtn text={`${origin()}/${acc[d.id].slug}`} label="Link" />
+                            </div>
+
+                            <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+                              <div className="mb-1 font-semibold text-ink-2">🖥️ Panel del dueño</div>
+                              <div className="flex items-center justify-between gap-2">
+                                <a href={acc[d.id].owner.url} target="_blank" rel="noreferrer" className="truncate text-brand hover:underline">{origin()}{acc[d.id].owner.url}</a>
+                                <CopyBtn text={`${origin()}${acc[d.id].owner.url}`} label="Link" />
+                              </div>
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <span>Usuario y clave: <b className="text-ink">{acc[d.id].owner.user}</b></span>
+                                <CopyBtn text={acc[d.id].owner.user} />
+                              </div>
+                            </div>
+
+                            {acc[d.id].socio && (
+                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+                                <div className="mb-1 font-semibold text-ink-2">📲 App del socio ({acc[d.id].socio!.name})</div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <a href={acc[d.id].socio!.url} target="_blank" rel="noreferrer" className="truncate text-brand hover:underline">{origin()}{acc[d.id].socio!.url}</a>
+                                  <CopyBtn text={`${origin()}${acc[d.id].socio!.url}`} label="Link" />
+                                </div>
+                                <div className="mt-1 flex items-center justify-between gap-2">
+                                  <span>Usuario y clave: <b className="text-ink">{acc[d.id].socio!.user}</b></span>
+                                  <CopyBtn text={acc[d.id].socio!.user} />
+                                </div>
+                              </div>
+                            )}
+
+                            <CopyBtn full text={messageFor(acc[d.id])} label="📋 Copiar mensaje para el cliente" />
+                          </div>
+                        ) : (
+                          <p className="text-xs text-crit">No se pudieron cargar los accesos.</p>
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
