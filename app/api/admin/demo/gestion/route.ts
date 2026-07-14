@@ -1,0 +1,95 @@
+import { NextResponse } from "next/server";
+import { createClient as createAdmin } from "@supabase/supabase-js";
+import { createClient as createServer } from "@/lib/supabase-server";
+import { generateDemoConfig } from "@/lib/ai/demo";
+import { resolveLandingConfig, type LandingConfig } from "@/lib/landing-config";
+import type { Gym } from "@/types/db";
+
+/**
+ * Gestión de una demo (solo super admin, solo is_demo):
+ *  - suspender:   pausa/reactiva la web pública
+ *  - actualizar:  edición rápida (nombre, frase, descripción, color)
+ *  - regenerar:   vuelve a generar los textos con IA (mantiene marca, fotos y logins)
+ */
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+export async function POST(req: Request) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    return NextResponse.json({ ok: false, error: "Falta SUPABASE_SERVICE_ROLE_KEY en el servidor." }, { status: 500 });
+  }
+
+  const supa = createServer();
+  const { data: { user } } = await supa.auth.getUser();
+  if (!user) return NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 });
+  const admin = createAdmin(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: me } = await admin.from("profiles").select("role").eq("id", user.id).single<{ role: string }>();
+  if (me?.role !== "super_admin") {
+    return NextResponse.json({ ok: false, error: "Solo el super admin." }, { status: 403 });
+  }
+
+  let body: {
+    action?: string; gymId?: string; suspended?: boolean;
+    name?: string; tagline?: string; descripcion?: string; brandColor?: string; infoLibre?: string;
+  };
+  try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
+
+  const gymId = String(body.gymId || "").trim();
+  if (!gymId) return NextResponse.json({ ok: false, error: "Falta gymId." }, { status: 400 });
+
+  const { data: gym } = await admin.from("gyms").select("*").eq("id", gymId).single<Gym>();
+  if (!gym || !gym.is_demo) return NextResponse.json({ ok: false, error: "No es una demo válida." }, { status: 404 });
+
+  // ---- Suspender / reactivar ----
+  if (body.action === "suspender") {
+    const { error } = await admin.from("gyms").update({ demo_suspended: !!body.suspended }).eq("id", gymId);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true, suspended: !!body.suspended });
+  }
+
+  // ---- Edición rápida ----
+  if (body.action === "actualizar") {
+    const patch: Record<string, unknown> = {};
+    if (typeof body.name === "string" && body.name.trim()) patch.name = body.name.trim();
+    if (typeof body.tagline === "string") patch.tagline = body.tagline;
+    if (typeof body.descripcion === "string") patch.description = body.descripcion;
+    if (/^#[0-9a-fA-F]{6}$/.test(body.brandColor || "")) patch.accent_color = body.brandColor;
+    if (Object.keys(patch).length === 0) return NextResponse.json({ ok: false, error: "Nada para actualizar." }, { status: 400 });
+    const { error } = await admin.from("gyms").update(patch).eq("id", gymId);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ---- Regenerar textos con IA (mantiene marca, fotos, logins) ----
+  if (body.action === "regenerar") {
+    const base: LandingConfig = resolveLandingConfig(gym);
+    let ai;
+    try {
+      ai = await generateDemoConfig({
+        nombre: gym.name,
+        ciudad: base.ubicacion.ciudad || gym.address || undefined,
+        infoLibre: body.infoLibre || `${gym.name}. ${base.descripcion}`,
+      });
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: (e as Error).message || "La IA no pudo regenerar." }, { status: 502 });
+    }
+    const nueva: LandingConfig = {
+      ...base,
+      tagline: ai.tagline,
+      descripcion: ai.descripcion,
+      beneficios: ai.beneficios,
+      clases: ai.clases,
+      planes: ai.planes,
+      ubicacion: { ...base.ubicacion, horarios: ai.ubicacion.horarios?.length ? ai.ubicacion.horarios : base.ubicacion.horarios },
+    };
+    const { error } = await admin.from("gyms").update({
+      landing_config: nueva, tagline: ai.tagline, description: ai.descripcion,
+    }).eq("id", gymId);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ ok: false, error: "Acción desconocida." }, { status: 400 });
+}

@@ -81,6 +81,10 @@ export interface Gym {
   /** Ediciones de la landing pública (plantilla definitiva). Se combina con los
    *  defaults de lib/landing-config.ts. Null = sin ediciones. */
   landing_config: unknown;
+  /** Gimnasio demo (generado para prospectos). */
+  is_demo?: boolean;
+  /** Demo suspendida: la web pública no se muestra. */
+  demo_suspended?: boolean;
 }
 
 /** Planes de abono mensual de GymCore (lo que Maxi le cobra a cada dueño).

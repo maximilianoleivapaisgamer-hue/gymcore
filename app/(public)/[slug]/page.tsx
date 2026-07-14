@@ -46,6 +46,18 @@ export default async function GymLanding({ params }: { params: { slug: string } 
   const gym = await getGym(params.slug);
   if (!gym) notFound();
 
+  if (gym.demo_suspended) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#0b0f16] px-6 text-center text-[#e6edf3]">
+        <div className="max-w-md">
+          <div className="mb-3 text-4xl">🚧</div>
+          <h1 className="text-2xl font-bold">Esta página no está disponible</h1>
+          <p className="mt-2 text-[#94a3b8]">La demo fue pausada. Si sos el dueño, contactanos para reactivarla.</p>
+        </div>
+      </main>
+    );
+  }
+
   const config = resolveLandingConfig(gym);
 
   return (

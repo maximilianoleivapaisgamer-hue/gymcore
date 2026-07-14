@@ -7,7 +7,7 @@ import { removeWhiteBackground } from "@/lib/remove-white-bg";
 import { dominantColor } from "@/lib/dominant-color";
 import { STOCK_GYM } from "@/lib/stock-images";
 
-interface DemoGym { id: string; name: string; slug: string; created_at: string | null; }
+interface DemoGym { id: string; name: string; slug: string; created_at: string | null; demo_suspended?: boolean; }
 interface ImgData { mediaType: string; data: string; name: string; }
 interface AccInfo { slug: string; name: string; owner: { user: string; url: string }; socio: { name: string; user: string; url: string } | null; }
 
@@ -109,13 +109,17 @@ export default function DemosPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [acc, setAcc] = useState<Record<string, AccInfo>>({});
   const [accBusy, setAccBusy] = useState<string | null>(null);
+  // Gestión (suspender / editar / regenerar)
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [eName, setEName] = useState(""); const [eTag, setETag] = useState(""); const [eDesc, setEDesc] = useState(""); const [eColor, setEColor] = useState("#22d3ee");
 
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState<{ slug: string; url: string; owner: { user: string; loginUrl: string }; socio: { name: string; user: string; loginUrl: string } | null } | null>(null);
 
   async function loadDemos() {
-    const { data } = await supabase.from("gyms").select("id, name, slug, created_at")
+    const { data } = await supabase.from("gyms").select("id, name, slug, created_at, demo_suspended")
       .eq("is_demo", true).order("created_at", { ascending: false });
     setDemos((data as DemoGym[]) || []);
   }
@@ -165,6 +169,45 @@ export default function DemosPage() {
       } catch { /* noop */ }
       setAccBusy(null);
     }
+  }
+
+  async function gestion(action: string, payload: Record<string, unknown>) {
+    const res = await fetch("/api/admin/demo/gestion", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    return res.json();
+  }
+  async function suspender(d: DemoGym, suspended: boolean) {
+    setBusyId(d.id);
+    const data = await gestion("suspender", { gymId: d.id, suspended }).catch(() => null);
+    setBusyId(null);
+    if (data?.ok) setDemos((ds) => ds.map((x) => (x.id === d.id ? { ...x, demo_suspended: suspended } : x)));
+    else alert(data?.error || "No se pudo cambiar el estado.");
+  }
+  function startEdit(d: DemoGym) {
+    if (editId === d.id) { setEditId(null); return; }
+    setEditId(d.id); setOpenId(null);
+    setEName(d.name); setETag(""); setEDesc(""); setEColor("#22d3ee");
+  }
+  async function guardarEdit(d: DemoGym) {
+    setBusyId(d.id);
+    const data = await gestion("actualizar", {
+      gymId: d.id, name: eName,
+      tagline: eTag || undefined, descripcion: eDesc || undefined,
+      brandColor: /^#[0-9a-fA-F]{6}$/.test(eColor) ? eColor : undefined,
+    }).catch(() => null);
+    setBusyId(null);
+    if (data?.ok) { setDemos((ds) => ds.map((x) => (x.id === d.id ? { ...x, name: eName || x.name } : x))); setEditId(null); }
+    else alert(data?.error || "No se pudo guardar.");
+  }
+  async function regenerar(d: DemoGym) {
+    if (!confirm(`¿Regenerar los textos de "${d.name}" con IA? Se reescriben frase, beneficios, clases y planes (se mantienen marca, fotos y accesos).`)) return;
+    setBusyId(d.id);
+    const data = await gestion("regenerar", { gymId: d.id }).catch(() => null);
+    setBusyId(null);
+    if (!data?.ok) alert(data?.error || "No se pudo regenerar.");
+    else alert("✓ Textos regenerados. Abrí la web para verlos.");
   }
 
   async function eliminar(d: DemoGym) {
@@ -428,17 +471,35 @@ export default function DemosPage() {
               <ul className="divide-y divide-white/10">
                 {demos.map((d) => (
                   <li key={d.id}>
-                    <div className="flex items-center justify-between gap-2 p-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{d.name}</div>
-                        <div className="truncate text-[11px] text-muted">/{d.slug}</div>
+                    <div className="p-3">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-semibold">{d.name}</span>
+                        {d.demo_suspended && <span className="shrink-0 rounded-full bg-[rgba(240,82,82,.14)] px-2 py-0.5 text-[10px] font-semibold text-crit">Suspendida</span>}
                       </div>
-                      <div className="flex shrink-0 items-center gap-3">
-                        <button onClick={() => toggleAcc(d)} className="text-xs font-semibold text-brand hover:underline">{openId === d.id ? "Ocultar" : "Accesos"}</button>
-                        <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-brand hover:underline">Ver web</a>
-                        <button onClick={() => eliminar(d)} className="text-xs font-semibold text-crit hover:underline">Eliminar</button>
+                      <div className="truncate text-[11px] text-muted">/{d.slug}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
+                        <button onClick={() => toggleAcc(d)} className="text-brand hover:underline">{openId === d.id ? "Ocultar" : "Accesos"}</button>
+                        <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver web</a>
+                        <button onClick={() => startEdit(d)} className="text-ink-2 hover:text-ink">{editId === d.id ? "Cerrar" : "Editar"}</button>
+                        <button onClick={() => regenerar(d)} disabled={busyId === d.id} className="text-ink-2 hover:text-ink disabled:opacity-50">{busyId === d.id ? "…" : "Regenerar IA"}</button>
+                        <button onClick={() => suspender(d, !d.demo_suspended)} disabled={busyId === d.id} className="text-warn hover:underline disabled:opacity-50">{d.demo_suspended ? "Reactivar" : "Suspender"}</button>
+                        <button onClick={() => eliminar(d)} className="text-crit hover:underline">Eliminar</button>
                       </div>
                     </div>
+
+                    {editId === d.id && (
+                      <div className="space-y-2 border-t border-white/10 bg-white/[.02] p-3">
+                        <input className="input" value={eName} onChange={(e) => setEName(e.target.value)} placeholder="Nombre" />
+                        <input className="input" value={eTag} onChange={(e) => setETag(e.target.value)} placeholder="Frase principal (vacío = no cambiar)" />
+                        <textarea className="input" rows={2} value={eDesc} onChange={(e) => setEDesc(e.target.value)} placeholder="Descripción (vacío = no cambiar)" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-ink-2">Color:</span>
+                          <input type="color" value={eColor} onChange={(e) => setEColor(e.target.value)} className="h-8 w-12 rounded" />
+                          <button className="btn btn-primary ml-auto text-xs" onClick={() => guardarEdit(d)} disabled={busyId === d.id}>{busyId === d.id ? "Guardando…" : "Guardar"}</button>
+                        </div>
+                        <p className="text-[11px] text-muted">Para editar todo (secciones, fotos, planes) entrá con el login del dueño (botón Accesos) → Configurar página.</p>
+                      </div>
+                    )}
 
                     {openId === d.id && (
                       <div className="border-t border-white/10 bg-white/[.02] p-3">
