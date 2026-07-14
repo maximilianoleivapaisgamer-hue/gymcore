@@ -103,6 +103,7 @@ export default function DemosPage() {
   const [gUrl, setGUrl] = useState("");
   const [gBusy, setGBusy] = useState(false);
   const [gallery, setGallery] = useState<string[]>([]);
+  const [heroPick, setHeroPick] = useState<string>("");
 
   // Accesos por demo (panel desplegable en la lista)
   const [openId, setOpenId] = useState<string | null>(null);
@@ -147,7 +148,7 @@ export default function DemosPage() {
   }
 
   const addStock = () => setGallery((prev) => Array.from(new Set([...prev, ...STOCK_GYM.slice(0, 5)])));
-  const removeImg = (u: string) => setGallery((prev) => prev.filter((x) => x !== u));
+  const removeImg = (u: string) => { setGallery((prev) => prev.filter((x) => x !== u)); setHeroPick((h) => (h === u ? "" : h)); };
 
   async function toggleAcc(d: DemoGym) {
     if (openId === d.id) { setOpenId(null); return; }
@@ -250,6 +251,7 @@ export default function DemosPage() {
           images: images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
           galleryUrls: gallery,
           logoUrl, heroUrl,
+          heroPick: heroPick || undefined,
           brandColor: brandColor || undefined,
         }),
       });
@@ -294,15 +296,22 @@ export default function DemosPage() {
 
             {gallery.length > 0 && (
               <>
-                <p className="mt-2 text-[11px] text-ink-2">{gallery.length} foto(s) en la galería (tocá la ✕ para sacar):</p>
+                <p className="mt-2 text-[11px] text-ink-2">{gallery.length} foto(s). Tocá <b>“Fondo”</b> para elegir la del hero, o la ✕ para sacar:</p>
                 <div className="mt-1 grid grid-cols-4 gap-1.5">
-                  {gallery.map((u, i) => (
-                    <div key={i} className="group relative overflow-hidden rounded-md border border-white/10">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={u} alt="" className="h-14 w-full object-cover" />
-                      <button type="button" onClick={() => removeImg(u)} className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-[10px] text-white">✕</button>
-                    </div>
-                  ))}
+                  {gallery.map((u, i) => {
+                    const isHero = heroPick ? heroPick === u : i === 0;
+                    return (
+                      <div key={i} className={`group relative overflow-hidden rounded-md border-2 ${isHero ? "border-brand" : "border-white/10"}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={u} alt="" className="h-14 w-full object-cover" />
+                        <button type="button" onClick={() => setHeroPick(u)}
+                          className={`absolute left-0.5 top-0.5 rounded px-1 text-[9px] font-bold ${isHero ? "bg-brand text-[#04121a]" : "bg-black/70 text-white"}`}>
+                          {isHero ? "★ Fondo" : "Fondo"}
+                        </button>
+                        <button type="button" onClick={() => removeImg(u)} className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-[10px] text-white">✕</button>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}

@@ -135,7 +135,7 @@ export async function POST(req: Request) {
   let body: {
     nombre?: string; instagram?: string; ciudad?: string; website?: string; infoLibre?: string;
     images?: { mediaType: string; data: string }[]; logoUrl?: string; heroUrl?: string;
-    galleryUrls?: string[]; brandColor?: string;
+    galleryUrls?: string[]; brandColor?: string; heroPick?: string;
     ownerEmail?: string; ownerPassword?: string;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
@@ -159,22 +159,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: (e as Error).message || "La IA no pudo generar la demo." }, { status: 502 });
   }
 
-  // 2) Bajar las fotos a la galería. Si no eligieron ninguna, usamos fotos de
-  //    ejemplo para que la landing no quede vacía.
-  const urls = Array.isArray(body.galleryUrls) && body.galleryUrls.length
+  // 2) Bajar las fotos a la galería (máx 5 en las demos). Si no eligieron
+  //    ninguna, usamos fotos de ejemplo para que la landing no quede vacía.
+  let urls = (Array.isArray(body.galleryUrls) && body.galleryUrls.length
     ? body.galleryUrls
-    : STOCK_GYM.slice(0, 5);
+    : STOCK_GYM).slice(0, 5);
+  // Si eligieron una foto para el fondo, la ponemos primera (será el hero).
+  if (body.heroPick && urls.includes(body.heroPick)) {
+    urls = [body.heroPick, ...urls.filter((u) => u !== body.heroPick)].slice(0, 5);
+  }
   const galeria = await importGallery(admin, urls);
 
   // 3) Armar la LandingConfig completa.
   const logoUrl = body.logoUrl || null;
+  // Fondo del hero: el que subieron, o la primera foto (de Google) para que se
+  // vea el gimnasio detrás del título.
+  const heroImagen = body.heroUrl || galeria[0]?.src || null;
   const cfg: LandingConfig = {
     ...JSON.parse(JSON.stringify(DEFAULT_LANDING)),
     nombre,
     tagline: ai.tagline,
     descripcion: ai.descripcion,
     logoUrl,
-    heroImagen: body.heroUrl || null,
+    heroImagen,
     heroLogo: !!logoUrl,
     tituloColor: null,
     // El color de marca real (detectado del logo/perfil) manda sobre lo que adivine la IA.
