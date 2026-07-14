@@ -1,5 +1,5 @@
 import { landingBrandStyle, landingLinks, type LandingConfig } from "@/lib/landing-config";
-import { Icon, InstagramIcon, FacebookIcon, TiktokIcon } from "./Icon";
+import { Icon, InstagramIcon, FacebookIcon, TiktokIcon, WhatsappIcon } from "./Icon";
 import { Reveal } from "./Reveal";
 import { LandingHeader } from "./LandingHeader";
 import { Gallery } from "./Gallery";
@@ -30,7 +30,7 @@ function SectionHeading({ eyebrow, titulo, descripcion }: { eyebrow: string; tit
  */
 export default function LandingSite({ config, slug, preview = false }: { config: LandingConfig; slug: string; preview?: boolean }) {
   const { portalUrl, joinHref } = landingLinks(slug);
-  const wa = waLink(config.whatsapp);
+  const wa = waLink(config.whatsapp, "Hola, vengo desde la web. Quiero info del gimnasio.");
   const s = config.secciones;
 
   const showBeneficios = s.beneficios && config.beneficios.length > 0;
@@ -47,7 +47,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
   ].filter(Boolean) as { href: string; label: string }[];
 
   return (
-    <div className="tg-landing" style={landingBrandStyle(config.marca)}>
+    <div className="tg-landing relative" style={landingBrandStyle(config.marca)}>
       <LandingHeader nombre={config.nombre} logoUrl={config.logoUrl} portalUrl={portalUrl} links={links} sticky={!preview} />
 
       <main>
@@ -64,7 +64,11 @@ export default function LandingSite({ config, slug, preview = false }: { config:
             <span className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wide tg-muted" style={{ borderColor: "var(--l-border)", backgroundColor: "color-mix(in srgb, var(--l-surface) 70%, transparent)" }}>
               <span className="size-2 rounded-full" style={{ background: "var(--l-brand)" }} /> Sumate a la comunidad
             </span>
-            <h1 className="max-w-4xl text-4xl font-bold leading-[1.05] sm:text-6xl lg:text-7xl">{config.nombre}</h1>
+            {config.heroLogo && config.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={config.logoUrl} alt={config.nombre} className="mb-2 h-24 w-auto max-w-[280px] object-contain sm:h-32" />
+            )}
+            <h1 className="max-w-4xl text-4xl font-bold leading-[1.05] sm:text-6xl lg:text-7xl" style={config.tituloColor ? { color: config.tituloColor } : undefined}>{config.nombre}</h1>
             <p className="max-w-2xl text-lg font-medium sm:text-2xl" style={{ color: "color-mix(in srgb, var(--l-text) 90%, transparent)" }}>{config.tagline}</p>
             <p className="tg-muted max-w-xl text-base sm:text-lg">{config.descripcion}</p>
 
@@ -163,7 +167,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
                         <span className="tg-muted pb-1 text-sm">/ {p.periodo}</span>
                       </div>
                       <ul className="flex flex-col gap-3">
-                        {p.incluye.map((item, k) => (
+                        {p.incluye.filter((x) => x && x.trim()).map((item, k) => (
                           <li key={k} className="flex items-start gap-2.5 text-sm">
                             <Icon name="Check" className="mt-0.5 size-4 shrink-0" style={{ color: "var(--l-brand)" }} />
                             <span>{item}</span>
@@ -285,6 +289,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
             </div>
             <p className="tg-muted max-w-xs text-sm">{config.descripcion}</p>
             <div className="flex gap-3">
+              {wa && <a href={wa} aria-label="WhatsApp" target="_blank" rel="noopener noreferrer" className="tg-muted transition-colors hover:opacity-80"><WhatsappIcon className="size-5" /></a>}
               {config.instagram && <a href={igLink(config.instagram)} aria-label="Instagram" target="_blank" rel="noopener noreferrer" className="tg-muted transition-colors hover:opacity-80"><InstagramIcon className="size-5" /></a>}
               {config.facebook && <a href={config.facebook} aria-label="Facebook" target="_blank" rel="noopener noreferrer" className="tg-muted transition-colors hover:opacity-80"><FacebookIcon className="size-5" /></a>}
               {config.tiktok && <a href={config.tiktok} aria-label="TikTok" target="_blank" rel="noopener noreferrer" className="tg-muted transition-colors hover:opacity-80"><TiktokIcon className="size-5" /></a>}
@@ -329,9 +334,9 @@ export default function LandingSite({ config, slug, preview = false }: { config:
         </div>
       </footer>
 
-      {/* WhatsApp flotante */}
-      {wa && !preview && (
-        <a href={wa} target="_blank" rel="noopener noreferrer" aria-label="Escribinos por WhatsApp" className="fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full text-white shadow-lg transition hover:scale-105" style={{ background: "#25D366", boxShadow: "0 8px 24px rgba(37,211,102,.45)" }}>
+      {/* WhatsApp flotante (siempre a la derecha; en preview es absoluto) */}
+      {wa && (
+        <a href={wa} target="_blank" rel="noopener noreferrer" aria-label="Escribinos por WhatsApp" className={`${preview ? "absolute" : "fixed"} bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full text-white shadow-lg transition hover:scale-105`} style={{ background: "#25D366", boxShadow: "0 8px 24px rgba(37,211,102,.45)" }}>
           <svg viewBox="0 0 32 32" className="h-7 w-7" fill="currentColor" aria-hidden="true">
             <path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.5A11.9 11.9 0 0016 27c6.6 0 12-5.4 12-12S22.6 3 16 3zm5.4 16.5c-.2.6-1.3 1.2-1.9 1.3-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.6-.6-2.9-1.3-4.8-4.3-5-4.5-.1-.2-1.2-1.6-1.2-3s.7-2.1 1-2.4c.2-.3.5-.4.7-.4h.5c.2 0 .4 0 .6.5.2.6.8 2 .9 2.1.1.1.1.3 0 .5-.1.2-.1.3-.3.5l-.4.5c-.1.1-.3.3-.1.6.1.3.7 1.2 1.6 2 1.1.9 2 1.2 2.3 1.4.3.1.5.1.6-.1.2-.2.7-.8.9-1.1.2-.3.4-.2.6-.1.3.1 1.7.8 2 .9.3.2.5.2.6.3.1.2.1.7-.1 1.3z" />
           </svg>

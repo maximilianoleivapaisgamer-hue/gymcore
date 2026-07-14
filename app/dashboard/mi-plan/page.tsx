@@ -135,17 +135,29 @@ export default function MiPlanPage() {
           <div className="grid items-start gap-5 md:grid-cols-3">
             {plans.map((p) => {
               const isCurrent = sub?.plan === p.key;
+              const hasIA = p.capabilities?.includes("ia");
               return (
                 <div
                   key={p.key}
                   className={`relative flex flex-col rounded-2xl border p-6 ${
                     isCurrent
                       ? "border-brand bg-[rgba(34,211,238,.06)]"
-                      : p.featured
-                        ? "border-brand/60 bg-surface"
-                        : "border-white/10 bg-surface"
+                      : hasIA
+                        ? "border-[#a78bfa]/50 bg-gradient-to-b from-[rgba(139,92,246,.08)] to-surface shadow-[0_0_45px_-14px_rgba(139,92,246,.6)]"
+                        : p.featured
+                          ? "border-brand/60 bg-surface"
+                          : "border-white/10 bg-surface"
                   }`}
                 >
+                  {/* Listón diagonal de IA (esquina) */}
+                  {hasIA && (
+                    <div className="pointer-events-none absolute right-0 top-0 h-[86px] w-[86px] overflow-hidden rounded-tr-2xl">
+                      <div className="absolute -right-[34px] top-[16px] w-[130px] rotate-45 bg-gradient-to-r from-[#8b5cf6] to-brand py-1 text-center text-[10px] font-bold uppercase tracking-[1.5px] text-white shadow-md">
+                        Con IA
+                      </div>
+                    </div>
+                  )}
+
                   {(isCurrent || p.featured) && (
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-brand px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-black">
                       {isCurrent ? "Tu plan actual" : "Más elegido"}
@@ -175,9 +187,9 @@ export default function MiPlanPage() {
                   </div>
 
                   {/* Cartel de IA */}
-                  {p.capabilities?.includes("ia") && (
-                    <div className="mb-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-3 py-2 text-xs font-semibold text-brand">
-                      <span>🤖</span> IA que genera rutinas y dietas
+                  {hasIA && (
+                    <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#a78bfa]/30 bg-gradient-to-r from-[rgba(139,92,246,.14)] to-[rgba(34,211,238,.10)] px-3 py-2 text-xs font-bold text-white">
+                      <span className="text-sm">🤖</span> IA que genera rutinas y dietas
                     </div>
                   )}
 

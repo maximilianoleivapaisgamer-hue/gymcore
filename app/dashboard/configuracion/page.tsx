@@ -110,20 +110,25 @@ export default function ConfiguracionPage() {
   async function save() {
     if (!gymId) return;
     setSaving(true); setMsg("");
+    // Limpiamos líneas vacías de los planes al guardar.
+    const clean: LandingConfig = {
+      ...cfg,
+      planes: cfg.planes.map((p) => ({ ...p, incluye: p.incluye.map((s) => s.trim()).filter(Boolean) })),
+    };
     const { error } = await supabase.from("gyms").update({
-      name: cfg.nombre,
+      name: clean.nombre,
       slug,
-      accent_color: cfg.marca.primary,
+      accent_color: clean.marca.primary,
       theme,
       bg_style: bgStyle,
-      tagline: cfg.tagline,
-      description: cfg.descripcion,
-      whatsapp: cfg.whatsapp,
-      address: cfg.ubicacion.direccion,
-      instagram: cfg.instagram,
-      logo_url: cfg.logoUrl,
-      hero_url: cfg.heroImagen,
-      landing_config: cfg,
+      tagline: clean.tagline,
+      description: clean.descripcion,
+      whatsapp: clean.whatsapp,
+      address: clean.ubicacion.direccion,
+      instagram: clean.instagram,
+      logo_url: clean.logoUrl,
+      hero_url: clean.heroImagen,
+      landing_config: clean,
     }).eq("id", gymId);
     setSaving(false);
     setMsg(error ? "No se pudo guardar." : "¡Guardado! Tu página ya está publicada.");
@@ -198,6 +203,16 @@ export default function ConfiguracionPage() {
 
         <Section title="Encabezado">
           <Field label="Nombre del gimnasio"><input className="input" value={cfg.nombre} onChange={(e) => patch({ nombre: e.target.value })} /></Field>
+          <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-2">
+            <input type="checkbox" checked={cfg.heroLogo} onChange={(e) => patch({ heroLogo: e.target.checked })} />
+            Mostrar el logo grande arriba del nombre
+          </label>
+          {cfg.heroLogo && !cfg.logoUrl && <p className="mb-2 text-[11px] text-warn">Subí un logo en “Logo y fondo” para que aparezca.</p>}
+          <div className="mb-3 flex items-center gap-3">
+            <label className="text-xs font-semibold text-ink-2">Color del título</label>
+            <input type="color" value={cfg.tituloColor || "#ffffff"} onChange={(e) => patch({ tituloColor: e.target.value })} className="h-8 w-12 rounded" />
+            {cfg.tituloColor && <button className="text-xs text-ink-2 hover:text-crit" onClick={() => patch({ tituloColor: null })}>Automático</button>}
+          </div>
           <Field label="Dirección de la página (slug)"><input className="input" value={slug} onChange={(e) => setSlug(e.target.value)} /></Field>
           <Field label="Frase principal (tagline)"><input className="input" value={cfg.tagline} onChange={(e) => patch({ tagline: e.target.value })} /></Field>
           <Field label="Descripción"><textarea className="input" rows={3} value={cfg.descripcion} onChange={(e) => patch({ descripcion: e.target.value })} /></Field>
@@ -225,10 +240,12 @@ export default function ConfiguracionPage() {
           </div>
           <div className="space-y-2">
             {cfg.ubicacion.horarios.map((h, i) => (
-              <div key={i} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-2">
-                <input className="input flex-1" placeholder="Días (ej: Lun a Vie)" value={h.dia} onChange={(e) => setHorario(i, { dia: e.target.value })} />
-                <input className="input w-32" placeholder="06:00 – 23:00" value={h.horas} onChange={(e) => setHorario(i, { horas: e.target.value })} />
-                <RemoveBtn onClick={() => delHorario(i)} />
+              <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2">
+                <input className="input mb-1.5 w-full" placeholder="Días (ej: Lunes a Viernes)" value={h.dia} onChange={(e) => setHorario(i, { dia: e.target.value })} />
+                <div className="flex items-center gap-1.5">
+                  <input className="input flex-1" placeholder="06:00 – 23:00" value={h.horas} onChange={(e) => setHorario(i, { horas: e.target.value })} />
+                  <RemoveBtn onClick={() => delHorario(i)} />
+                </div>
               </div>
             ))}
           </div>
@@ -298,8 +315,8 @@ export default function ConfiguracionPage() {
                   </div>
                   <input className="input flex-1" placeholder="Período (ej: mes)" value={p.periodo} onChange={(e) => setPlan(i, { periodo: e.target.value })} />
                 </div>
-                <textarea className="input mb-1.5" rows={3} placeholder="Qué incluye (uno por línea)"
-                  value={p.incluye.join("\n")} onChange={(e) => setPlan(i, { incluye: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })} />
+                <textarea className="input mb-1.5" rows={3} placeholder="Qué incluye (uno por línea, Enter para agregar)"
+                  value={p.incluye.join("\n")} onChange={(e) => setPlan(i, { incluye: e.target.value.split("\n") })} />
                 <label className="flex items-center gap-2 text-xs text-ink-2">
                   <input type="checkbox" checked={!!p.destacado} onChange={(e) => setPlan(i, { destacado: e.target.checked })} /> Destacado (recomendado)
                 </label>

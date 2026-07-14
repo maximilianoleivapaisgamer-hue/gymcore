@@ -65,6 +65,10 @@ export interface LandingConfig {
   logoUrl: string | null;
   /** Imagen de fondo del hero (cambiable por el dueño). */
   heroImagen: string | null;
+  /** Mostrar el logo grande arriba del nombre en el encabezado. */
+  heroLogo: boolean;
+  /** Color del título del encabezado (null = automático según el modo). */
+  tituloColor: string | null;
   marca: LMarca;
   whatsapp: string;
   email: string;
@@ -88,6 +92,8 @@ export const DEFAULT_LANDING: LandingConfig = {
     "El gimnasio de barrio con equipamiento profesional, clases todos los días y una comunidad que te banca. Musculación, funcional y crosstraining en un solo lugar.",
   logoUrl: null,
   heroImagen: null,
+  heroLogo: false,
+  tituloColor: null,
   marca: { primary: "#22D3EE", secondary: "#3B82F6", dark: true },
   whatsapp: "",
   email: "",

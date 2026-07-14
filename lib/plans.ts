@@ -43,7 +43,7 @@ export const DEFAULT_PLANS: PlanConfig[] = [
   {
     key: "pro", sort: 2, label: "Pro", tagline: "Para gimnasios en crecimiento.",
     price: 79000, promo_price: null, promo_note: null, featured: true,
-    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Recordatorios automáticos"],
+    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Recordatorios automáticos", "Configurá tu dominio propio (ej: tugim.com.ar)"],
     capabilities: ["clases", "dietas", "control_acceso"],
   },
   {
