@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { removeWhiteBackground } from "@/lib/remove-white-bg";
+import { STOCK_GYM } from "@/lib/stock-images";
 
 interface DemoGym { id: string; name: string; slug: string; created_at: string | null; }
 interface ImgData { mediaType: string; data: string; name: string; }
@@ -60,9 +62,15 @@ export default function DemosPage() {
   const [infoLibre, setInfoLibre] = useState("");
   const [images, setImages] = useState<ImgData[]>([]);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoNoBg, setLogoNoBg] = useState(true);
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerPassword, setOwnerPassword] = useState("");
+
+  // Google (Apify) + galería
+  const [gUrl, setGUrl] = useState("");
+  const [gBusy, setGBusy] = useState(false);
+  const [gallery, setGallery] = useState<string[]>([]);
 
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
@@ -87,12 +95,17 @@ export default function DemosPage() {
   }, []);
 
   async function uploadImg(file: File, kind: "logo" | "hero") {
-    const path = `demos/${kind}/${crypto.randomUUID()}-${file.name}`;
-    const { error } = await supabase.storage.from("gym-assets").upload(path, file, { upsert: true });
+    let f = file;
+    if (kind === "logo" && logoNoBg) f = await removeWhiteBackground(file);
+    const path = `demos/${kind}/${crypto.randomUUID()}-${f.name}`;
+    const { error } = await supabase.storage.from("gym-assets").upload(path, f, { upsert: true });
     if (error) { setErr("No se pudo subir la imagen."); return; }
     const { data } = supabase.storage.from("gym-assets").getPublicUrl(path);
     if (kind === "logo") setLogoUrl(data.publicUrl); else setHeroUrl(data.publicUrl);
   }
+
+  const addStock = () => setGallery((prev) => Array.from(new Set([...prev, ...STOCK_GYM.slice(0, 5)])));
+  const removeImg = (u: string) => setGallery((prev) => prev.filter((x) => x !== u));
 
   async function addFiles(files: File[]) {
     const imgs = files.filter((f) => f.type.startsWith("image/"));
@@ -123,6 +136,34 @@ export default function DemosPage() {
     /* eslint-disable-next-line */
   }, []);
 
+  async function buscarGoogle() {
+    setErr("");
+    const val = gUrl.trim();
+    if (!val) { setErr("Pegá el link de Google Maps o escribí nombre + ciudad."); return; }
+    setGBusy(true);
+    try {
+      const isUrl = /^https?:\/\//i.test(val) || val.includes("google.") || val.includes("maps.app");
+      const res = await fetch("/api/admin/demo/google", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify(isUrl ? { url: val } : { query: val }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { setErr(data?.error || "No se pudo leer Google."); setGBusy(false); return; }
+      const p = data.place as { name: string; ciudad: string; website: string; address: string; phone: string; horarios: { dia: string; horas: string }[]; images: string[] };
+      if (!nombre && p.name) setNombre(p.name);
+      if (p.ciudad) setCiudad(p.ciudad);
+      if (p.website) setWebsite(p.website);
+      const resumen = [
+        p.address && `Dirección: ${p.address}`,
+        p.phone && `Teléfono: ${p.phone}`,
+        p.horarios?.length ? `Horarios: ${p.horarios.map((h) => `${h.dia} ${h.horas}`).join(" · ")}` : "",
+      ].filter(Boolean).join("\n");
+      if (resumen) setInfoLibre((prev) => (prev ? prev + "\n" + resumen : resumen));
+      if (p.images?.length) setGallery((prev) => Array.from(new Set([...prev, ...p.images])));
+    } catch { setErr("Falló la conexión con Google/Apify."); }
+    setGBusy(false);
+  }
+
   async function generar() {
     setErr(""); setResult(null);
     if (!nombre.trim()) { setErr("Poné al menos el nombre del gimnasio."); return; }
@@ -134,6 +175,7 @@ export default function DemosPage() {
         body: JSON.stringify({
           nombre, instagram, ciudad, website, infoLibre,
           images: images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
+          galleryUrls: gallery,
           logoUrl, heroUrl,
           ownerEmail: ownerEmail || undefined, ownerPassword: ownerPassword || undefined,
         }),
@@ -164,6 +206,36 @@ export default function DemosPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* Form */}
         <div className="card">
+          {/* Traer de Google Maps (Apify) */}
+          <div className="mb-4 rounded-lg border border-brand/25 bg-[rgba(34,211,238,.06)] p-3">
+            <label className="mb-1 block text-xs font-semibold text-brand">🗺️ Traer de Google Maps</label>
+            <div className="flex gap-2">
+              <input className="input flex-1" value={gUrl} onChange={(e) => setGUrl(e.target.value)}
+                placeholder="Pegá el link de Google Maps — o: MegaCenter Gym San Miguel" />
+              <button className="btn btn-ghost shrink-0" onClick={buscarGoogle} disabled={gBusy}>{gBusy ? "Buscando…" : "Buscar"}</button>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="text-[11px] text-muted">Autocompleta ciudad, web, dirección, horarios y trae las fotos del perfil.</p>
+              <button type="button" onClick={addStock} className="shrink-0 rounded-lg border border-white/15 px-2 py-1 text-[11px] font-semibold hover:bg-white/5">+ Fotos de ejemplo</button>
+            </div>
+
+            {gallery.length > 0 && (
+              <>
+                <p className="mt-2 text-[11px] text-ink-2">{gallery.length} foto(s) en la galería (tocá la ✕ para sacar):</p>
+                <div className="mt-1 grid grid-cols-4 gap-1.5">
+                  {gallery.map((u, i) => (
+                    <div key={i} className="group relative overflow-hidden rounded-md border border-white/10">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={u} alt="" className="h-14 w-full object-cover" />
+                      <button type="button" onClick={() => removeImg(u)} className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-[10px] text-white">✕</button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            <p className="mt-1 text-[10px] text-muted">Si no cargás ninguna, la demo usa 5 fotos de ejemplo para que no quede vacía.</p>
+          </div>
+
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
             <Field label="Nombre del gimnasio *"><input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: MegaCenter Gym" /></Field>
             <Field label="Instagram (@ o link)"><input className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@megacentergym" /></Field>
@@ -201,8 +273,18 @@ export default function DemosPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Logo (opcional)">
+              <label className="mb-1 flex items-center gap-1.5 text-[11px] text-ink-2">
+                <input type="checkbox" checked={logoNoBg} onChange={(e) => setLogoNoBg(e.target.checked)} />
+                Quitar fondo blanco (para logos de Instagram)
+              </label>
               <input type="file" accept="image/*" className="text-sm" onChange={(e) => e.target.files?.[0] && uploadImg(e.target.files[0], "logo")} />
-              {logoUrl && <span className="mt-1 block text-[11px] text-brand">Logo cargado ✓</span>}
+              {logoUrl && (
+                <span className="mt-1 flex items-center gap-2 text-[11px] text-brand">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={logoUrl} alt="" className="h-8 w-8 rounded object-contain" style={{ backgroundImage: "linear-gradient(45deg,#333 25%,transparent 25%,transparent 75%,#333 75%),linear-gradient(45deg,#333 25%,#222 25%,#222 75%,#333 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,4px 4px" }} />
+                  Logo cargado ✓
+                </span>
+              )}
             </Field>
             <Field label="Foto de fondo (opcional)">
               <input type="file" accept="image/*" className="text-sm" onChange={(e) => e.target.files?.[0] && uploadImg(e.target.files[0], "hero")} />
@@ -235,12 +317,11 @@ export default function DemosPage() {
                   <a href={result.url} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">turnogym.app{result.url}</a>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                  <div className="text-xs text-muted">Login del panel (dueño)</div>
-                  <div className="break-all">{result.owner.email}</div>
-                  <div>Contraseña: <b>{result.owner.password}</b></div>
-                  <div className="mt-1 text-[11px] text-muted">Entra en turnogym.app/acceso</div>
+                  <div className="text-xs text-muted">Login del panel — usuario y contraseña son <b>iguales</b>:</div>
+                  <div className="mt-0.5 break-all font-semibold text-ink">{result.owner.email}</div>
+                  <div className="mt-1 text-[11px] text-muted">Entra en turnogym.app/acceso (poné ese texto en usuario y en contraseña).</div>
                 </div>
-                <p className="text-[11px] text-muted">El login del socio y los datos de ejemplo los sumamos en el próximo paso.</p>
+                <p className="text-[11px] text-muted">La demo ya viene con 10 socios, rutinas, dietas, clases y caja cargados. El login del socio lo sumamos en el próximo paso.</p>
               </div>
             </div>
           )}

@@ -3,6 +3,8 @@ import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient as createServer } from "@/lib/supabase-server";
 import { generateDemoConfig } from "@/lib/ai/demo";
 import { DEFAULT_LANDING, type LandingConfig } from "@/lib/landing-config";
+import { seedDemoGym } from "@/lib/demo-seed";
+import { STOCK_GYM } from "@/lib/stock-images";
 
 /**
  * Genera un gimnasio DEMO con IA (solo super admin).
@@ -23,6 +25,32 @@ function rand(n: number): string {
   let s = "";
   for (let i = 0; i < n; i++) s += c[Math.floor(Math.random() * c.length)];
   return s;
+}
+
+/** Baja imágenes (ej: fotos de Google) y las sube al bucket para la galería. */
+async function importGallery(
+  admin: ReturnType<typeof createAdmin>,
+  urls: string[]
+): Promise<{ src: string; alt: string }[]> {
+  const out: { src: string; alt: string }[] = [];
+  for (const u of urls.slice(0, 12)) {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) continue;
+      const ct = r.headers.get("content-type") || "image/jpeg";
+      if (!ct.startsWith("image/")) continue;
+      const buf = Buffer.from(await r.arrayBuffer());
+      const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
+      const path = `demos/gallery/${crypto.randomUUID()}.${ext}`;
+      const { error } = await admin.storage.from("gym-assets").upload(path, buf, { contentType: ct, upsert: true });
+      if (error) continue;
+      const { data } = admin.storage.from("gym-assets").getPublicUrl(path);
+      out.push({ src: data.publicUrl, alt: "" });
+    } catch {
+      /* siguiente */
+    }
+  }
+  return out;
 }
 
 async function fetchWebText(url: string): Promise<string> {
@@ -63,6 +91,7 @@ export async function POST(req: Request) {
   let body: {
     nombre?: string; instagram?: string; ciudad?: string; website?: string; infoLibre?: string;
     images?: { mediaType: string; data: string }[]; logoUrl?: string; heroUrl?: string;
+    galleryUrls?: string[];
     ownerEmail?: string; ownerPassword?: string;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
@@ -86,7 +115,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: (e as Error).message || "La IA no pudo generar la demo." }, { status: 502 });
   }
 
-  // 2) Armar la LandingConfig completa.
+  // 2) Bajar las fotos a la galería. Si no eligieron ninguna, usamos fotos de
+  //    ejemplo para que la landing no quede vacía.
+  const urls = Array.isArray(body.galleryUrls) && body.galleryUrls.length
+    ? body.galleryUrls
+    : STOCK_GYM.slice(0, 5);
+  const galeria = await importGallery(admin, urls);
+
+  // 3) Armar la LandingConfig completa.
   const logoUrl = body.logoUrl || null;
   const cfg: LandingConfig = {
     ...JSON.parse(JSON.stringify(DEFAULT_LANDING)),
@@ -107,15 +143,16 @@ export async function POST(req: Request) {
     beneficios: ai.beneficios,
     clases: ai.clases,
     planes: ai.planes,
-    galeria: [],
+    galeria,
     ubicacion: ai.ubicacion,
     secciones: { beneficios: true, clases: true, planes: true, galeria: true },
   };
 
-  // 3) Crear el usuario dueño de la demo (login del panel).
+  // 4) Crear el usuario dueño de la demo (login del panel).
+  // Login simple: usuario y contraseña son iguales (es una demo).
   const slug = `demo-${slugify(nombre)}-${rand(4)}`;
-  const ownerEmail = String(body.ownerEmail || "").trim().toLowerCase() || `${slug}@demo.turnogym.app`;
-  const ownerPassword = String(body.ownerPassword || "") || `demo-${rand(6)}`;
+  const ownerEmail = String(body.ownerEmail || "").trim().toLowerCase() || `${slugify(nombre).slice(0, 18) || "demo"}-${rand(3)}@demo.turnogym.app`;
+  const ownerPassword = String(body.ownerPassword || "") || ownerEmail;
   const { data: created, error: cErr } = await admin.auth.admin.createUser({
     email: ownerEmail,
     password: ownerPassword,
@@ -154,7 +191,10 @@ export async function POST(req: Request) {
   // 5) Perfil del dueño + suscripción Elite (todo desbloqueado) + sede principal.
   await admin.from("profiles").upsert({ id: ownerId, role: "owner", gym_id: gym.id, full_name: nombre }, { onConflict: "id" });
   await admin.from("subscriptions").upsert({ gym_id: gym.id, plan: "elite", status: "active" }, { onConflict: "gym_id" });
-  await admin.from("sedes").insert({ gym_id: gym.id, name: "Sede principal" });
+  const { data: sede } = await admin.from("sedes").insert({ gym_id: gym.id, name: "Sede principal" }).select("id").single<{ id: string }>();
+
+  // 6) Datos de ejemplo (10 socios con rutinas, dietas, clases, caja).
+  await seedDemoGym(admin, gym.id, sede?.id ?? null);
 
   return NextResponse.json({
     ok: true,

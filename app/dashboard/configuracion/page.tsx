@@ -18,6 +18,7 @@ import {
 } from "@/lib/landing-config";
 import { Icon, BENEFIT_ICONS } from "@/components/landing/site/Icon";
 import LandingSite from "@/components/landing/site/LandingSite";
+import { removeWhiteBackground } from "@/lib/remove-white-bg";
 import "../../(public)/landing.css";
 
 /**
@@ -37,6 +38,7 @@ export default function ConfiguracionPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [logoNoBg, setLogoNoBg] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -63,8 +65,10 @@ export default function ConfiguracionPage() {
 
   async function uploadImage(file: File, kind: "logo" | "hero") {
     setMsg("Subiendo imagen…");
-    const path = `${kind}/${crypto.randomUUID()}-${file.name}`;
-    const { error } = await supabase.storage.from("gym-assets").upload(path, file, { upsert: true });
+    let f = file;
+    if (kind === "logo" && logoNoBg) f = await removeWhiteBackground(file);
+    const path = `${kind}/${crypto.randomUUID()}-${f.name}`;
+    const { error } = await supabase.storage.from("gym-assets").upload(path, f, { upsert: true });
     if (error) { setMsg("Error al subir la imagen"); return; }
     const { data } = supabase.storage.from("gym-assets").getPublicUrl(path);
     if (kind === "logo") patch({ logoUrl: data.publicUrl });
@@ -181,6 +185,10 @@ export default function ConfiguracionPage() {
 
         <Section title="Logo y fondo">
           <label className="mb-1 block text-xs font-semibold text-ink-2">Logo del gimnasio</label>
+          <label className="mb-1 flex items-center gap-1.5 text-[11px] text-ink-2">
+            <input type="checkbox" checked={logoNoBg} onChange={(e) => setLogoNoBg(e.target.checked)} />
+            Quitar fondo blanco (para logos de Instagram)
+          </label>
           <input type="file" accept="image/*" className="mb-2 text-sm" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], "logo")} />
           {cfg.logoUrl && (
             <div className="mb-3 flex items-center gap-2">
