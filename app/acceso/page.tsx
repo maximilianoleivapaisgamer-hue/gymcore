@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { redirectForRole } from "@/lib/roles";
 import type { UserRole } from "@/types/db";
 import AppBackground from "@/components/AppBackground";
+import { BrandMark } from "@/components/BrandMark";
 
 /** Login. Tras autenticar, redirige según el rol del usuario. */
 export default function AccesoPage() {
@@ -50,11 +51,9 @@ export default function AccesoPage() {
       <AppBackground style="aurora" />
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 text-xl">
-            💪
-          </div>
+          <BrandMark size={52} className="mx-auto mb-3 rounded-2xl" />
           <h1 className="text-2xl font-bold">Iniciá sesión</h1>
-          <p className="text-sm text-ink-2">Accedé a tu panel de GymCore</p>
+          <p className="text-sm text-ink-2">Accedé a tu panel de turnogym</p>
         </div>
         <form onSubmit={login} className="card flex flex-col gap-3">
           <input

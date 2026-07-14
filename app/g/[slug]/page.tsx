@@ -91,7 +91,7 @@ export default function GymLoginPage({ params }: { params: { slug: string } }) {
           {error && <p className="text-sm text-crit">{error}</p>}
           <button className="btn btn-primary" disabled={loading}>{loading ? "Entrando…" : "Entrar"}</button>
         </form>
-        <p className="mt-4 text-center text-xs text-muted">{gym?.name || "GymCore"} · Acceso de socios</p>
+        <p className="mt-4 text-center text-xs text-muted">{gym?.name || "turnogym"} · Acceso de socios</p>
       </div>
     </main>
   );

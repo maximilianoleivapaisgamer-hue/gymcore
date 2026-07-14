@@ -57,7 +57,7 @@ export default function RegistroPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold">Registrá tu gimnasio</h1>
-          <p className="text-sm text-ink-2">14 días de prueba gratis. Sin tarjeta.</p>
+          <p className="text-sm text-ink-2">7 días de prueba gratis. Sin tarjeta.</p>
         </div>
         <form onSubmit={register} className="card flex flex-col gap-3">
           <input className="input" placeholder="Tu nombre" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} required />

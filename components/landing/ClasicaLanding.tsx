@@ -2,7 +2,7 @@ import type { Gym, LandingSectionKey, MemberPlan } from "@/types/db";
 
 /**
  * Plantilla "Clásica": hero centrado con imagen de fondo a página completa,
- * secciones apiladas con tarjetas suaves. Es el diseño original de GymCore.
+ * secciones apiladas con tarjetas suaves. Es el diseño original de turnogym.
  */
 export default function ClasicaLanding({
   gym,
@@ -344,7 +344,7 @@ export default function ClasicaLanding({
             <span className="font-semibold text-ink">{gym.name}</span>
           </div>
           <div className="text-xs text-muted">
-            Powered by <b style={{ color: accent }}>GymCore</b>
+            Powered by <b style={{ color: accent }}>turnogym</b>
           </div>
         </div>
       </footer>

@@ -8,7 +8,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 /**
- * Botón/banner para instalar GymCore como app (PWA) desde el portal del
+ * Botón/banner para instalar turnogym como app (PWA) desde el portal del
  * socio. En Chrome/Android usa el evento beforeinstallprompt; en iOS Safari
  * (que no lo soporta) muestra instrucciones manuales de "Agregar a inicio".
  */

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import { PAY_METHODS, type PayMethod, type RealPlan } from "@/types/db";
+import { allows, loadPlans } from "@/lib/plans";
 
 interface Member {
   id: string; gym_id: string; member_number: number | null;
@@ -66,7 +67,7 @@ export default function SocioDetallePage() {
         supabase.from("subscriptions").select("plan").eq("gym_id", m.gym_id).maybeSingle<{ plan: string }>(),
         supabase.from("gyms").select("real_plans").eq("id", m.gym_id).maybeSingle<{ real_plans: RealPlan[] }>(),
       ]);
-      setIsElite(sub?.plan === "elite" || sub?.plan === "pro"); // Dietas: Pro y Elite
+      setIsElite(allows(await loadPlans(supabase), sub?.plan, "dietas")); // Dieta: según permisos del plan
       setGymPlans(gym?.real_plans || []);
     }
     setLoading(false);

@@ -1,6 +1,6 @@
 {
-  "name": "GymCore",
-  "short_name": "GymCore",
+  "name": "turnogym",
+  "short_name": "turnogym",
   "description": "Tu rutina, tu dieta, tus clases y tu progreso — todo en un solo lugar.",
   "start_url": "/portal",
   "scope": "/",

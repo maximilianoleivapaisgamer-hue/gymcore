@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { planAllows } from "@/types/db";
+import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
 
 interface Member {
   id: string;
@@ -31,6 +31,7 @@ export default function ControlAccesoPage() {
   const [result, setResult] = useState<Result>(null);
   const [today, setToday] = useState<{ name: string; time: string; ok: boolean }[]>([]);
   const [plan, setPlan] = useState<string | null>(null);
+  const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
   const [loadingPlan, setLoadingPlan] = useState(true);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function ControlAccesoPage() {
         const { data: sub } = await supabase
           .from("subscriptions").select("plan").eq("gym_id", profile.gym_id).maybeSingle<{ plan: string }>();
         setPlan(sub?.plan ?? null);
+        setPlans(await loadPlans(supabase));
       }
       setLoadingPlan(false);
     })();
@@ -69,13 +71,13 @@ export default function ControlAccesoPage() {
     setDni("");
   }
 
-  if (!loadingPlan && !planAllows(plan, "control_acceso")) {
+  if (!loadingPlan && !allows(plans, plan, "control_acceso")) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-16 text-center">
         <div className="mb-2 text-4xl">🚪</div>
         <h1 className="text-2xl font-bold">Control de acceso está en los planes Pro y Elite</h1>
         <p className="mt-2 text-ink-2">
-          Validar el ingreso de tus socios por DNI/QR está disponible a partir del plan Pro de GymCore.
+          Validar el ingreso de tus socios por DNI/QR está disponible a partir del plan Pro de turnogym.
         </p>
         <Link href="/dashboard/mi-plan" className="btn btn-primary mt-5 inline-block">Ver planes</Link>
       </main>

@@ -266,7 +266,7 @@ export default function ModernaLanding({
       <footer className="border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
           <span>
-            {gym.name} · Powered by <b style={{ color: accent }}>GymCore</b>
+            {gym.name} · Powered by <b style={{ color: accent }}>turnogym</b>
           </span>
           {igHref && (
             <a href={igHref} target="_blank" rel="noreferrer" className="hover:text-ink-2">

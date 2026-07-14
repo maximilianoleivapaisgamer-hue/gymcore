@@ -558,7 +558,7 @@ export default function ConfiguracionPage() {
       {/* PREVIEW EN VIVO */}
       <div className="overflow-auto p-6" style={{ "--accent": accent } as React.CSSProperties}>
         <div className="mb-3">
-          <p className="text-sm text-ink-2">Vista previa · gymcore.app/{gym.slug || "tu-gym"}</p>
+          <p className="text-sm text-ink-2">Vista previa · turnogym.app/{gym.slug || "tu-gym"}</p>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-white/10">

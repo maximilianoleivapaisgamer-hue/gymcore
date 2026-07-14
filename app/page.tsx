@@ -1,14 +1,14 @@
 import Link from "next/link";
+import { BrandMark, BrandWordmark } from "@/components/BrandMark";
 
-/** Home del SaaS GymCore (marketing simple + accesos). */
+/** Home del SaaS turnogym (marketing simple + accesos). */
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-6 px-6 text-center">
-      <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 text-2xl">
-        💪
-      </div>
-      <h1 className="text-4xl font-bold tracking-tight">
-        GymCore — el sistema premium para tu gimnasio
+      <BrandMark size={64} className="rounded-2xl" />
+      <BrandWordmark size="text-4xl" />
+      <h1 className="text-3xl font-bold tracking-tight">
+        El sistema premium para tu gimnasio
       </h1>
       <p className="max-w-lg text-ink-2">
         Gestioná socios, rutinas, clases, finanzas y el acceso. Tu página pública

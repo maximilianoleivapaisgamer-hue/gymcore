@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { planAllows, type PlanFeature } from "@/types/db";
+import { allows, loadPlans, type PlanFeature } from "@/lib/plans";
 
 /** ¿El plan del gimnasio habilita esta función? (chequeo del lado del servidor). */
 export async function gymHasFeature(
@@ -10,7 +10,8 @@ export async function gymHasFeature(
   const { data } = await admin
     .from("subscriptions").select("plan").eq("gym_id", gymId)
     .maybeSingle<{ plan: string }>();
-  return planAllows(data?.plan, feature);
+  const plans = await loadPlans(admin);
+  return allows(plans, data?.plan, feature);
 }
 
 /**

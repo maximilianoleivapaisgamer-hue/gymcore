@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { SUB_PLANS, SUB_STATUS_LABEL, type SubPlanKey } from "@/types/db";
+import { SUB_STATUS_LABEL } from "@/types/db";
+import { loadPlans, DEFAULT_PLANS, type PlanConfig, type SubPlanKey } from "@/lib/plans";
 
 interface Sub {
   plan: SubPlanKey;
@@ -16,17 +17,45 @@ const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 const fdate = (s: string | null) => (s ? new Date(s).toLocaleDateString("es-AR") : "—");
 
 /**
- * "Mi plan": el abono mensual del DUEÑO con GymCore (no confundir con los
+ * "Mi plan": el abono mensual del DUEÑO con turnogym (no confundir con los
  * planes de sus socios). El plan y estado los configura Maxi desde /admin;
  * acá el dueño solo ve en qué situación está.
  */
 export default function MiPlanPage() {
   const supabase = createClient();
   const [sub, setSub] = useState<Sub | null>(null);
+  const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
   const [loading, setLoading] = useState(true);
+  const [changing, setChanging] = useState<string | null>(null);
+  const [payMsg, setPayMsg] = useState("");
+  const [justPaid, setJustPaid] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mp") === "ok") {
+      setJustPaid(true);
+    }
+  }, []);
+
+  async function cambiar(plan: string) {
+    setChanging(plan); setPayMsg("");
+    try {
+      const res = await fetch("/api/pagos/crear", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json();
+      if (data.ok && data.init_point) { window.location.href = data.init_point; return; }
+      setPayMsg(data.error || "No se pudo iniciar el pago.");
+    } catch {
+      setPayMsg("Falló la conexión. Probá de nuevo.");
+    }
+    setChanging(null);
+  }
 
   useEffect(() => {
     (async () => {
+      setPlans(await loadPlans(supabase));
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data: profile } = await supabase
@@ -53,8 +82,19 @@ export default function MiPlanPage() {
           <span>/</span><span>Mi plan</span>
         </div>
         <h1 className="text-2xl font-bold">Mi plan</h1>
-        <p className="text-ink-2">Tu abono mensual con GymCore.</p>
+        <p className="text-ink-2">Tu abono mensual con turnogym.</p>
       </div>
+
+      {justPaid && (
+        <div className="mb-6 rounded-xl border border-good/30 bg-[rgba(34,197,94,.08)] px-4 py-3 text-sm text-good">
+          ¡Gracias! Estamos confirmando tu pago con Mercado Pago. Tu plan se activa en unos minutos; si no ves el cambio, refrescá esta página.
+        </div>
+      )}
+      {payMsg && (
+        <div className="mb-6 rounded-xl border border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)] px-4 py-3 text-sm text-[#f5b13d]">
+          {payMsg}
+        </div>
+      )}
 
       {loading ? (
         <p className="p-8 text-center text-ink-2">Cargando…</p>
@@ -67,7 +107,7 @@ export default function MiPlanPage() {
                   <div className="text-xs uppercase tracking-wide text-muted">Estado de tu cuenta</div>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="text-lg font-bold">
-                      {SUB_PLANS.find((p) => p.key === sub.plan)?.label || sub.plan}
+                      {plans.find((p) => p.key === sub.plan)?.label || sub.plan}
                     </span>
                     {st && <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${st.cls}`}>{st.label}</span>}
                   </div>
@@ -89,12 +129,12 @@ export default function MiPlanPage() {
 
           <h2 className="mb-3 text-lg font-bold">Planes disponibles</h2>
           <p className="mb-4 text-sm text-muted">
-            Estos planes los administra el equipo de GymCore. Si querés cambiar de plan, contactanos.
+            Elegí tu plan y aboná con Mercado Pago (débito automático mensual). El cambio se activa solo apenas
+            se confirma el pago.
           </p>
           <div className="grid items-start gap-5 md:grid-cols-3">
-            {SUB_PLANS.map((p) => {
+            {plans.map((p) => {
               const isCurrent = sub?.plan === p.key;
-              const highlight = isCurrent || p.featured;
               return (
                 <div
                   key={p.key}
@@ -117,10 +157,10 @@ export default function MiPlanPage() {
 
                   {/* Precio (con promo si corresponde) */}
                   <div className="my-3">
-                    {p.promoPrice ? (
+                    {p.promo_price ? (
                       <>
                         <div className="text-3xl font-black tracking-tight">
-                          {money(p.promoPrice)}
+                          {money(p.promo_price)}
                           <span className="text-sm font-normal text-muted"> 1er mes</span>
                         </div>
                         <div className="text-sm text-muted">
@@ -135,7 +175,7 @@ export default function MiPlanPage() {
                   </div>
 
                   {/* Cartel de IA */}
-                  {p.ai && (
+                  {p.capabilities?.includes("ia") && (
                     <div className="mb-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-3 py-2 text-xs font-semibold text-brand">
                       <span>🤖</span> IA que genera rutinas y dietas
                     </div>
@@ -150,9 +190,20 @@ export default function MiPlanPage() {
                     ))}
                   </ul>
 
-                  {p.promoNote && <p className="mt-4 text-[11px] text-muted">{p.promoNote}</p>}
-                  {highlight && !isCurrent && (
-                    <p className="mt-4 text-[11px] text-muted">Para cambiar de plan, escribinos.</p>
+                  {p.promo_note && <p className="mt-3 text-[11px] text-muted">{p.promo_note}</p>}
+
+                  {isCurrent ? (
+                    <div className="mt-4 rounded-lg border border-white/10 py-2 text-center text-xs font-semibold text-ink-2">
+                      Es tu plan actual
+                    </div>
+                  ) : (
+                    <button
+                      className="btn btn-primary mt-4 w-full"
+                      disabled={changing === p.key}
+                      onClick={() => cambiar(p.key)}
+                    >
+                      {changing === p.key ? "Redirigiendo a Mercado Pago…" : `Cambiar a ${p.label}`}
+                    </button>
                   )}
                 </div>
               );

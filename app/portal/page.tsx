@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { allows, loadPlans } from "@/lib/plans";
 import InstallAppButton from "@/components/InstallAppButton";
 import ThemeApply from "@/components/ThemeApply";
 import AppBackground from "@/components/AppBackground";
@@ -104,7 +105,8 @@ export default function PortalPage() {
     setClasses((cl as Klass[]) || []);
     setAllBookings((ab as BookingLite[]) || []);
     setLastWeight(((wl as WeightLog[]) || [])[0] ?? null);
-    setIsElite(sub?.plan === "elite" || sub?.plan === "pro");
+    const loadedPlans = await loadPlans(supabase);
+    setIsElite(allows(loadedPlans, sub?.plan, "dietas"));
     setDiet((dt as Diet) ?? null);
     if (dt) {
       const { data: dp } = await supabase.from("diet_progress").select("meal_id, date")
@@ -247,7 +249,7 @@ export default function PortalPage() {
       )}`
     : null;
 
-  const qrText = `SOCIO: ${member!.full_name} | DNI: ${member!.dni || "-"} | ${gym?.name || "GymCore"}`;
+  const qrText = `SOCIO: ${member!.full_name} | DNI: ${member!.dni || "-"} | ${gym?.name || "turnogym"}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(qrText)}`;
 
   return (
@@ -589,7 +591,7 @@ export default function PortalPage() {
         </div>
       )}
 
-      <p className="mt-6 text-center text-xs text-muted">GymCore · <Link href="/acceso" className="hover:text-brand">Cerrar sesión</Link></p>
+      <p className="mt-6 text-center text-xs text-muted">turnogym · <Link href="/acceso" className="hover:text-brand">Cerrar sesión</Link></p>
     </main>
   );
 }

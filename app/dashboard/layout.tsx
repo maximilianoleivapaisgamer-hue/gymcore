@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { planAllows, minPlanLabelFor, type PlanFeature } from "@/types/db";
+import { allows, minPlanLabel, loadPlans, DEFAULT_PLANS, type PlanFeature, type PlanConfig } from "@/lib/plans";
 import ThemeApply from "@/components/ThemeApply";
 
 interface NavItem {
@@ -148,6 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [fullName, setFullName] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
+  const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
   const [role, setRole] = useState<string>("owner");
   const [seeFinance, setSeeFinance] = useState(true);
 
@@ -170,6 +171,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ]);
         setGym(g ?? null);
         setPlan(sub?.plan ?? null);
+        setPlans(await loadPlans(supabase));
         setSeeFinance(profile.role !== "empleado" || !!g?.employees_see_finance);
       }
     })();
@@ -217,7 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           )}
           <div className="min-w-0">
-            <div className="truncate text-[17px] font-bold leading-tight tracking-[-.3px]">{gym?.name || "GymCore"}</div>
+            <div className="truncate text-[17px] font-bold leading-tight tracking-[-.3px]">{gym?.name || "turnogym"}</div>
             <div className="text-[11px] font-medium text-muted">Panel del gimnasio</div>
           </div>
         </div>
@@ -238,9 +240,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <>
                       <span className={active ? "text-brand" : "opacity-85"}><Icon name={item.icon} /></span>
                       <span className="flex-1">{item.label}</span>
-                      {item.feature && !planAllows(plan, item.feature) && (
+                      {item.feature && !allows(plans, plan, item.feature) && (
                         <span className="rounded-full bg-[rgba(245,177,61,.14)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#f5b13d]">
-                          {minPlanLabelFor(item.feature)}
+                          {minPlanLabel(plans, item.feature)}
                         </span>
                       )}
                     </>
@@ -268,7 +270,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-bold" title={fullName || email}>{fullName || email || "Mi cuenta"}</div>
-            <div className="truncate text-xs text-muted">{gym?.name || "GymCore"}</div>
+            <div className="truncate text-xs text-muted">{gym?.name || "turnogym"}</div>
           </div>
           <button onClick={logout} title="Cerrar sesión"
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/[.08] text-ink-2 transition hover:border-white/20 hover:text-crit">
