@@ -130,42 +130,52 @@ export const DEFAULT_LANDING: LandingConfig = {
   secciones: { beneficios: true, clases: true, planes: true, galeria: true },
 };
 
-/** Combina defaults + identidad del gym + ediciones guardadas. */
+/**
+ * Combina en este orden:
+ *   1) DEFAULT_LANDING (demo)
+ *   2) gym.landing_config → contenido rico editado (beneficios, clases, planes,
+ *      galería, ubicación, marca secundaria/modo, redes, secciones, etc.)
+ *   3) columnas dedicadas del gym → identidad (nombre, color, logo, fondo,
+ *      tagline, descripción, WhatsApp, Instagram, dirección). Son la fuente
+ *      autoritativa: si el editor las cambió, se guardaron también en columna,
+ *      así que nunca quedan desincronizadas ni "viejas".
+ */
 export function resolveLandingConfig(gym: Gym): LandingConfig {
-  // Copia profunda del demo para no mutarlo.
   const base: LandingConfig = JSON.parse(JSON.stringify(DEFAULT_LANDING));
 
-  // Capa 2: identidad real del gimnasio (columnas dedicadas).
-  base.nombre = gym.name || base.nombre;
-  if (gym.tagline) base.tagline = gym.tagline;
-  if (gym.description) base.descripcion = gym.description;
-  base.logoUrl = gym.logo_url ?? null;
-  base.heroImagen = gym.hero_url ?? null;
-  if (gym.accent_color) base.marca.primary = gym.accent_color;
-  if (gym.whatsapp) base.whatsapp = gym.whatsapp.replace(/\D/g, "");
-  if (gym.instagram) base.instagram = gym.instagram;
-  if (gym.address) {
-    base.ubicacion.direccion = gym.address;
-    base.ubicacion.mapsQuery = gym.address;
-  }
-  if (Array.isArray(gym.gallery) && gym.gallery.length) {
-    base.galeria = gym.gallery.filter(Boolean).map((src) => ({ src, alt: gym.name }));
-  }
-
-  // Capa 3: ediciones guardadas del dueño (pisan lo anterior).
+  // Capa 2: contenido rico guardado.
   const cfg = (gym.landing_config as Partial<LandingConfig> | null | undefined) ?? null;
-  if (cfg && typeof cfg === "object") {
-    for (const key of Object.keys(cfg) as (keyof LandingConfig)[]) {
+  const hasCfg = cfg && typeof cfg === "object";
+  if (hasCfg) {
+    for (const key of Object.keys(cfg).filter(Boolean) as (keyof LandingConfig)[]) {
       const val = cfg[key];
       if (val === undefined || val === null) continue;
       if (key === "marca" || key === "ubicacion" || key === "secciones") {
-        // objetos: merge superficial
         base[key] = { ...(base[key] as object), ...(val as object) } as never;
       } else {
         base[key] = val as never;
       }
     }
   }
+
+  // Capa 3: identidad desde columnas (manda).
+  base.nombre = gym.name || base.nombre;
+  base.logoUrl = gym.logo_url ?? base.logoUrl;
+  base.heroImagen = gym.hero_url ?? base.heroImagen;
+  if (gym.accent_color) base.marca.primary = gym.accent_color;
+  if (gym.tagline) base.tagline = gym.tagline;
+  if (gym.description) base.descripcion = gym.description;
+  if (gym.whatsapp) base.whatsapp = gym.whatsapp.replace(/\D/g, "");
+  if (gym.instagram) base.instagram = gym.instagram;
+  if (gym.address) base.ubicacion.direccion = gym.address;
+
+  // Fallbacks: galería desde la columna vieja si el config no la definió;
+  // mapsQuery a la dirección si quedó vacío.
+  if (!(hasCfg && "galeria" in (cfg as object)) && Array.isArray(gym.gallery) && gym.gallery.length) {
+    base.galeria = gym.gallery.filter(Boolean).map((src) => ({ src, alt: gym.name }));
+  }
+  if (!base.ubicacion.mapsQuery && gym.address) base.ubicacion.mapsQuery = gym.address;
+
   return base;
 }
 

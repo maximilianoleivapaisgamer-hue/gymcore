@@ -28,7 +28,7 @@ function SectionHeading({ eyebrow, titulo, descripcion }: { eyebrow: string; tit
  * Testimonios no se renderizan (fuera por decisión de producto). Ubicación y el
  * CTA final van siempre.
  */
-export default function LandingSite({ config, slug }: { config: LandingConfig; slug: string }) {
+export default function LandingSite({ config, slug, preview = false }: { config: LandingConfig; slug: string; preview?: boolean }) {
   const { portalUrl, joinHref } = landingLinks(slug);
   const wa = waLink(config.whatsapp);
   const s = config.secciones;
@@ -48,7 +48,7 @@ export default function LandingSite({ config, slug }: { config: LandingConfig; s
 
   return (
     <div className="tg-landing" style={landingBrandStyle(config.marca)}>
-      <LandingHeader nombre={config.nombre} logoUrl={config.logoUrl} portalUrl={portalUrl} links={links} />
+      <LandingHeader nombre={config.nombre} logoUrl={config.logoUrl} portalUrl={portalUrl} links={links} sticky={!preview} />
 
       <main>
         {/* HERO */}
@@ -330,7 +330,7 @@ export default function LandingSite({ config, slug }: { config: LandingConfig; s
       </footer>
 
       {/* WhatsApp flotante */}
-      {wa && (
+      {wa && !preview && (
         <a href={wa} target="_blank" rel="noopener noreferrer" aria-label="Escribinos por WhatsApp" className="fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full text-white shadow-lg transition hover:scale-105" style={{ background: "#25D366", boxShadow: "0 8px 24px rgba(37,211,102,.45)" }}>
           <svg viewBox="0 0 32 32" className="h-7 w-7" fill="currentColor" aria-hidden="true">
             <path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.5A11.9 11.9 0 0016 27c6.6 0 12-5.4 12-12S22.6 3 16 3zm5.4 16.5c-.2.6-1.3 1.2-1.9 1.3-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.6-.6-2.9-1.3-4.8-4.3-5-4.5-.1-.2-1.2-1.6-1.2-3s.7-2.1 1-2.4c.2-.3.5-.4.7-.4h.5c.2 0 .4 0 .6.5.2.6.8 2 .9 2.1.1.1.1.3 0 .5-.1.2-.1.3-.3.5l-.4.5c-.1.1-.3.3-.1.6.1.3.7 1.2 1.6 2 1.1.9 2 1.2 2.3 1.4.3.1.5.1.6-.1.2-.2.7-.8.9-1.1.2-.3.4-.2.6-.1.3.1 1.7.8 2 .9.3.2.5.2.6.3.1.2.1.7-.1 1.3z" />

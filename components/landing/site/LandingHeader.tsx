@@ -14,11 +14,13 @@ export function LandingHeader({
   logoUrl,
   portalUrl,
   links,
+  sticky = true,
 }: {
   nombre: string;
   logoUrl: string | null;
   portalUrl: string;
   links: NavLink[];
+  sticky?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -47,7 +49,7 @@ export function LandingHeader({
 
   return (
     <header
-      className="sticky top-0 z-40 border-b transition-colors"
+      className={`${sticky ? "sticky top-0" : "relative"} z-40 border-b transition-colors`}
       style={{
         borderColor: scrolled || open ? "var(--l-border)" : "transparent",
         backgroundColor: scrolled || open ? "color-mix(in srgb, var(--l-bg) 85%, transparent)" : "transparent",
