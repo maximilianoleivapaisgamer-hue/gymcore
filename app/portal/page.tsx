@@ -348,7 +348,7 @@ export default function PortalPage() {
           </div>
 
           {/* Al final de "Mi perfil": recomendación de bajar la webapp */}
-          <InstallAppButton />
+          <InstallAppButton appName={gym?.name || undefined} />
         </div>
       )}
 

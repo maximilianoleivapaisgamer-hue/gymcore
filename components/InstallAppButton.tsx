@@ -8,69 +8,77 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 /**
- * Botón/banner para instalar turnogym como app (PWA) desde el portal del
- * socio. En Chrome/Android usa el evento beforeinstallprompt; en iOS Safari
- * (que no lo soporta) muestra instrucciones manuales de "Agregar a inicio".
+ * Tarjeta para instalar la app (PWA) desde el portal del socio, estilo Selly:
+ * siempre visible (salvo que ya esté instalada), con un botón grande "Instalar
+ * app" que dispara la instalación en el momento. Si el navegador no soporta el
+ * prompt directo (iOS Safari, o Chrome que todavía no lo habilitó), muestra el
+ * paso a paso.
  */
-export default function InstallAppButton() {
+export default function InstallAppButton({ appName }: { appName?: string }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [dismissed, setDismissed] = useState(true); // arranca oculto hasta confirmar que corresponde mostrarlo
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     const standalone =
       window.matchMedia?.("(display-mode: standalone)").matches ||
       (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     setInstalled(!!standalone);
-
-    const ua = window.navigator.userAgent || "";
-    setIsIOS(/iphone|ipad|ipod/i.test(ua));
-
-    let wasDismissed = false;
-    try { wasDismissed = localStorage.getItem("gymcore_install_dismissed") === "1"; } catch { /* noop */ }
-    setDismissed(wasDismissed);
+    setIsIOS(/iphone|ipad|ipod/i.test(window.navigator.userAgent || ""));
 
     function onPrompt(e: Event) {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);
     }
+    const onInstalled = () => setInstalled(true);
     window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", () => setInstalled(true));
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
-  function dismiss() {
-    setDismissed(true);
-    try { localStorage.setItem("gymcore_install_dismissed", "1"); } catch { /* noop */ }
-  }
-
   async function install() {
-    if (!deferred) return;
-    await deferred.prompt();
-    await deferred.userChoice;
-    setDeferred(null);
+    if (deferred) {
+      await deferred.prompt();
+      const choice = await deferred.userChoice;
+      if (choice.outcome === "accepted") setInstalled(true);
+      setDeferred(null);
+      return;
+    }
+    // Sin prompt disponible: mostramos el paso a paso.
+    setShowHelp(true);
   }
 
-  if (installed || dismissed) return null;
-  if (!deferred && !isIOS) return null; // Chrome desktop/Android que todavía no disparó el evento
+  if (installed) return null;
+
+  const nombre = appName ? `la app de ${appName}` : "la app";
 
   return (
-    <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-brand/30 bg-[rgba(34,211,238,.08)] px-4 py-3">
-      <div className="min-w-0">
-        <div className="text-sm font-semibold">📲 Descargá la app</div>
-        <div className="text-xs text-ink-2">
-          {isIOS && !deferred
-            ? "Tocá compartir (⬆️) y elegí “Agregar a pantalla de inicio”."
-            : "No ocupa memoria y queda como una app más en tu celular."}
+    <div className="mb-4 rounded-2xl border border-white/10 bg-surface p-5 text-center">
+      <div className="text-base font-bold">📲 Instalá {nombre} en tu celular</div>
+      <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-2">
+        No ocupa espacio (no es una app pesada) y queda como un ícono en tu pantalla de inicio,
+        para entrar directo a tu rutina, dieta y clases.
+      </p>
+      <button
+        onClick={install}
+        className="btn btn-primary mt-4 w-full py-3 text-base font-semibold"
+      >
+        Instalar app
+      </button>
+
+      {showHelp && (
+        <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-left text-xs text-ink-2">
+          {isIOS ? (
+            <>Para instalarla en iPhone: tocá el botón <b>Compartir</b> (⬆️) abajo en Safari y elegí <b>“Agregar a pantalla de inicio”</b>.</>
+          ) : (
+            <>Abrí el menú del navegador (los <b>3 puntitos ⋮</b> arriba a la derecha) y tocá <b>“Instalar app”</b> o <b>“Agregar a pantalla de inicio”</b>.</>
+          )}
         </div>
-      </div>
-      <div className="flex shrink-0 gap-2">
-        {deferred && (
-          <button className="btn btn-primary text-xs" onClick={install}>Instalar</button>
-        )}
-        <button className="text-ink-2 hover:text-ink" onClick={dismiss} title="Cerrar">×</button>
-      </div>
+      )}
     </div>
   );
 }
