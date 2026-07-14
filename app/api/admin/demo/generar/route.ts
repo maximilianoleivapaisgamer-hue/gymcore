@@ -80,7 +80,7 @@ export async function POST(req: Request) {
       ciudad: body.ciudad,
       webTexto,
       infoLibre: body.infoLibre,
-      images: Array.isArray(body.images) ? body.images.slice(0, 4) : undefined,
+      images: Array.isArray(body.images) ? body.images.slice(0, 10) : undefined,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message || "La IA no pudo generar la demo." }, { status: 502 });

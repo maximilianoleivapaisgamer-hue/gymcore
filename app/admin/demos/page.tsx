@@ -7,13 +7,39 @@ import { createClient } from "@/lib/supabase-browser";
 interface DemoGym { id: string; name: string; slug: string; created_at: string | null; }
 interface ImgData { mediaType: string; data: string; name: string; }
 
+const MAX_IMAGES = 10;
+
+/** Lee la imagen y la reduce (máx 1600px, JPEG) para que el pedido no pese de más. */
 function fileToBase64(file: File): Promise<{ mediaType: string; data: string }> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => {
-      const res = String(r.result || "");
-      const comma = res.indexOf(",");
-      resolve({ mediaType: file.type || "image/jpeg", data: res.slice(comma + 1) });
+      const src = String(r.result || "");
+      const rawFallback = () => {
+        const comma = src.indexOf(",");
+        resolve({ mediaType: file.type || "image/jpeg", data: src.slice(comma + 1) });
+      };
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 1600;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            const scale = maxDim / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return rawFallback();
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+          resolve({ mediaType: "image/jpeg", data: dataUrl.slice(dataUrl.indexOf(",") + 1) });
+        } catch { rawFallback(); }
+      };
+      img.onerror = rawFallback;
+      img.src = src;
     };
     r.onerror = reject;
     r.readAsDataURL(file);
@@ -68,14 +94,34 @@ export default function DemosPage() {
     if (kind === "logo") setLogoUrl(data.publicUrl); else setHeroUrl(data.publicUrl);
   }
 
-  async function addScreenshots(files: FileList) {
+  async function addFiles(files: File[]) {
+    const imgs = files.filter((f) => f.type.startsWith("image/"));
     const arr: ImgData[] = [];
-    for (const f of Array.from(files).slice(0, 4)) {
+    for (const f of imgs.slice(0, MAX_IMAGES)) {
       const b = await fileToBase64(f);
-      arr.push({ ...b, name: f.name });
+      arr.push({ ...b, name: f.name || "captura.png" });
     }
-    setImages((prev) => [...prev, ...arr].slice(0, 4));
+    if (arr.length) setImages((prev) => [...prev, ...arr].slice(0, MAX_IMAGES));
   }
+
+  // Pegar capturas con Ctrl+V en cualquier parte de la pantalla.
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const it of Array.from(items)) {
+        if (it.type.startsWith("image/")) {
+          const f = it.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (files.length) { e.preventDefault(); addFiles(files); }
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+    /* eslint-disable-next-line */
+  }, []);
 
   async function generar() {
     setErr(""); setResult(null);
@@ -130,8 +176,17 @@ export default function DemosPage() {
               placeholder="Ej: gimnasio 24hs en San Miguel, tiene sala de musculación, funcional y clases de spinning. Cuota $18.000. Instagram con logo rojo." />
           </Field>
 
-          <Field label="Capturas (Instagram / WhatsApp / web) — hasta 4">
-            <input type="file" accept="image/*" multiple className="text-sm" onChange={(e) => e.target.files?.length && addScreenshots(e.target.files)} />
+          <Field label={`Capturas (Instagram / WhatsApp / web) — hasta ${MAX_IMAGES}`}>
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files?.length) addFiles(Array.from(e.dataTransfer.files)); }}
+              className="mb-2 rounded-lg border border-dashed border-white/20 bg-white/5 p-3 text-center text-xs text-ink-2"
+            >
+              📋 Sacá la captura y pegala acá con <b>Ctrl+V</b> — o arrastrala — o elegí el archivo:
+              <div className="mt-2">
+                <input type="file" accept="image/*" multiple className="text-sm" onChange={(e) => e.target.files?.length && addFiles(Array.from(e.target.files))} />
+              </div>
+            </div>
             {images.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {images.map((im, i) => (
