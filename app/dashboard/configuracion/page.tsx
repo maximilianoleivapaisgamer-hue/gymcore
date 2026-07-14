@@ -8,6 +8,7 @@ import { DEFAULT_LANDING_SECTIONS, LANDING_SECTION_LABELS } from "@/types/db";
 import { combinedLandingPlans, visibleLandingSections } from "@/lib/landing";
 import { THEMES, BG_STYLES } from "@/lib/theme";
 import ThemeApply from "@/components/ThemeApply";
+import ShareGym from "@/components/ShareGym";
 
 /**
  * Editor de la página pública del gimnasio.
@@ -557,6 +558,8 @@ export default function ConfiguracionPage() {
 
       {/* PREVIEW EN VIVO */}
       <div className="overflow-auto p-6" style={{ "--accent": accent } as React.CSSProperties}>
+        <ShareGym slug={gym.slug || ""} gymName={gym.name || ""} />
+
         <div className="mb-3">
           <p className="text-sm text-ink-2">Vista previa · turnogym.app/{gym.slug || "tu-gym"}</p>
         </div>
