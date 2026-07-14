@@ -64,8 +64,6 @@ export default function DemosPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoNoBg, setLogoNoBg] = useState(true);
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
-  const [ownerEmail, setOwnerEmail] = useState("");
-  const [ownerPassword, setOwnerPassword] = useState("");
 
   // Google (Apify) + galería
   const [gUrl, setGUrl] = useState("");
@@ -74,7 +72,7 @@ export default function DemosPage() {
 
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
-  const [result, setResult] = useState<{ slug: string; url: string; owner: { email: string; password: string }; socio: { dni: string; name: string } | null } | null>(null);
+  const [result, setResult] = useState<{ slug: string; url: string; owner: { user: string; loginUrl: string }; socio: { name: string; user: string; loginUrl: string } | null } | null>(null);
 
   async function loadDemos() {
     const { data } = await supabase.from("gyms").select("id, name, slug, created_at")
@@ -142,10 +140,9 @@ export default function DemosPage() {
     if (!val) { setErr("Pegá el link de Google Maps o escribí nombre + ciudad."); return; }
     setGBusy(true);
     try {
-      const isUrl = /^https?:\/\//i.test(val) || val.includes("google.") || val.includes("maps.app");
       const res = await fetch("/api/admin/demo/google", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify(isUrl ? { url: val } : { query: val }),
+        body: JSON.stringify({ input: val }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) { setErr(data?.error || "No se pudo leer Google."); setGBusy(false); return; }
@@ -177,7 +174,6 @@ export default function DemosPage() {
           images: images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
           galleryUrls: gallery,
           logoUrl, heroUrl,
-          ownerEmail: ownerEmail || undefined, ownerPassword: ownerPassword || undefined,
         }),
       });
       const data = await res.json();
@@ -211,7 +207,7 @@ export default function DemosPage() {
             <label className="mb-1 block text-xs font-semibold text-brand">🗺️ Traer de Google Maps</label>
             <div className="flex gap-2">
               <input className="input flex-1" value={gUrl} onChange={(e) => setGUrl(e.target.value)}
-                placeholder="Pegá el link de Google Maps — o: MegaCenter Gym San Miguel" />
+                placeholder="Escribí: MegaCenter Gym San Miguel — o pegá el link de Maps" />
               <button className="btn btn-ghost shrink-0" onClick={buscarGoogle} disabled={gBusy}>{gBusy ? "Buscando…" : "Buscar"}</button>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
@@ -292,14 +288,6 @@ export default function DemosPage() {
             </Field>
           </div>
 
-          <details className="mt-2">
-            <summary className="cursor-pointer text-xs text-ink-2">Login del dueño (opcional — si no, lo genero solo)</summary>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
-              <Field label="Email del dueño"><input className="input" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} placeholder="demo@…" /></Field>
-              <Field label="Contraseña"><input className="input" value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} placeholder="mín. 6" /></Field>
-            </div>
-          </details>
-
           {err && <p className="mt-3 text-sm text-crit">{err}</p>}
           <button className="btn btn-primary mt-4 w-full" onClick={generar} disabled={gen}>
             {gen ? "Generando con IA… (puede tardar ~20s)" : "🤖 Generar demo con IA"}
@@ -313,20 +301,28 @@ export default function DemosPage() {
               <div className="mb-2 text-sm font-bold text-good">¡Demo lista! 🎉</div>
               <div className="space-y-2 text-sm">
                 <div>
-                  <div className="text-xs text-muted">Web pública</div>
+                  <div className="text-xs text-muted">🌐 Web pública</div>
                   <a href={result.url} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">turnogym.app{result.url}</a>
                 </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                  <div className="text-xs text-muted">👤 Panel del dueño — usuario y contraseña <b>iguales</b>:</div>
-                  <div className="mt-0.5 break-all font-semibold text-ink">{result.owner.email}</div>
+
+                <div className="rounded-lg border border-white/10 bg-white/5 p-2.5">
+                  <div className="text-xs font-semibold text-ink-2">👤 Panel del dueño</div>
+                  <div className="mt-1 text-xs text-muted">Link:</div>
+                  <a href={result.owner.loginUrl} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">turnogym.app{result.owner.loginUrl}</a>
+                  <div className="mt-1.5 text-xs text-muted">Usuario y contraseña (iguales):</div>
+                  <div className="text-base font-bold text-ink">{result.owner.user}</div>
                 </div>
+
                 {result.socio && (
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                    <div className="text-xs text-muted">📲 App del socio ({result.socio.name}) — usuario y contraseña <b>iguales</b>:</div>
-                    <div className="mt-0.5 text-lg font-bold text-ink">{result.socio.dni}</div>
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-2.5">
+                    <div className="text-xs font-semibold text-ink-2">📲 App del socio ({result.socio.name})</div>
+                    <div className="mt-1 text-xs text-muted">Link (con el logo del gimnasio):</div>
+                    <a href={result.socio.loginUrl} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">turnogym.app{result.socio.loginUrl}</a>
+                    <div className="mt-1.5 text-xs text-muted">Usuario y contraseña (iguales):</div>
+                    <div className="text-base font-bold text-ink">{result.socio.user}</div>
                   </div>
                 )}
-                <p className="text-[11px] text-muted">Ambos entran en turnogym.app/acceso (poné el mismo texto en usuario y contraseña). La demo viene con 10 socios, rutinas, dietas, clases y caja.</p>
+                <p className="text-[11px] text-muted">Poné el mismo texto en usuario y en contraseña. La demo viene con 10 socios, rutinas, dietas, clases y caja.</p>
               </div>
             </div>
           )}

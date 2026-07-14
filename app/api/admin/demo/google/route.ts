@@ -31,17 +31,16 @@ export async function POST(req: Request) {
     }
   }
 
-  let body: { url?: string; query?: string };
+  let body: { input?: string; url?: string; query?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
-  const gUrl = String(body.url || "").trim();
-  const query = String(body.query || "").trim();
-  if (!gUrl && !query) {
-    return NextResponse.json({ ok: false, error: "Pegá el link de Google Maps o escribí nombre + ciudad." }, { status: 400 });
+  const input = String(body.input || body.url || body.query || "").trim();
+  if (!input) {
+    return NextResponse.json({ ok: false, error: "Escribí nombre + ciudad, o pegá el link de Google Maps." }, { status: 400 });
   }
 
   try {
-    const place = await scrapeGooglePlace({ url: gUrl || undefined, query: query || undefined }, token);
-    if (!place) return NextResponse.json({ ok: false, error: "No encontré ese lugar en Google. Probá con el link directo de Maps." }, { status: 404 });
+    const place = await scrapeGooglePlace(input, token);
+    if (!place) return NextResponse.json({ ok: false, error: "No encontré ese lugar. Probá escribiendo el nombre + la ciudad (ej: MegaCenter Gym San Miguel)." }, { status: 404 });
     return NextResponse.json({ ok: true, place });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message || "Falló la consulta a Apify." }, { status: 502 });

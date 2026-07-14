@@ -67,15 +67,51 @@ function toImages(raw: unknown): string[] {
     .slice(0, 12);
 }
 
+/** Sigue redirecciones de un link corto (share.google, maps.app.goo.gl, goo.gl). */
+async function resolveRedirect(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      headers: { "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15" },
+    });
+    return res.url || null;
+  } catch {
+    return null;
+  }
+}
+
+const isFullMapsUrl = (s: string) =>
+  /https?:\/\/(www\.)?google\.[^/]+\/maps/i.test(s) || /\/maps\/(search|place)/i.test(s) || /[?&]cid=\d+/i.test(s);
+const isShortLink = (s: string) =>
+  /^https?:\/\/(share\.google|maps\.app\.goo\.gl|goo\.gl|g\.co|maps\.google\.[^/]+\/url)/i.test(s.trim());
+
 /**
- * Lee un lugar de Google Maps por URL o por texto (nombre + ciudad).
- * Devuelve datos normalizados o null si no encontró nada.
+ * Lee un lugar de Google Maps a partir de lo que escriba el usuario: un link de
+ * Google Maps (incluidos los cortos share.google / maps.app.goo.gl, que se
+ * resuelven), o texto libre "nombre + ciudad" (que se busca). Devuelve datos
+ * normalizados o null.
  */
 export async function scrapeGooglePlace(
-  q: { url?: string; query?: string },
+  rawInput: string,
   token: string,
   actor = process.env.APIFY_GMAPS_ACTOR || DEFAULT_GMAPS_ACTOR
 ): Promise<GooglePlace | null> {
+  const s = (rawInput || "").trim();
+  if (!s) return null;
+
+  // Decidir: link directo, link corto (resolver), o búsqueda por texto.
+  let startUrl: string | null = null;
+  let query: string | null = null;
+  if (isFullMapsUrl(s)) {
+    startUrl = s;
+  } else if (isShortLink(s)) {
+    const resolved = await resolveRedirect(s);
+    if (resolved && isFullMapsUrl(resolved)) startUrl = resolved;
+    else startUrl = s; // último recurso
+  } else {
+    query = s; // texto libre → búsqueda
+  }
+
   const input: Record<string, unknown> = {
     maxImages: 12,
     language: "es",
@@ -83,8 +119,8 @@ export async function scrapeGooglePlace(
     maxCrawledPlaces: 1,
     scrapeImageAuthors: false,
   };
-  if (q.url) input.startUrls = [{ url: q.url }];
-  else if (q.query) input.searchStringsArray = [q.query];
+  if (startUrl) input.startUrls = [{ url: startUrl }];
+  else if (query) input.searchStringsArray = [query];
   else return null;
 
   const items = await runActorSync(actor, input, token);

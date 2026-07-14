@@ -179,22 +179,24 @@ export async function POST(req: Request) {
     secciones: { beneficios: true, clases: true, planes: true, galeria: true },
   };
 
-  // 4) Crear el usuario dueño de la demo (login del panel).
-  // Login simple: usuario y contraseña son iguales (es una demo).
+  // 4) Usuario dueño (login del panel). Usuario = nombre del gym todo junto;
+  //    la contraseña es la misma. Entra en /acceso escribiendo ese usuario.
   const slug = `demo-${slugify(nombre)}-${rand(4)}`;
-  const ownerEmail = String(body.ownerEmail || "").trim().toLowerCase() || `${slugify(nombre).slice(0, 18) || "demo"}-${rand(3)}@demo.turnogym.app`;
-  const ownerPassword = String(body.ownerPassword || "") || ownerEmail;
-  const { data: created, error: cErr } = await admin.auth.admin.createUser({
-    email: ownerEmail,
-    password: ownerPassword,
-    email_confirm: true,
-    user_metadata: { account_type: "owner", full_name: nombre, is_demo: true },
-  });
-  if (cErr || !created?.user?.id) {
-    const already = /already|registered|exists|duplicate/i.test(cErr?.message || "");
-    return NextResponse.json({ ok: false, error: already ? "Ese email de dueño ya existe. Probá otro." : (cErr?.message || "No se pudo crear el usuario dueño.") }, { status: 400 });
+  let ownerUser = slugify(nombre).replace(/-/g, "").slice(0, 24) || "demo";
+  if (ownerUser.length < 6) ownerUser = (ownerUser + "000000").slice(0, 6);
+  const userBase = ownerUser;
+  let ownerId = "";
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const email = `${ownerUser}@socios.gymcore.app`;
+    const { data: created, error: cErr } = await admin.auth.admin.createUser({
+      email, password: ownerUser, email_confirm: true,
+      user_metadata: { account_type: "owner", full_name: nombre, is_demo: true },
+    });
+    if (!cErr && created?.user?.id) { ownerId = created.user.id; break; }
+    if (cErr && /already|exists|duplicate|registered/i.test(cErr.message || "")) { ownerUser = `${userBase}${attempt + 2}`; continue; }
+    return NextResponse.json({ ok: false, error: cErr?.message || "No se pudo crear el usuario dueño." }, { status: 400 });
   }
-  const ownerId = created.user.id;
+  if (!ownerId) return NextResponse.json({ ok: false, error: "No se pudo crear el usuario dueño (probá otro nombre)." }, { status: 400 });
 
   // 4) Crear el gimnasio demo.
   const { data: gym, error: gErr } = await admin.from("gyms").insert({
@@ -234,7 +236,7 @@ export async function POST(req: Request) {
     ok: true,
     slug: gym.slug,
     url: `/${gym.slug}`,
-    owner: { email: ownerEmail, password: ownerPassword },
-    socio: socio ? { dni: socio.dni, name: socio.name } : null,
+    owner: { user: ownerUser, loginUrl: "/acceso" },
+    socio: socio ? { name: socio.name, user: socio.dni, loginUrl: `/g/${gym.slug}` } : null,
   });
 }
