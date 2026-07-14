@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { text, result } = await chatWithTool({
+    const { text, result } = await chatWithTool<{ days?: unknown[] }>({
       system,
       messages,
       toolName: esRutina ? "armar_rutina" : "armar_dieta",
@@ -48,11 +48,24 @@ export async function POST(req: Request) {
         ? "Arma la rutina completa con días, bloques y ejercicios cuando ya tenés la info necesaria."
         : "Arma el plan de comidas completo con días y comidas cuando ya tenés la info necesaria.",
       schema: esRutina ? ROUTINE_SCHEMA : DIET_SCHEMA,
-      maxTokens: 4096,
+      // Los planes largos (varios días con recetas) ocupan mucho: damos margen
+      // para que no se corte a la mitad.
+      maxTokens: esRutina ? 8000 : 16000,
     });
 
-    if (result) {
+    // Si armó un resultado válido (con días), lo devolvemos para "Cargar en sistema".
+    if (result && Array.isArray(result.days) && result.days.length > 0) {
       return NextResponse.json({ ok: true, type: "result", data: result, text: text || "" });
+    }
+    // Si "armó" algo pero quedó vacío (p. ej. se cortó), pedimos achicar en vez de romper.
+    if (result) {
+      return NextResponse.json({
+        ok: true,
+        type: "message",
+        text:
+          (text ? text + "\n\n" : "") +
+          "Se me hizo muy largo y no llegué a completarlo. ¿Probamos con menos días o comidas para que entre completo?",
+      });
     }
     return NextResponse.json({ ok: true, type: "message", text: text || "¿Podés darme un poco más de detalle?" });
   } catch (e) {

@@ -14,9 +14,9 @@ interface Msg { role: "user" | "assistant"; content: string }
 
 const GREETING: Record<"rutina" | "dieta", string> = {
   rutina:
-    "¡Hola! Te ayudo a armar la rutina 💪. ¿Qué objetivo buscás? (hipertrofia, fuerza, bajar grasa, tonificar, salud general)",
+    "¡Hola! Soy Gimo 🤖, tu asistente. Te ayudo a armarle la rutina a tu socio en un ratito. Arranquemos: ¿qué objetivo buscás? (hipertrofia, fuerza, bajar grasa, tonificar, salud general)",
   dieta:
-    "¡Hola! Te ayudo a armar el plan de comidas 🥗. ¿Qué objetivo buscás? (bajar grasa, ganar masa muscular, mantenimiento, rendimiento)",
+    "¡Hola! Soy Gimo 🤖, tu asistente. Te armo el plan de comidas para tu socio. Arranquemos: ¿qué objetivo buscás? (bajar grasa, ganar masa muscular, mantenimiento, rendimiento)",
 };
 
 export default function AiChat({
@@ -117,7 +117,7 @@ export default function AiChat({
   return (
     <>
       <button type="button" className="btn btn-ghost" onClick={() => setOpen(true)}>
-        ✨ Generar con IA
+        🤖 Generar con IA
       </button>
 
       {open && (
@@ -125,8 +125,11 @@ export default function AiChat({
           {/* Header */}
           <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
             <span className="flex items-center gap-2 text-sm font-semibold">
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-black">✨</span>
-              {esRutina ? "Entrenador IA" : "Nutricionista IA"}
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-base">🤖</span>
+              <span className="flex flex-col leading-tight">
+                <span>Gimo</span>
+                <span className="text-[10px] font-normal text-ink-2">{esRutina ? "Entrenador" : "Nutricionista"}</span>
+              </span>
             </span>
             <button className="text-ink-2 hover:text-ink" onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
           </div>
