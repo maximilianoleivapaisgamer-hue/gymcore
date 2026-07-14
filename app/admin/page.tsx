@@ -65,7 +65,7 @@ export default function AdminPage() {
       if (me?.role !== "super_admin") { setStatus("denied"); return; }
 
       const [{ data: g }, { data: s }, { data: p }, { data: mem }] = await Promise.all([
-        supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp"),
+        supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp").eq("is_demo", false),
         supabase.from("subscriptions").select("gym_id, plan, status, trial_ends_at, current_period_end"),
         supabase.from("profiles").select("id, full_name"),
         supabase.from("members").select("gym_id"),
@@ -166,7 +166,10 @@ export default function AdminPage() {
           </div>
           <p className="mt-1 text-ink-2">Todos los gimnasios clientes y su suscripción.</p>
         </div>
-        <button className="btn btn-ghost" onClick={logout}>Cerrar sesión</button>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/demos" className="btn btn-primary">🤖 Generar demo</Link>
+          <button className="btn btn-ghost" onClick={logout}>Cerrar sesión</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
