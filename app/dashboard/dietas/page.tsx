@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { PLANS_WITH_DIET, type SubPlanKey } from "@/types/db";
+import { planAllows } from "@/types/db";
 import AiChat from "@/components/AiChat";
 
 interface Member { id: string; full_name: string; }
@@ -175,7 +175,7 @@ export default function DietasPage() {
 
   const memberName = (id: string | null) => members.find((m) => m.id === id)?.full_name;
 
-  if (!loading && !(plan && PLANS_WITH_DIET.includes(plan as SubPlanKey))) {
+  if (!loading && !planAllows(plan, "dietas")) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-16 text-center">
         <div className="mb-2 text-4xl">🥗</div>
@@ -200,7 +200,7 @@ export default function DietasPage() {
           <p className="text-ink-2">{diets.length} dietas cargadas</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AiChat kind="dieta" gymId={gymId} members={members} onDone={load} />
+          <AiChat kind="dieta" gymId={gymId} members={members} onDone={load} enabled={planAllows(plan, "ia")} />
           <button className="btn btn-primary" onClick={startNew}>+ Nueva dieta</button>
         </div>
       </div>

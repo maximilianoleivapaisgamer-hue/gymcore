@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import AiChat from "@/components/AiChat";
+import { planAllows } from "@/types/db";
 
 interface Exercise { id: string; name: string; notes: string | null; }
 interface Member { id: string; full_name: string; }
@@ -50,13 +51,20 @@ export default function RutinasPage() {
   const [newEx, setNewEx] = useState("");
   const [applyMember, setApplyMember] = useState("");
   const [applyMsg, setApplyMsg] = useState("");
+  const [plan, setPlan] = useState<string | null>(null);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data: profile } = await supabase
       .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
-    setGymId(profile?.gym_id ?? null);
+    const gid = profile?.gym_id ?? null;
+    setGymId(gid);
+    if (gid) {
+      const { data: sub } = await supabase
+        .from("subscriptions").select("plan").eq("gym_id", gid).maybeSingle<{ plan: string }>();
+      setPlan(sub?.plan ?? null);
+    }
     const [{ data: ex }, { data: mem }, { data: rout }] = await Promise.all([
       supabase.from("exercises").select("id, name, notes").order("name"),
       supabase.from("members").select("id, full_name").order("full_name"),
@@ -252,7 +260,7 @@ export default function RutinasPage() {
           <p className="text-ink-2">{routines.length} rutinas · {exercises.length} ejercicios en biblioteca</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AiChat kind="rutina" gymId={gymId} members={members} onDone={load} />
+          <AiChat kind="rutina" gymId={gymId} members={members} onDone={load} enabled={planAllows(plan, "ia")} />
           <button className="btn btn-ghost" onClick={() => setLibOpen(true)}>Biblioteca</button>
           <button className="btn btn-primary" onClick={startNew}>+ Nueva rutina</button>
         </div>

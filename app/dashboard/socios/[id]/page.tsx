@@ -66,7 +66,7 @@ export default function SocioDetallePage() {
         supabase.from("subscriptions").select("plan").eq("gym_id", m.gym_id).maybeSingle<{ plan: string }>(),
         supabase.from("gyms").select("real_plans").eq("id", m.gym_id).maybeSingle<{ real_plans: RealPlan[] }>(),
       ]);
-      setIsElite(sub?.plan === "elite");
+      setIsElite(sub?.plan === "elite" || sub?.plan === "pro"); // Dietas: Pro y Elite
       setGymPlans(gym?.real_plans || []);
     }
     setLoading(false);
@@ -238,7 +238,7 @@ export default function SocioDetallePage() {
         )}
       </div>
 
-      {/* DIETA ASIGNADA (solo plan Elite) */}
+      {/* DIETA ASIGNADA (planes Pro y Elite) */}
       {isElite && (
         <div className="card p-0">
           <div className="border-b border-white/10 p-4 text-sm font-semibold">Dieta asignada</div>

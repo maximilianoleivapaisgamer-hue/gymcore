@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { saveRoutine, saveDiet, type AIRoutine, type AIDiet } from "@/lib/ai/persist";
+import { saveRoutine, saveDiet, gymHasFeature, type AIRoutine, type AIDiet } from "@/lib/ai/persist";
 
 /**
  * "Cargar en sistema": persiste la rutina/dieta que armó el agente en el chat,
@@ -33,6 +33,11 @@ export async function POST(req: Request) {
   }
 
   const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  // La IA que arma rutinas/dietas es del plan Elite.
+  if (!(await gymHasFeature(admin, gymId, "ia"))) {
+    return NextResponse.json({ ok: false, error: "La IA que genera rutinas y dietas está disponible en el plan Elite." }, { status: 403 });
+  }
 
   // Nombre del socio (para el título de la copia), si hay socio.
   let memberName: string | null = null;

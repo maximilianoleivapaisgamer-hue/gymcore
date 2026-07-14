@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { chatWithTool, type ChatMsg } from "@/lib/ai/anthropic";
 import { ENTRENADOR_CHAT_SKILL } from "@/lib/ai/skills/entrenador-chat";
 import { NUTRICIONISTA_CHAT_SKILL } from "@/lib/ai/skills/nutricionista-chat";
-import { ROUTINE_SCHEMA, DIET_SCHEMA } from "@/lib/ai/persist";
+import { ROUTINE_SCHEMA, DIET_SCHEMA, gymHasFeature } from "@/lib/ai/persist";
 
 /**
  * Chat conversacional del agente (entrenador o nutricionista).
@@ -29,6 +30,17 @@ export async function POST(req: Request) {
   const messages = Array.isArray(body.messages) ? body.messages.filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content) : [];
   if (!messages.length) {
     return NextResponse.json({ ok: false, error: "Falta el mensaje." }, { status: 400 });
+  }
+
+  // La IA que arma rutinas/dietas es del plan Elite (chequeo del lado del servidor).
+  const gymId = String(body.gymId || "").trim();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (gymId && url && serviceKey) {
+    const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+    if (!(await gymHasFeature(admin, gymId, "ia"))) {
+      return NextResponse.json({ ok: false, error: "La IA que genera rutinas y dietas está disponible en el plan Elite." }, { status: 403 });
+    }
   }
 
   const esRutina = kind === "rutina";

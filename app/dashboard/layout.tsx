@@ -4,13 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
+import { planAllows, minPlanLabelFor, type PlanFeature } from "@/types/db";
 import ThemeApply from "@/components/ThemeApply";
 
 interface NavItem {
   href: string;
   label: string;
   icon: string;
-  elite?: boolean;
+  /** Función que requiere: si el plan no la incluye, se muestra un candado. */
+  feature?: PlanFeature;
   superAdmin?: boolean;
   external?: boolean;
 }
@@ -23,11 +25,11 @@ const NAV: NavGroup[] = [
       { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
       { href: "/dashboard/socios", label: "Socios", icon: "users" },
       { href: "/dashboard/rutinas", label: "Rutinas", icon: "dumbbell" },
-      { href: "/dashboard/dietas", label: "Dietas", icon: "salad", elite: true },
+      { href: "/dashboard/dietas", label: "Dietas", icon: "salad", feature: "dietas" },
       { href: "/dashboard/finanzas", label: "Finanzas", icon: "chart" },
       { href: "/dashboard/clases", label: "Clases", icon: "calendar" },
       { href: "/dashboard/equipo", label: "Equipo", icon: "staff" },
-      { href: "/dashboard/control-acceso", label: "Control de acceso", icon: "acceso" },
+      { href: "/dashboard/control-acceso", label: "Control de acceso", icon: "acceso", feature: "control_acceso" },
       { href: "/dashboard/planes", label: "Planes", icon: "layers" },
     ],
   },
@@ -145,7 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [email, setEmail] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
   const [open, setOpen] = useState(false);
-  const [isElite, setIsElite] = useState(false);
+  const [plan, setPlan] = useState<string | null>(null);
   const [role, setRole] = useState<string>("owner");
   const [seeFinance, setSeeFinance] = useState(true);
 
@@ -167,7 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             .maybeSingle<{ plan: string }>(),
         ]);
         setGym(g ?? null);
-        setIsElite(sub?.plan === "elite");
+        setPlan(sub?.plan ?? null);
         setSeeFinance(profile.role !== "empleado" || !!g?.employees_see_finance);
       }
     })();
@@ -236,9 +238,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <>
                       <span className={active ? "text-brand" : "opacity-85"}><Icon name={item.icon} /></span>
                       <span className="flex-1">{item.label}</span>
-                      {item.elite && !isElite && (
+                      {item.feature && !planAllows(plan, item.feature) && (
                         <span className="rounded-full bg-[rgba(245,177,61,.14)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#f5b13d]">
-                          Elite
+                          {minPlanLabelFor(item.feature)}
                         </span>
                       )}
                     </>

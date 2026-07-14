@@ -104,12 +104,12 @@ export const SUB_PLANS: SubPlan[] = [
   {
     key: "basico", label: "Básico", price: 49000,
     tagline: "Para gimnasios que arrancan.",
-    features: ["Una sola sucursal", "Socios ilimitados", "Gestión de socios y cobros", "Rutinas y finanzas", "Portal del socio", "Página pública white-label"],
+    features: ["Una sola sucursal", "Socios ilimitados", "Gestión de socios y cobros", "Rutinas y finanzas", "Clases y reservas", "Portal del socio", "Página pública white-label"],
   },
   {
     key: "pro", label: "Pro", price: 79000, featured: true,
     tagline: "Para gimnasios en crecimiento.",
-    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Clases y reservas", "Recordatorios automáticos"],
+    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Recordatorios automáticos"],
   },
   {
     key: "elite", label: "Elite", price: 119000, promoPrice: 90000,
@@ -118,8 +118,26 @@ export const SUB_PLANS: SubPlan[] = [
     features: ["Sucursales ilimitadas", "Todo lo del Pro", "Control de acceso por QR", "Cobros online (Mercado Pago)", "Soporte prioritario"],
   },
 ];
-/** Planes cuyo abono habilita el módulo de Dietas / nutrición. */
-export const PLANS_WITH_DIET: SubPlanKey[] = ["pro", "elite"];
+/**
+ * Permisos por plan (fuente única de la verdad).
+ * Cada plan lista TODO lo que desbloquea (acumulativo). Para cambiar qué
+ * incluye cada plan, editá solo esta tabla: todo el panel la consulta.
+ */
+export type PlanFeature = "clases" | "dietas" | "control_acceso" | "ia";
+export const PLAN_FEATURES: Record<SubPlanKey, PlanFeature[]> = {
+  basico: ["clases"],
+  pro: ["clases", "dietas", "control_acceso"],
+  elite: ["clases", "dietas", "control_acceso", "ia"],
+};
+/** ¿El plan del gimnasio habilita esta función? */
+export function planAllows(plan: string | null | undefined, feature: PlanFeature): boolean {
+  const key = (plan && plan in PLAN_FEATURES ? plan : "basico") as SubPlanKey;
+  return PLAN_FEATURES[key].includes(feature);
+}
+/** Etiqueta del plan más barato que incluye la función (para los candados del menú). */
+export function minPlanLabelFor(feature: PlanFeature): string {
+  return SUB_PLANS.find((p) => PLAN_FEATURES[p.key].includes(feature))?.label || "Elite";
+}
 export const SUB_STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   active: { label: "Al día", cls: "bg-[rgba(34,197,94,.14)] text-good" },
   trial: { label: "En prueba", cls: "bg-[rgba(34,211,238,.14)] text-brand" },

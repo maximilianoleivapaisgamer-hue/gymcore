@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { planAllows } from "@/types/db";
 
 interface Member {
   id: string;
@@ -29,6 +30,24 @@ export default function ControlAccesoPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result>(null);
   const [today, setToday] = useState<{ name: string; time: string; ok: boolean }[]>([]);
+  const [plan, setPlan] = useState<string | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoadingPlan(false); return; }
+      const { data: profile } = await supabase
+        .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
+      if (profile?.gym_id) {
+        const { data: sub } = await supabase
+          .from("subscriptions").select("plan").eq("gym_id", profile.gym_id).maybeSingle<{ plan: string }>();
+        setPlan(sub?.plan ?? null);
+      }
+      setLoadingPlan(false);
+    })();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, []);
 
   async function validar() {
     const q = dni.trim();
@@ -48,6 +67,19 @@ export default function ControlAccesoPage() {
     const time = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
     setToday((t) => [{ name: data.full_name, time, ok }, ...t].slice(0, 20));
     setDni("");
+  }
+
+  if (!loadingPlan && !planAllows(plan, "control_acceso")) {
+    return (
+      <main className="mx-auto max-w-2xl px-6 py-16 text-center">
+        <div className="mb-2 text-4xl">🚪</div>
+        <h1 className="text-2xl font-bold">Control de acceso está en los planes Pro y Elite</h1>
+        <p className="mt-2 text-ink-2">
+          Validar el ingreso de tus socios por DNI/QR está disponible a partir del plan Pro de GymCore.
+        </p>
+        <Link href="/dashboard/mi-plan" className="btn btn-primary mt-5 inline-block">Ver planes</Link>
+      </main>
+    );
   }
 
   return (

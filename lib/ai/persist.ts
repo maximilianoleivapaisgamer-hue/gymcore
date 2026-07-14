@@ -1,4 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { planAllows, type PlanFeature } from "@/types/db";
+
+/** ¿El plan del gimnasio habilita esta función? (chequeo del lado del servidor). */
+export async function gymHasFeature(
+  admin: SupabaseClient,
+  gymId: string,
+  feature: PlanFeature
+): Promise<boolean> {
+  const { data } = await admin
+    .from("subscriptions").select("plan").eq("gym_id", gymId)
+    .maybeSingle<{ plan: string }>();
+  return planAllows(data?.plan, feature);
+}
 
 /**
  * Tipos + esquemas + guardado de rutinas/dietas generadas por IA.

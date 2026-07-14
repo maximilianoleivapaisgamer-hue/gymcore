@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 
 /**
  * Botón "Generar con IA" que abre una ventanita de chat flotante con el agente
@@ -24,11 +25,14 @@ export default function AiChat({
   gymId,
   members,
   onDone,
+  enabled = true,
 }: {
   kind: "rutina" | "dieta";
   gymId: string | null;
   members: MemberLite[];
   onDone: () => void;
+  /** Si el plan del gimnasio no incluye la IA, se muestra un botón bloqueado. */
+  enabled?: boolean;
 }) {
   const esRutina = kind === "rutina";
   const [open, setOpen] = useState(false);
@@ -112,6 +116,22 @@ export default function AiChat({
   function reset() {
     setMessages([{ role: "assistant", content: GREETING[kind] }]);
     setPending(null); setSaved(null); setErr(""); setInput("");
+  }
+
+  // Si el plan no incluye la IA, mostramos un botón bloqueado que invita a mejorar el plan.
+  if (!enabled) {
+    return (
+      <Link
+        href="/dashboard/mi-plan"
+        className="btn btn-ghost opacity-80"
+        title="La IA que genera rutinas y dietas está en el plan Elite"
+      >
+        🤖 Generar con IA
+        <span className="ml-2 rounded-full bg-[rgba(245,177,61,.14)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#f5b13d]">
+          Elite
+        </span>
+      </Link>
+    );
   }
 
   return (
