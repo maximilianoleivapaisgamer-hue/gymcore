@@ -61,9 +61,6 @@ export default function LandingSite({ config, slug, preview = false }: { config:
           <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 h-96 w-[42rem] -translate-x-1/2 rounded-full blur-3xl" style={{ background: "color-mix(in srgb, var(--l-brand) 25%, transparent)" }} />
 
           <div className="tg-container relative flex min-h-[88vh] flex-col items-center justify-center gap-7 py-24 text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wide tg-muted" style={{ borderColor: "var(--l-border)", backgroundColor: "color-mix(in srgb, var(--l-surface) 70%, transparent)" }}>
-              <span className="size-2 rounded-full" style={{ background: "var(--l-brand)" }} /> Sumate a la comunidad
-            </span>
             {config.heroLogo && config.logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={config.logoUrl} alt={config.nombre} className="mb-2 h-24 w-auto max-w-[280px] object-contain sm:h-32" />
