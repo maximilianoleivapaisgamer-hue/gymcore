@@ -7,17 +7,19 @@
  *
  * Variables de entorno (van en Vercel → Project Settings → Environment Variables):
  *   - ANTHROPIC_API_KEY  (obligatoria)  → tu clave de https://console.anthropic.com
- *   - ANTHROPIC_MODEL    (opcional)     → id del modelo. Por defecto usamos el
- *                                         alias estable "claude-3-5-sonnet-latest".
- *                                         Si querés un modelo más nuevo, cambiá
- *                                         esta variable sin tocar el código.
+ *   - ANTHROPIC_MODEL    (opcional)     → id del modelo. Por defecto usamos
+ *                                         "claude-sonnet-4-6". Otros vigentes:
+ *                                         claude-opus-4-7, claude-haiku-4-5.
+ *                                         Cambialo sin tocar el código.
  *
  * La clave NUNCA se expone al cliente: este archivo se importa solo desde
  * rutas de servidor (app/api/**).
  */
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const DEFAULT_MODEL = "claude-3-5-sonnet-latest";
+// Modelo por defecto (IDs vigentes 2026: claude-opus-4-7 / claude-sonnet-4-6 / claude-haiku-4-5).
+// Cambialo con la variable de entorno ANTHROPIC_MODEL sin tocar el código.
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 export interface GenerateJSONOpts {
   /** Instrucciones de sistema: acá va la "skill" (el criterio del experto). */

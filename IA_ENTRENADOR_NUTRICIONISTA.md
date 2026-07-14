@@ -21,7 +21,7 @@ abrir la rutina/dieta y editarla como cualquier otra.
 | Variable | Obligatoria | Para qué |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | **Sí** | Clave de la API de Claude (https://console.anthropic.com). Se paga por uso. |
-| `ANTHROPIC_MODEL` | No | Id del modelo. Por defecto `claude-3-5-sonnet-latest`. Cambialo si querés uno más nuevo/económico. |
+| `ANTHROPIC_MODEL` | No | Id del modelo. Por defecto `claude-sonnet-4-6`. Otros vigentes: `claude-opus-4-7`, `claude-haiku-4-5`. |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Sí** | Ya la usás para el alta de socios. Permite guardar la rutina/dieta del lado del servidor. |
 
 > La `ANTHROPIC_API_KEY` **nunca** se expone al navegador: solo la usan las rutas

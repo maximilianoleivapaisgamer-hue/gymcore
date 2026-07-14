@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import AiGenerate from "@/components/AiGenerate";
 import AiChat from "@/components/AiChat";
 
 interface Exercise { id: string; name: string; notes: string | null; }
@@ -253,7 +252,7 @@ export default function RutinasPage() {
           <p className="text-ink-2">{routines.length} rutinas · {exercises.length} ejercicios en biblioteca</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AiGenerate kind="rutina" gymId={gymId} members={members} onDone={load} />
+          <AiChat kind="rutina" gymId={gymId} members={members} onDone={load} />
           <button className="btn btn-ghost" onClick={() => setLibOpen(true)}>Biblioteca</button>
           <button className="btn btn-primary" onClick={startNew}>+ Nueva rutina</button>
         </div>
@@ -426,9 +425,6 @@ export default function RutinasPage() {
           </div>
         )}
       </div>
-
-      {/* Chat con el asistente IA — arma la rutina charlando */}
-      <AiChat kind="rutina" gymId={gymId} members={members} onDone={load} />
 
       {/* Modal biblioteca de ejercicios */}
       {libOpen && (

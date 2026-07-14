@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import AiGenerate from "@/components/AiGenerate";
 import AiChat from "@/components/AiChat";
 
 interface Member { id: string; full_name: string; }
@@ -200,7 +199,7 @@ export default function DietasPage() {
           <p className="text-ink-2">{diets.length} dietas cargadas</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AiGenerate kind="dieta" gymId={gymId} members={members} onDone={load} />
+          <AiChat kind="dieta" gymId={gymId} members={members} onDone={load} />
           <button className="btn btn-primary" onClick={startNew}>+ Nueva dieta</button>
         </div>
       </div>
@@ -347,8 +346,6 @@ export default function DietasPage() {
         )}
       </div>
 
-      {/* Chat con el asistente IA — arma el plan de comidas charlando */}
-      <AiChat kind="dieta" gymId={gymId} members={members} onDone={load} />
     </main>
   );
 }

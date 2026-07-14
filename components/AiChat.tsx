@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 
 /**
- * Globo de chat con el agente IA (entrenador o nutricionista).
- * El profe charla, el agente pregunta hasta tener todo y arma la rutina/dieta;
- * aparece un preview con el botón "Cargar en sistema" que la guarda y asigna.
- *
- * Se ubica debajo del contenido en Rutinas (kind="rutina") y Dietas (kind="dieta").
+ * Botón "Generar con IA" que abre una ventanita de chat flotante con el agente
+ * (entrenador o nutricionista). El profe charla, el agente pregunta de a una
+ * cosa hasta armar la rutina/dieta; aparece un preview con "Cargar en sistema"
+ * que la guarda y asigna.
  */
 
 interface MemberLite { id: string; full_name: string }
@@ -15,9 +14,9 @@ interface Msg { role: "user" | "assistant"; content: string }
 
 const GREETING: Record<"rutina" | "dieta", string> = {
   rutina:
-    "¡Hola! Soy tu asistente para armar la rutina 💪. Para arrancar: ¿qué objetivo buscás? (hipertrofia, fuerza, bajar grasa, tonificar, salud general)",
+    "¡Hola! Te ayudo a armar la rutina 💪. ¿Qué objetivo buscás? (hipertrofia, fuerza, bajar grasa, tonificar, salud general)",
   dieta:
-    "¡Hola! Soy tu asistente para armar el plan de comidas 🥗. Para arrancar: ¿qué objetivo buscás? (bajar grasa, ganar masa muscular, mantenimiento, rendimiento)",
+    "¡Hola! Te ayudo a armar el plan de comidas 🥗. ¿Qué objetivo buscás? (bajar grasa, ganar masa muscular, mantenimiento, rendimiento)",
 };
 
 export default function AiChat({
@@ -116,35 +115,32 @@ export default function AiChat({
   }
 
   return (
-    <div className="mt-4 rounded-2xl border border-brand/30 bg-surface">
-      {/* Encabezado / toggle */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
-      >
-        <span className="flex items-center gap-2 font-semibold">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-black">✨</span>
-          {esRutina ? "Asistente IA — Entrenador" : "Asistente IA — Nutricionista"}
-        </span>
-        <span className="text-sm text-ink-2">{open ? "Ocultar ▲" : "Abrir chat ▼"}</span>
+    <>
+      <button type="button" className="btn btn-ghost" onClick={() => setOpen(true)}>
+        ✨ Generar con IA
       </button>
 
       {open && (
-        <div className="border-t border-white/10 p-4">
-          {/* Socio destino */}
-          <label className="mb-3 block">
-            <span className="mb-1 block text-xs font-semibold text-ink-2">
-              {esRutina ? "¿Para qué socio?" : "¿Para qué socio?"} (opcional)
+        <div className="fixed bottom-4 right-4 z-50 flex max-h-[82vh] w-[92vw] max-w-sm flex-col overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+            <span className="flex items-center gap-2 text-sm font-semibold">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-black">✨</span>
+              {esRutina ? "Entrenador IA" : "Nutricionista IA"}
             </span>
-            <select className="input w-full" value={memberId} onChange={(e) => setMemberId(e.target.value)}>
+            <button className="text-ink-2 hover:text-ink" onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
+          </div>
+
+          {/* Socio destino */}
+          <div className="border-b border-white/10 px-3 py-2">
+            <select className="input w-full text-sm" value={memberId} onChange={(e) => setMemberId(e.target.value)}>
               <option value="">Plantilla general (sin socio)</option>
               {members.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
-          </label>
+          </div>
 
           {/* Conversación */}
-          <div ref={scrollRef} className="max-h-80 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-3">
+          <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto bg-black/20 p-3">
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
@@ -163,7 +159,7 @@ export default function AiChat({
               <div className="rounded-xl border border-brand/40 bg-[rgba(34,211,238,.06)] p-3">
                 <div className="mb-1 text-sm font-bold">{pending.name || (esRutina ? "Rutina" : "Plan")}</div>
                 {pending.resumen && <div className="mb-2 text-xs text-ink-2">{pending.resumen}</div>}
-                <div className="max-h-52 space-y-2 overflow-y-auto">
+                <div className="max-h-48 space-y-2 overflow-y-auto">
                   {(pending.days || []).map((d: any, di: number) => (
                     <div key={di} className="rounded-lg border border-white/10 bg-black/20 p-2">
                       <div className="mb-1 text-xs font-semibold text-brand">{d.name || `Día ${di + 1}`}</div>
@@ -172,9 +168,9 @@ export default function AiChat({
                             <div key={bi} className="mb-1">
                               {b.name && <div className="text-[11px] uppercase tracking-wide text-muted">{b.name}</div>}
                               {(b.rows || []).map((r: any, ri: number) => (
-                                <div key={ri} className="flex justify-between text-xs">
-                                  <span>{r.exercise}</span>
-                                  <span className="text-ink-2">{r.sets || "-"} × {r.reps || "-"}</span>
+                                <div key={ri} className="flex justify-between gap-2 text-xs">
+                                  <span className="min-w-0">{r.exercise}</span>
+                                  <span className="shrink-0 whitespace-nowrap text-ink-2">{r.sets || "-"} × {r.reps || "-"}</span>
                                 </div>
                               ))}
                             </div>
@@ -195,35 +191,33 @@ export default function AiChat({
             )}
           </div>
 
-          {err && <p className="mt-2 text-sm text-crit">{err}</p>}
-          {saved && (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-3 py-2 text-sm text-brand">
-              <span>{saved}</span>
-              <button className="shrink-0 text-xs underline" onClick={reset}>Armar otra</button>
-            </div>
-          )}
-
-          {/* Input */}
-          {!saved && (
-            <div className="mt-3 flex gap-2">
-              <input
-                className="input flex-1"
-                placeholder="Escribí tu respuesta…"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                disabled={loading}
-              />
-              <button className="btn btn-primary" onClick={send} disabled={loading || !input.trim()}>
-                Enviar
-              </button>
-            </div>
-          )}
-          <p className="mt-2 text-[11px] text-muted">
-            El asistente arma {esRutina ? "la rutina" : "el plan"} charlando. Cuando esté listo, tocás “Cargar en sistema”.
-          </p>
+          {/* Estado + input */}
+          <div className="border-t border-white/10 p-2">
+            {err && <p className="mb-2 px-1 text-xs text-crit">{err}</p>}
+            {saved ? (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-3 py-2 text-xs text-brand">
+                <span className="min-w-0">{saved}</span>
+                <button className="shrink-0 underline" onClick={reset}>Armar otra</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  className="input flex-1 text-sm"
+                  placeholder="Escribí tu respuesta…"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  disabled={loading}
+                  autoFocus
+                />
+                <button className="btn btn-primary" onClick={send} disabled={loading || !input.trim()}>
+                  Enviar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
