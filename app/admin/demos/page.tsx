@@ -74,7 +74,7 @@ export default function DemosPage() {
 
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
-  const [result, setResult] = useState<{ slug: string; url: string; owner: { email: string; password: string } } | null>(null);
+  const [result, setResult] = useState<{ slug: string; url: string; owner: { email: string; password: string }; socio: { dni: string; name: string } | null } | null>(null);
 
   async function loadDemos() {
     const { data } = await supabase.from("gyms").select("id, name, slug, created_at")
@@ -182,7 +182,7 @@ export default function DemosPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) { setErr(data?.error || "No se pudo generar la demo."); setGen(false); return; }
-      setResult({ slug: data.slug, url: data.url, owner: data.owner });
+      setResult({ slug: data.slug, url: data.url, owner: data.owner, socio: data.socio ?? null });
       await loadDemos();
     } catch {
       setErr("Falló la conexión. Probá de nuevo.");
@@ -317,11 +317,16 @@ export default function DemosPage() {
                   <a href={result.url} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">turnogym.app{result.url}</a>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                  <div className="text-xs text-muted">Login del panel — usuario y contraseña son <b>iguales</b>:</div>
+                  <div className="text-xs text-muted">👤 Panel del dueño — usuario y contraseña <b>iguales</b>:</div>
                   <div className="mt-0.5 break-all font-semibold text-ink">{result.owner.email}</div>
-                  <div className="mt-1 text-[11px] text-muted">Entra en turnogym.app/acceso (poné ese texto en usuario y en contraseña).</div>
                 </div>
-                <p className="text-[11px] text-muted">La demo ya viene con 10 socios, rutinas, dietas, clases y caja cargados. El login del socio lo sumamos en el próximo paso.</p>
+                {result.socio && (
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+                    <div className="text-xs text-muted">📲 App del socio ({result.socio.name}) — usuario y contraseña <b>iguales</b>:</div>
+                    <div className="mt-0.5 text-lg font-bold text-ink">{result.socio.dni}</div>
+                  </div>
+                )}
+                <p className="text-[11px] text-muted">Ambos entran en turnogym.app/acceso (poné el mismo texto en usuario y contraseña). La demo viene con 10 socios, rutinas, dietas, clases y caja.</p>
               </div>
             </div>
           )}

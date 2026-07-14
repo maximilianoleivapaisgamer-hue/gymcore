@@ -53,6 +53,37 @@ async function importGallery(
   return out;
 }
 
+/** Crea UN socio demo con login propio (DNI = usuario y contraseña), vinculado
+ *  a la primera ficha (que ya tiene rutina y dieta cargadas). */
+async function createDemoSocio(
+  admin: ReturnType<typeof createAdmin>,
+  gymId: string
+): Promise<{ dni: string; name: string } | null> {
+  const { data: mem } = await admin.from("members")
+    .select("id, full_name").eq("gym_id", gymId)
+    .order("created_at", { ascending: true }).limit(1).maybeSingle<{ id: string; full_name: string }>();
+  if (!mem) return null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const dni = String(Math.floor(10000000 + Math.random() * 89999999));
+    const email = `${dni}@socios.gymcore.app`;
+    const { data: created, error } = await admin.auth.admin.createUser({
+      email, password: dni, email_confirm: true,
+      user_metadata: { account_type: "member", full_name: mem.full_name, dni, is_demo: true },
+    });
+    if (error) {
+      if (/already|exists|duplicate|registered/i.test(error.message || "")) continue;
+      return null;
+    }
+    const userId = created?.user?.id;
+    if (!userId) return null;
+    await admin.from("profiles").upsert({ id: userId, role: "member", gym_id: gymId, full_name: mem.full_name }, { onConflict: "id" });
+    await admin.from("members").update({ dni, linked_user_id: userId }).eq("id", mem.id);
+    return { dni, name: mem.full_name };
+  }
+  return null;
+}
+
 async function fetchWebText(url: string): Promise<string> {
   try {
     const u = url.startsWith("http") ? url : `https://${url}`;
@@ -196,10 +227,14 @@ export async function POST(req: Request) {
   // 6) Datos de ejemplo (10 socios con rutinas, dietas, clases, caja).
   await seedDemoGym(admin, gym.id, sede?.id ?? null);
 
+  // 7) Login de socio demo (para ver la app del cliente).
+  const socio = await createDemoSocio(admin, gym.id).catch(() => null);
+
   return NextResponse.json({
     ok: true,
     slug: gym.slug,
     url: `/${gym.slug}`,
     owner: { email: ownerEmail, password: ownerPassword },
+    socio: socio ? { dni: socio.dni, name: socio.name } : null,
   });
 }
