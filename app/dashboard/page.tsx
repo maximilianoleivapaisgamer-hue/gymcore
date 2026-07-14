@@ -65,14 +65,15 @@ export default function DashboardHome() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data: profile } = await supabase
-        .from("profiles").select("full_name, role, gym_id").eq("id", user.id)
-        .single<{ full_name: string | null; role: string; gym_id: string | null }>();
+        .from("profiles").select("full_name, role, gym_id, permissions").eq("id", user.id)
+        .single<{ full_name: string | null; role: string; gym_id: string | null; permissions: string[] | null }>();
       setName((profile?.full_name || "").split(" ")[0] || "");
+      // Los empleados ven los ingresos solo si tienen habilitada la sección Finanzas.
+      if (profile?.role === "empleado") setCanSeeIncome((profile?.permissions || []).includes("finanzas"));
       if (profile?.gym_id) {
-        const { data: g } = await supabase.from("gyms").select("name, employees_see_income_card")
-          .eq("id", profile.gym_id).maybeSingle<{ name: string; employees_see_income_card: boolean }>();
+        const { data: g } = await supabase.from("gyms").select("name")
+          .eq("id", profile.gym_id).maybeSingle<{ name: string }>();
         setGymName(g?.name || "");
-        if (profile.role === "empleado") setCanSeeIncome(!!g?.employees_see_income_card);
       }
       const now = new Date();
       const start6 = iso(new Date(now.getFullYear(), now.getMonth() - 5, 1));

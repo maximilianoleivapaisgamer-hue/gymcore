@@ -65,12 +65,11 @@ export default function FinanzasPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data: profile } = await supabase
-      .from("profiles").select("gym_id, role").eq("id", user.id).single<{ gym_id: string; role: string }>();
+      .from("profiles").select("gym_id, role, permissions").eq("id", user.id)
+      .single<{ gym_id: string; role: string; permissions: string[] | null }>();
     setGymId(profile?.gym_id ?? null);
-    if (profile?.role === "empleado" && profile.gym_id) {
-      const { data: g } = await supabase.from("gyms").select("employees_see_finance")
-        .eq("id", profile.gym_id).maybeSingle<{ employees_see_finance: boolean }>();
-      if (!g?.employees_see_finance) { setBlocked(true); setLoading(false); return; }
+    if (profile?.role === "empleado" && !(profile?.permissions || []).includes("finanzas")) {
+      setBlocked(true); setLoading(false); return;
     }
     const c6 = new Date(y, m - 5, 1);
     const c6Iso = `${c6.getFullYear()}-${pad(c6.getMonth() + 1)}-01`;

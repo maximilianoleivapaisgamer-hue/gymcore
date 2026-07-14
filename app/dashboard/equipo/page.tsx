@@ -3,81 +3,104 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { STAFF_PERMS, STAFF_PRESETS, type StaffPerm } from "@/lib/staff";
 
-interface Gym {
-  id: string; name: string; staff_code: string | null;
-  employees_see_finance: boolean; employees_see_income_card: boolean;
-}
-interface Empleado { id: string; full_name: string | null; created_at: string }
-
-function randomCode() {
-  // 8 caracteres alfanuméricos, sin depender de crypto server-side.
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
-  }
-  return Math.random().toString(36).slice(2, 10);
-}
+interface Empleado { id: string; full_name: string | null; created_at: string; permissions: string[] }
 
 export default function EquipoPage() {
   const supabase = createClient();
   const [role, setRole] = useState<string>("owner");
-  const [gym, setGym] = useState<Gym | null>(null);
+  const [gymId, setGymId] = useState<string | null>(null);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
-  const [savingFlag, setSavingFlag] = useState<string | null>(null);
-  const [origin, setOrigin] = useState("");
+
+  // Form de alta
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [preset, setPreset] = useState("entrenador");
+  const [perms, setPerms] = useState<StaffPerm[]>(STAFF_PRESETS[0].perms);
+  const [creating, setCreating] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [savingEmp, setSavingEmp] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
-    setOrigin(window.location.origin);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data: profile } = await supabase
       .from("profiles").select("gym_id, role").eq("id", user.id).single<{ gym_id: string; role: string }>();
     setRole(profile?.role || "owner");
-    if (profile?.gym_id) {
-      const { data: g } = await supabase.from("gyms")
-        .select("id, name, staff_code, employees_see_finance, employees_see_income_card")
-        .eq("id", profile.gym_id).single<Gym>();
-      setGym(g ?? null);
-      if (profile.role !== "empleado") {
-        const { data: emp } = await supabase.from("profiles")
-          .select("id, full_name, created_at").eq("role", "empleado").eq("gym_id", profile.gym_id)
-          .order("created_at", { ascending: false });
-        setEmpleados((emp as Empleado[]) || []);
-      }
+    setGymId(profile?.gym_id ?? null);
+    if (profile?.gym_id && profile.role !== "empleado") {
+      const { data: emp } = await supabase.from("profiles")
+        .select("id, full_name, created_at, permissions").eq("role", "empleado").eq("gym_id", profile.gym_id)
+        .order("created_at", { ascending: false });
+      setEmpleados((emp as Empleado[]) || []);
     }
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
-  async function regenerateCode() {
-    if (!gym) return;
-    if (!confirm("¿Generar un código nuevo? El link/QR anterior dejará de funcionar para nuevas altas.")) return;
-    setRegenerating(true);
-    const code = randomCode();
-    const { error } = await supabase.from("gyms").update({ staff_code: code }).eq("id", gym.id);
-    setRegenerating(false);
-    if (!error) setGym((g) => (g ? { ...g, staff_code: code } : g));
+  function applyPreset(key: string) {
+    setPreset(key);
+    const p = STAFF_PRESETS.find((x) => x.key === key);
+    if (p && key !== "personalizado") setPerms(p.perms);
+  }
+  function togglePerm(k: StaffPerm) {
+    setPreset("personalizado");
+    setPerms((ps) => (ps.includes(k) ? ps.filter((x) => x !== k) : [...ps, k]));
   }
 
-  async function toggleFlag(key: "employees_see_finance" | "employees_see_income_card") {
-    if (!gym) return;
-    setSavingFlag(key);
-    const next = !gym[key];
-    const { error } = await supabase.from("gyms").update({ [key]: next }).eq("id", gym.id);
-    setSavingFlag(null);
-    if (!error) setGym((g) => (g ? { ...g, [key]: next } : g));
+  async function crear() {
+    if (!gymId) return;
+    setErr(""); setMsg("");
+    if (!fullName.trim() || !email.trim() || !password) { setErr("Completá nombre, email y contraseña."); return; }
+    if (!perms.length) { setErr("Elegí al menos una sección que pueda ver."); return; }
+    setCreating(true);
+    try {
+      const res = await fetch("/api/empleado-alta", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gymId, fullName, email, password, permissions: perms }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { setErr(data?.error || "No se pudo crear."); setCreating(false); return; }
+      setMsg(`✅ ${fullName} ya puede entrar con su email y contraseña.`);
+      setFullName(""); setEmail(""); setPassword(""); applyPreset("entrenador");
+      load();
+    } catch { setErr("Falló la conexión."); }
+    setCreating(false);
+  }
+
+  async function toggleEmpPerm(emp: Empleado, k: StaffPerm) {
+    if (!gymId) return;
+    const next = emp.permissions.includes(k) ? emp.permissions.filter((x) => x !== k) : [...emp.permissions, k];
+    setSavingEmp(emp.id);
+    const { error } = await supabase.from("profiles").update({ permissions: next }).eq("id", emp.id);
+    setSavingEmp(null);
+    if (!error) setEmpleados((es) => es.map((e) => (e.id === emp.id ? { ...e, permissions: next } : e)));
+  }
+
+  async function quitar(emp: Empleado) {
+    if (!gymId) return;
+    if (!confirm(`¿Quitar a ${emp.full_name || "este empleado"} del equipo? Se elimina su acceso.`)) return;
+    setSavingEmp(emp.id);
+    try {
+      const res = await fetch("/api/empleado-baja", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gymId, userId: emp.id }),
+      });
+      const data = await res.json();
+      if (data.ok) setEmpleados((es) => es.filter((e) => e.id !== emp.id));
+    } catch { /* noop */ }
+    setSavingEmp(null);
   }
 
   if (loading) return <main className="p-8 text-center text-ink-2">Cargando…</main>;
-  if (!gym) return <main className="p-8 text-center text-ink-2">No se encontró el gimnasio.</main>;
-
-  const inviteUrl = origin && gym.staff_code ? `${origin}/empleado/registro?code=${gym.staff_code}` : "";
-  const qrUrl = inviteUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(inviteUrl)}`
-    : "";
+  if (role === "empleado") return <main className="p-8 text-center text-ink-2">Esta sección es solo para el dueño del gimnasio.</main>;
 
   return (
     <main className="p-5 md:p-7">
@@ -87,99 +110,98 @@ export default function EquipoPage() {
           <span>/</span><span>Equipo</span>
         </div>
         <h1 className="text-2xl font-bold">Equipo</h1>
-        <p className="text-ink-2">
-          {role === "empleado"
-            ? "Invitá a un compañero para que se sume al equipo del gimnasio."
-            : "Invitá empleados y controlá qué pueden ver."}
-        </p>
+        <p className="text-ink-2">Creá las cuentas de tus empleados y elegí qué puede ver cada uno.</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-        {/* QR / link de invitación */}
-        <div className="card text-center">
-          <div className="mb-3 text-xs uppercase tracking-wide text-muted">Invitar empleado</div>
-          {qrUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={qrUrl} alt="QR de invitación al equipo" className="mx-auto h-[180px] w-[180px] rounded-lg border-4 border-brand bg-white p-1" />
-          ) : (
-            <p className="text-sm text-ink-2">Generá un código para tener tu QR.</p>
-          )}
-          <div className="mt-3 break-all rounded-lg border border-white/10 bg-black/20 p-2 text-xs text-ink-2">
-            {inviteUrl || "—"}
-          </div>
-          <div className="mt-3 flex flex-col gap-2">
-            {inviteUrl && (
+      <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+        {/* Alta de empleado */}
+        <div className="card">
+          <div className="mb-3 text-sm font-semibold">Nuevo empleado</div>
+          <label className="mb-1 block text-xs font-semibold text-ink-2">Nombre y apellido</label>
+          <input className="input mb-3" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ej: Lucía Gómez" />
+
+          <label className="mb-1 block text-xs font-semibold text-ink-2">Email (será su usuario)</label>
+          <input className="input mb-3" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="lucia@email.com" />
+
+          <label className="mb-1 block text-xs font-semibold text-ink-2">Contraseña</label>
+          <input className="input mb-3" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+
+          <label className="mb-1 block text-xs font-semibold text-ink-2">Tipo</label>
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            {STAFF_PRESETS.map((p) => (
               <button
-                className="btn btn-ghost text-xs"
-                onClick={() => { navigator.clipboard.writeText(inviteUrl); }}
+                key={p.key}
+                type="button"
+                onClick={() => applyPreset(p.key)}
+                className={`rounded-lg border p-2 text-xs font-semibold transition ${preset === p.key ? "border-brand bg-white/5 text-brand" : "border-white/10 text-ink-2 hover:bg-white/5"}`}
+                title={p.desc}
               >
-                Copiar link
+                {p.label}
               </button>
-            )}
-            {role !== "empleado" && (
-              <button className="btn btn-ghost text-xs" onClick={regenerateCode} disabled={regenerating}>
-                {regenerating ? "Generando…" : "🔄 Generar código nuevo"}
-              </button>
-            )}
+            ))}
           </div>
-          <p className="mt-3 text-xs text-muted">
-            Quien escanee este QR o abra el link puede crear su cuenta de empleado y descargar la app.
+
+          <label className="mb-1 block text-xs font-semibold text-ink-2">Puede ver</label>
+          <div className="mb-4 grid grid-cols-2 gap-1.5">
+            {STAFF_PERMS.map((sp) => (
+              <label key={sp.key} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs">
+                <input type="checkbox" checked={perms.includes(sp.key)} onChange={() => togglePerm(sp.key)} />
+                {sp.label}
+              </label>
+            ))}
+          </div>
+
+          {err && <p className="mb-2 text-sm text-crit">{err}</p>}
+          {msg && <p className="mb-2 text-sm text-brand">{msg}</p>}
+          <button className="btn btn-primary w-full" onClick={crear} disabled={creating}>
+            {creating ? "Creando…" : "Crear empleado"}
+          </button>
+          <p className="mt-3 text-[11px] text-muted">
+            El empleado entra en <Link href="/acceso" className="text-brand">iniciar sesión</Link> con el email y la contraseña que le pusiste.
           </p>
         </div>
 
-        <div className="flex flex-col gap-6">
-          {role !== "empleado" && (
-            <div className="card">
-              <div className="mb-3 text-sm font-semibold">Qué pueden ver los empleados</div>
-              <div className="flex flex-col gap-3">
-                <label className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
-                  <div>
-                    <div className="font-medium">Módulo Finanzas</div>
-                    <div className="text-xs text-ink-2">Ver ingresos, egresos y balance de la caja.</div>
+        {/* Lista de empleados */}
+        <div className="card p-0">
+          <div className="border-b border-white/10 p-4 text-sm font-semibold">Empleados ({empleados.length})</div>
+          {empleados.length === 0 ? (
+            <p className="p-8 text-center text-ink-2">Todavía no cargaste empleados. Creá el primero acá al lado.</p>
+          ) : (
+            <ul className="divide-y divide-white/10">
+              {empleados.map((e) => (
+                <li key={e.id} className="p-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{e.full_name || "Sin nombre"}</div>
+                      <div className="text-xs text-muted">Alta el {new Date(e.created_at).toLocaleDateString("es-AR")}</div>
+                    </div>
+                    <button
+                      className="text-xs text-crit hover:underline disabled:opacity-50"
+                      onClick={() => quitar(e)}
+                      disabled={savingEmp === e.id}
+                    >
+                      Quitar
+                    </button>
                   </div>
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 accent-[var(--brand,#22d3ee)]"
-                    checked={gym.employees_see_finance}
-                    disabled={savingFlag === "employees_see_finance"}
-                    onChange={() => toggleFlag("employees_see_finance")}
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
-                  <div>
-                    <div className="font-medium">Tarjeta &quot;Ingresos activos&quot; del panel</div>
-                    <div className="text-xs text-ink-2">Se ve en el panel principal, arriba de todo.</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {STAFF_PERMS.map((sp) => {
+                      const on = e.permissions.includes(sp.key);
+                      return (
+                        <button
+                          key={sp.key}
+                          onClick={() => toggleEmpPerm(e, sp.key)}
+                          disabled={savingEmp === e.id}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${on ? "border-brand bg-[rgba(34,211,238,.12)] text-brand" : "border-white/10 text-ink-2 hover:bg-white/5"}`}
+                          title={on ? "Tocá para quitar" : "Tocá para dar acceso"}
+                        >
+                          {on ? "✓ " : ""}{sp.label}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 accent-[var(--brand,#22d3ee)]"
-                    checked={gym.employees_see_income_card}
-                    disabled={savingFlag === "employees_see_income_card"}
-                    onChange={() => toggleFlag("employees_see_income_card")}
-                  />
-                </label>
-              </div>
-            </div>
-          )}
-
-          {role !== "empleado" && (
-            <div className="card p-0">
-              <div className="border-b border-white/10 p-4 text-sm font-semibold">Empleados ({empleados.length})</div>
-              {empleados.length === 0 ? (
-                <p className="p-8 text-center text-ink-2">Todavía no se sumó ningún empleado. Compartí el QR o el link.</p>
-              ) : (
-                <ul className="divide-y divide-white/10">
-                  {empleados.map((e) => (
-                    <li key={e.id} className="flex items-center justify-between px-4 py-3">
-                      <span>{e.full_name || "Sin nombre"}</span>
-                      <span className="text-xs text-muted">
-                        Se sumó el {new Date(e.created_at).toLocaleDateString("es-AR")}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>

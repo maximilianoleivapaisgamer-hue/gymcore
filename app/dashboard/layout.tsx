@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, minPlanLabel, loadPlans, DEFAULT_PLANS, type PlanFeature, type PlanConfig } from "@/lib/plans";
+import { staffCanAccess } from "@/lib/staff";
 import ThemeApply from "@/components/ThemeApply";
 import { BrandMark, BrandWordmark } from "@/components/BrandMark";
 
@@ -49,9 +50,6 @@ const NAV: NavGroup[] = [
   },
 ];
 
-/** Ítems que un empleado (rol "empleado") no debería ver. Finanzas depende del
- * flag employees_see_finance (se filtra aparte). */
-const OWNER_ONLY_HREFS = ["/dashboard/planes", "/dashboard/configuracion", "/dashboard/mi-plan"];
 
 function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; className?: string }) {
   const p: Record<string, React.ReactNode> = {
@@ -144,6 +142,7 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const pathname = usePathname();
+  const router = useRouter();
   const [gym, setGym] = useState<{ name: string; logo_url: string | null; theme: string; bg_style: string } | null>(null);
   const [email, setEmail] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
@@ -151,7 +150,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [plan, setPlan] = useState<string | null>(null);
   const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
   const [role, setRole] = useState<string>("owner");
-  const [seeFinance, setSeeFinance] = useState(true);
+  const [perms, setPerms] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -159,33 +158,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!user) return;
       setEmail(user.email || "");
       const { data: profile } = await supabase
-        .from("profiles").select("gym_id, role, full_name").eq("id", user.id)
-        .single<{ gym_id: string; role: string; full_name: string | null }>();
+        .from("profiles").select("gym_id, role, full_name, permissions").eq("id", user.id)
+        .single<{ gym_id: string; role: string; full_name: string | null; permissions: string[] | null }>();
       setRole(profile?.role || "owner");
       setFullName(profile?.full_name || "");
+      setPerms(profile?.permissions || []);
       if (profile?.gym_id) {
         const [{ data: g }, { data: sub }] = await Promise.all([
-          supabase.from("gyms").select("name, logo_url, employees_see_finance, theme, bg_style").eq("id", profile.gym_id)
-            .single<{ name: string; logo_url: string | null; employees_see_finance: boolean; theme: string; bg_style: string }>(),
+          supabase.from("gyms").select("name, logo_url, theme, bg_style").eq("id", profile.gym_id)
+            .single<{ name: string; logo_url: string | null; theme: string; bg_style: string }>(),
           supabase.from("subscriptions").select("plan").eq("gym_id", profile.gym_id)
             .maybeSingle<{ plan: string }>(),
         ]);
         setGym(g ?? null);
         setPlan(sub?.plan ?? null);
         setPlans(await loadPlans(supabase));
-        setSeeFinance(profile.role !== "empleado" || !!g?.employees_see_finance);
       }
     })();
     /* eslint-disable-next-line */
   }, []);
 
+  // Si un empleado entra a una sección que no tiene habilitada, lo mandamos al inicio.
+  useEffect(() => {
+    if (role === "empleado" && !staffCanAccess(pathname, perms)) {
+      router.replace("/dashboard");
+    }
+  }, [role, perms, pathname, router]);
+
   function visibleItems(items: NavItem[]) {
     return items.filter((item) => {
       if (item.superAdmin && role !== "super_admin") return false;
-      if (role === "empleado") {
-        if (OWNER_ONLY_HREFS.includes(item.href)) return false;
-        if (item.href === "/dashboard/finanzas" && !seeFinance) return false;
-      }
+      if (role === "empleado") return staffCanAccess(item.href, perms);
       return true;
     });
   }
