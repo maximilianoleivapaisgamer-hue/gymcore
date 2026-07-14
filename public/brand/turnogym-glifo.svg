@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="220" viewBox="0 0 360 220">
+  <!-- Solo el glifo T-mancuerna (sin fondo). Cambiá el fill al color que necesites. -->
+  <g fill="#22D3EE">
+    <rect x="34" y="70" width="292" height="40" rx="20"/>
+    <circle cx="46" cy="90" r="58"/>
+    <circle cx="314" cy="90" r="58"/>
+    <rect x="150" y="90" width="52" height="118" rx="26"/>
+  </g>
+</svg>

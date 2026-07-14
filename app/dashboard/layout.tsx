@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, minPlanLabel, loadPlans, DEFAULT_PLANS, type PlanFeature, type PlanConfig } from "@/lib/plans";
 import ThemeApply from "@/components/ThemeApply";
+import { BrandMark, BrandWordmark } from "@/components/BrandMark";
 
 interface NavItem {
   href: string;
@@ -208,19 +209,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Brand */}
-        <div className="flex items-center gap-3 px-2.5 pb-4 pt-2">
-          {gym?.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={gym.logo_url} alt="" className="h-[34px] w-[34px] rounded-[10px] bg-white/5 object-contain p-0.5" />
-          ) : (
-            <div className="grid h-[34px] w-[34px] place-items-center rounded-[10px] bg-gradient-to-br from-brand to-brand-2 shadow-[0_6px_16px_rgba(34,211,238,.35)]">
-              <Icon name="logo" className="h-5 w-5 text-[#04121a]" />
+        {/* Brand: turnogym (plataforma) arriba + gimnasio del dueño abajo */}
+        <div className="px-2.5 pb-4 pt-2">
+          <div className="flex items-center gap-2.5">
+            <BrandMark size={34} className="rounded-[10px]" />
+            <BrandWordmark size="text-[19px]" />
+          </div>
+          <div className="mt-2.5 flex items-center gap-2 border-t border-white/[.06] pt-2.5">
+            {gym?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={gym.logo_url} alt="" className="h-6 w-6 shrink-0 rounded-md bg-white/5 object-contain p-0.5" />
+            ) : (
+              <div className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/5 text-[11px] font-bold text-ink-2">
+                {(gym?.name || "G").slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold leading-tight">{gym?.name || "Tu gimnasio"}</div>
+              <div className="text-[10px] font-medium text-muted">Panel del gimnasio</div>
             </div>
-          )}
-          <div className="min-w-0">
-            <div className="truncate text-[17px] font-bold leading-tight tracking-[-.3px]">{gym?.name || "turnogym"}</div>
-            <div className="text-[11px] font-medium text-muted">Panel del gimnasio</div>
           </div>
         </div>
 

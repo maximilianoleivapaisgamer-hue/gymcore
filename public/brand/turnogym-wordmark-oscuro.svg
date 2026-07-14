@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="170" viewBox="0 0 560 170" font-family="'Poppins','Segoe UI',Arial,sans-serif">
+  <!-- Wordmark para FONDO OSCURO (turno en blanco + gym en cian). -->
+  <text x="12" y="100" font-size="92" letter-spacing="-2">
+    <tspan fill="#FFFFFF" font-weight="600">turno</tspan><tspan fill="#22D3EE" font-weight="800">gym</tspan>
+  </text>
+  <rect x="14" y="118" width="250" height="7" rx="3.5" fill="#22D3EE"/>
+</svg>
