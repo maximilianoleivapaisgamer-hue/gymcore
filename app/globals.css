@@ -42,6 +42,18 @@ body {
   @apply w-full bg-surface border border-white/10 rounded-[9px] px-3 py-2.5 text-ink text-sm outline-none focus:border-brand;
 }
 
+/* Select propio: sin la apariencia nativa (que recorta el texto) + flecha custom.
+   Se usa en tablas del admin donde los <select> con altura chica se cortaban. */
+.sel {
+  @apply w-full appearance-none bg-surface border border-white/10 rounded-[9px] pl-3 pr-8 py-2 text-ink text-sm outline-none focus:border-brand;
+  line-height: 1.3;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239aa4b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  background-size: 14px;
+}
+.sel option { color: #0a0d12; }
+
 /* ── Fondo de la app (se tiñe con el color del gimnasio) ────────────────────
    Capa fija a pantalla completa, detrás de todo el contenido. */
 .app-bg {

@@ -271,7 +271,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3 text-ink-2">{ownerName(g.owner_id)}</td>
                       <td className="px-4 py-3">
                         <select
-                          className="input h-8 w-[128px] min-w-[128px] py-0 pr-8 text-xs"
+                          className="sel w-[120px] text-xs"
                           value={s?.plan ?? "basico"}
                           onChange={(e) => saveSub(g.id, { plan: e.target.value as Sub["plan"] })}
                         >
@@ -281,7 +281,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
                           <select
-                            className="input h-8 w-[132px] min-w-[132px] py-0 pr-8 text-xs"
+                            className="sel w-[132px] text-xs"
                             value={s?.status ?? "trial"}
                             onChange={(e) => saveSub(g.id, { status: e.target.value as Sub["status"] })}
                           >
@@ -296,7 +296,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-4 py-3">
                         <select
-                          className="input h-8 w-[140px] min-w-[140px] py-0 pr-8 text-xs"
+                          className="sel w-[150px] text-xs"
                           value={s?.payment_method ?? ""}
                           onChange={(e) => saveSub(g.id, { payment_method: e.target.value || null })}
                         >
@@ -307,7 +307,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3">
                         <input
                           type="date"
-                          className="input h-8 w-[140px] py-0 text-xs"
+                          className="input w-[150px] py-2 text-xs"
                           value={(vence || "").slice(0, 10)}
                           onChange={(e) =>
                             saveSub(g.id, s?.status === "trial"

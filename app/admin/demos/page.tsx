@@ -532,13 +532,13 @@ export default function DemosPage() {
                         <p className="text-xs font-semibold text-good">Convertir en cliente real</p>
                         <div className="flex flex-wrap items-center gap-2">
                           <label className="text-xs text-ink-2">Plan:</label>
-                          <select className="input h-8 w-28 py-0 text-xs" value={cPlan} onChange={(e) => setCPlan(e.target.value)}>
+                          <select className="sel w-32 text-xs" value={cPlan} onChange={(e) => setCPlan(e.target.value)}>
                             <option value="basico">Básico</option>
                             <option value="pro">Pro</option>
                             <option value="elite">Elite</option>
                           </select>
                           <label className="text-xs text-ink-2">Estado:</label>
-                          <select className="input h-8 w-32 py-0 text-xs" value={cStatus} onChange={(e) => setCStatus(e.target.value)}>
+                          <select className="sel w-40 text-xs" value={cStatus} onChange={(e) => setCStatus(e.target.value)}>
                             <option value="trial">Trial 7 días</option>
                             <option value="active">Activo (1 mes)</option>
                           </select>
