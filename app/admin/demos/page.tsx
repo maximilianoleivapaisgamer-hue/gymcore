@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { removeWhiteBackground } from "@/lib/remove-white-bg";
 import { dominantColor } from "@/lib/dominant-color";
@@ -113,6 +112,9 @@ export default function DemosPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [eName, setEName] = useState(""); const [eTag, setETag] = useState(""); const [eDesc, setEDesc] = useState(""); const [eColor, setEColor] = useState("#22d3ee");
+  // Convertir en cliente
+  const [convId, setConvId] = useState<string | null>(null);
+  const [cPlan, setCPlan] = useState("basico"); const [cStatus, setCStatus] = useState("trial");
 
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
@@ -208,6 +210,28 @@ export default function DemosPage() {
     setBusyId(null);
     if (!data?.ok) alert(data?.error || "No se pudo regenerar.");
     else alert("✓ Textos regenerados. Abrí la web para verlos.");
+  }
+
+  function startConvert(d: DemoGym) {
+    if (convId === d.id) { setConvId(null); return; }
+    setConvId(d.id); setEditId(null); setOpenId(null);
+    setCPlan("basico"); setCStatus("trial");
+  }
+  async function convertir(d: DemoGym) {
+    if (!confirm(`¿Convertir "${d.name}" en cliente real? Deja de ser demo y (según el ajuste de Cobros) se limpian los datos de ejemplo. Se mantiene la web y la marca.`)) return;
+    setBusyId(d.id);
+    const res = await fetch("/api/admin/demo/convertir", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gymId: d.id, plan: cPlan, status: cStatus }),
+    }).then((r) => r.json()).catch(() => null);
+    setBusyId(null);
+    if (res?.ok) {
+      setDemos((ds) => ds.filter((x) => x.id !== d.id)); // ya no es demo
+      setConvId(null);
+      alert("✓ Convertido en cliente. Aparece en el Dashboard de gimnasios.");
+    } else {
+      alert(res?.error || "No se pudo convertir.");
+    }
   }
 
   async function eliminar(d: DemoGym) {
@@ -312,11 +336,8 @@ export default function DemosPage() {
   if (role !== "super_admin") return <main className="p-8 text-center text-ink-2">Solo el super admin puede generar demos.</main>;
 
   return (
-    <main className="p-5 md:p-7">
+    <main>
       <div className="mb-6">
-        <div className="mb-1 flex items-center gap-2 text-sm text-ink-2">
-          <Link href="/admin" className="hover:text-brand">Super Admin</Link><span>/</span><span>Demos</span>
-        </div>
         <h1 className="text-2xl font-bold">Generador de demos</h1>
         <p className="text-ink-2">Cargá lo que tengas del gimnasio y la IA arma la demo branded (web + panel). No cuenta como cliente real.</p>
       </div>
@@ -483,9 +504,33 @@ export default function DemosPage() {
                         <button onClick={() => startEdit(d)} className="text-ink-2 hover:text-ink">{editId === d.id ? "Cerrar" : "Editar"}</button>
                         <button onClick={() => regenerar(d)} disabled={busyId === d.id} className="text-ink-2 hover:text-ink disabled:opacity-50">{busyId === d.id ? "…" : "Regenerar IA"}</button>
                         <button onClick={() => suspender(d, !d.demo_suspended)} disabled={busyId === d.id} className="text-warn hover:underline disabled:opacity-50">{d.demo_suspended ? "Reactivar" : "Suspender"}</button>
+                        <button onClick={() => startConvert(d)} disabled={busyId === d.id} className="text-good hover:underline disabled:opacity-50">{convId === d.id ? "Cerrar" : "Convertir en cliente"}</button>
                         <button onClick={() => eliminar(d)} className="text-crit hover:underline">Eliminar</button>
                       </div>
                     </div>
+
+                    {convId === d.id && (
+                      <div className="space-y-2 border-t border-good/20 bg-[rgba(34,197,94,.04)] p-3">
+                        <p className="text-xs font-semibold text-good">Convertir en cliente real</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="text-xs text-ink-2">Plan:</label>
+                          <select className="input h-8 w-28 py-0 text-xs" value={cPlan} onChange={(e) => setCPlan(e.target.value)}>
+                            <option value="basico">Básico</option>
+                            <option value="pro">Pro</option>
+                            <option value="elite">Elite</option>
+                          </select>
+                          <label className="text-xs text-ink-2">Estado:</label>
+                          <select className="input h-8 w-32 py-0 text-xs" value={cStatus} onChange={(e) => setCStatus(e.target.value)}>
+                            <option value="trial">Trial 7 días</option>
+                            <option value="active">Activo (1 mes)</option>
+                          </select>
+                          <button className="btn btn-primary ml-auto text-xs" onClick={() => convertir(d)} disabled={busyId === d.id}>
+                            {busyId === d.id ? "Convirtiendo…" : "Convertir"}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-muted">Deja de ser demo y aparece en el Dashboard. Los datos de ejemplo se limpian según el ajuste de <b>Cobros</b>.</p>
+                      </div>
+                    )}
 
                     {editId === d.id && (
                       <div className="space-y-2 border-t border-white/10 bg-white/[.02] p-3">
