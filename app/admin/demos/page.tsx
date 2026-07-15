@@ -11,7 +11,7 @@ interface DemoGym { id: string; name: string; slug: string; created_at: string |
 interface ImgData { mediaType: string; data: string; name: string; }
 interface AccInfo { slug: string; name: string; owner: { user: string; url: string }; socio: { name: string; user: string; url: string } | null; }
 
-function origin() { return typeof window !== "undefined" ? window.location.origin : "https://turnogym.app"; }
+function origin() { return typeof window !== "undefined" ? window.location.origin : "https://turnogym.com"; }
 function messageFor(info: AccInfo): string {
   const o = origin();
   const lines = [
@@ -438,13 +438,13 @@ export default function DemosPage() {
               <div className="space-y-2 text-sm">
                 <div>
                   <div className="text-xs text-muted">🌐 Web pública</div>
-                  <a href={result.url} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">turnogym.app{result.url}</a>
+                  <a href={result.url} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">{origin()}{result.url}</a>
                 </div>
 
                 <div className="rounded-lg border border-white/10 bg-white/5 p-2.5">
                   <div className="text-xs font-semibold text-ink-2">👤 Panel del dueño</div>
                   <div className="mt-1 text-xs text-muted">Link:</div>
-                  <a href={result.owner.loginUrl} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">turnogym.app{result.owner.loginUrl}</a>
+                  <a href={result.owner.loginUrl} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">{origin()}{result.owner.loginUrl}</a>
                   <div className="mt-1.5 text-xs text-muted">Usuario y contraseña (iguales):</div>
                   <div className="text-base font-bold text-ink">{result.owner.user}</div>
                 </div>
@@ -453,7 +453,7 @@ export default function DemosPage() {
                   <div className="rounded-lg border border-white/10 bg-white/5 p-2.5">
                     <div className="text-xs font-semibold text-ink-2">📲 App del socio ({result.socio.name})</div>
                     <div className="mt-1 text-xs text-muted">Link (con el logo del gimnasio):</div>
-                    <a href={result.socio.loginUrl} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">turnogym.app{result.socio.loginUrl}</a>
+                    <a href={result.socio.loginUrl} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">{origin()}{result.socio.loginUrl}</a>
                     <div className="mt-1.5 text-xs text-muted">Usuario y contraseña (iguales):</div>
                     <div className="text-base font-bold text-ink">{result.socio.user}</div>
                   </div>

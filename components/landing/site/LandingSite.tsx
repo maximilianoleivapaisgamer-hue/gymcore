@@ -326,7 +326,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
         <div className="border-t" style={{ borderColor: "var(--l-border)" }}>
           <div className="tg-container flex flex-col items-center justify-between gap-2 py-6 text-xs tg-muted sm:flex-row">
             <p>© 2026 {config.nombre}. Todos los derechos reservados.</p>
-            <p>Hecho con <a href="https://turnogym.app" target="_blank" rel="noopener noreferrer" className="font-medium transition-colors hover:opacity-80" style={{ color: "var(--l-text)" }}>turnogym</a></p>
+            <p>Hecho con <a href="https://turnogym.com" target="_blank" rel="noopener noreferrer" className="font-medium transition-colors hover:opacity-80" style={{ color: "var(--l-text)" }}>turnogym</a></p>
           </div>
         </div>
       </footer>
