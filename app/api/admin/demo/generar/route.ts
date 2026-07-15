@@ -122,14 +122,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Falta SUPABASE_SERVICE_ROLE_KEY en el servidor." }, { status: 500 });
   }
 
-  // Verificar super admin.
-  const supa = createServer();
-  const { data: { user } } = await supa.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 });
   const admin = createAdmin(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: me } = await admin.from("profiles").select("role").eq("id", user.id).single<{ role: string }>();
-  if (me?.role !== "super_admin") {
-    return NextResponse.json({ ok: false, error: "Solo el super admin puede generar demos." }, { status: 403 });
+
+  // Autorización: dos vías.
+  //  1) Token de bot (máquina-a-máquina): header 'x-bot-token' o 'Authorization: Bearer'.
+  //     Sirve para que el robot de ventas genere demos solo, sin sesión.
+  //  2) Sesión de super admin (cuando lo generás vos desde el panel).
+  const botToken = process.env.DEMO_BOT_TOKEN;
+  const authHeader = req.headers.get("authorization") || "";
+  const given = req.headers.get("x-bot-token") || (authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "");
+  const botOk = !!botToken && given.length >= 16 && given === botToken;
+
+  if (!botOk) {
+    const supa = createServer();
+    const { data: { user } } = await supa.auth.getUser();
+    if (!user) return NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 });
+    const { data: me } = await admin.from("profiles").select("role").eq("id", user.id).single<{ role: string }>();
+    if (me?.role !== "super_admin") {
+      return NextResponse.json({ ok: false, error: "Solo el super admin puede generar demos." }, { status: 403 });
+    }
   }
 
   let body: {
@@ -257,11 +268,22 @@ export async function POST(req: Request) {
   // 7) Login de socio demo (para ver la app del cliente).
   const socio = await createDemoSocio(admin, gym.id).catch(() => null);
 
+  // Base absoluta para que quien llame (ej: el bot) reciba links completos.
+  const base = (process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin).replace(/\/$/, "");
+
   return NextResponse.json({
     ok: true,
     slug: gym.slug,
     url: `/${gym.slug}`,
     owner: { user: ownerUser, loginUrl: "/acceso" },
     socio: socio ? { name: socio.name, user: socio.dni, loginUrl: `/g/${gym.slug}` } : null,
+    // Todo listo y absoluto (para bots / envíos automáticos):
+    links: {
+      web: `${base}/${gym.slug}`,
+      ownerPanel: `${base}/acceso`,
+      ownerUser: ownerUser,
+      socioApp: socio ? `${base}/g/${gym.slug}` : null,
+      socioUser: socio ? socio.dni : null,
+    },
   });
 }

@@ -10,8 +10,15 @@ interface Settings {
   transfer_cbu: string | null;
   transfer_holder: string | null;
   transfer_note: string | null;
+  support_whatsapp: string | null;
   convert_clear_sample: boolean;
 }
+interface Pendiente {
+  id: string; gym_id: string; gym_name: string; plan: string;
+  amount: number | null; receipt_url: string | null; note: string | null; created_at: string;
+}
+const amt = (n: number | null) => (n == null ? "—" : money(n));
+const fdate = (s: string) => new Date(s).toLocaleDateString("es-AR");
 
 export default function CobrosPage() {
   const supabase = createClient();
@@ -19,9 +26,16 @@ export default function CobrosPage() {
   const [mp, setMp] = useState(false);
   const [appUrl, setAppUrl] = useState("");
   const [plans, setPlans] = useState<PlanConfig[]>([]);
-  const [s, setS] = useState<Settings>({ transfer_alias: "", transfer_cbu: "", transfer_holder: "", transfer_note: "", convert_clear_sample: true });
+  const [s, setS] = useState<Settings>({ transfer_alias: "", transfer_cbu: "", transfer_holder: "", transfer_note: "", support_whatsapp: "", convert_clear_sample: true });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [pend, setPend] = useState<Pendiente[]>([]);
+  const [pendBusy, setPendBusy] = useState<string | null>(null);
+
+  async function loadPend() {
+    const r = await fetch("/api/admin/transferencia").then((x) => x.json()).catch(() => null);
+    if (r?.ok) setPend(r.pendientes || []);
+  }
 
   useEffect(() => {
     (async () => {
@@ -39,14 +53,29 @@ export default function CobrosPage() {
             transfer_cbu: res.settings.transfer_cbu || "",
             transfer_holder: res.settings.transfer_holder || "",
             transfer_note: res.settings.transfer_note || "",
+            support_whatsapp: res.settings.support_whatsapp || "",
             convert_clear_sample: res.settings.convert_clear_sample ?? true,
           });
         }
       }
+      await loadPend();
       setLoading(false);
     })();
     /* eslint-disable-next-line */
   }, []);
+
+  async function revisar(id: string, action: "aprobar" | "rechazar") {
+    if (action === "aprobar" && !confirm("¿Aprobar esta transferencia y activar el plan del gimnasio?")) return;
+    if (action === "rechazar" && !confirm("¿Rechazar esta transferencia? El gimnasio no se activa.")) return;
+    setPendBusy(id);
+    const r = await fetch("/api/admin/transferencia", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, action }),
+    }).then((x) => x.json()).catch(() => null);
+    setPendBusy(null);
+    if (r?.ok) setPend((ps) => ps.filter((p) => p.id !== id));
+    else alert(r?.error || "No se pudo procesar.");
+  }
 
   function set<K extends keyof Settings>(k: K, v: Settings[K]) { setS((p) => ({ ...p, [k]: v })); }
 
@@ -112,6 +141,41 @@ export default function CobrosPage() {
         </div>
       </div>
 
+      {/* Transferencias por verificar */}
+      <div className="mt-6 card">
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold">Transferencias por verificar</h2>
+          {pend.length > 0 && <span className="rounded-full bg-[rgba(245,177,61,.14)] px-2 py-0.5 text-[11px] font-semibold text-warn">{pend.length}</span>}
+        </div>
+        {pend.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-2">No hay transferencias pendientes. Cuando un dueño suba un comprobante, aparece acá para que lo verifiques (hasta 48hs).</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-white/10">
+            {pend.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">{p.gym_name}</div>
+                  <div className="text-xs text-ink-2">
+                    Plan {p.plan} · <b className="text-brand">{amt(p.amount)}</b> · {fdate(p.created_at)}
+                  </div>
+                </div>
+                {p.receipt_url && (
+                  <a href={p.receipt_url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-white/5">Ver comprobante</a>
+                )}
+                <button onClick={() => revisar(p.id, "aprobar")} disabled={pendBusy === p.id}
+                  className="rounded-lg border border-good/40 px-3 py-1.5 text-xs font-semibold text-good hover:bg-[rgba(34,197,94,.12)] disabled:opacity-50">
+                  {pendBusy === p.id ? "…" : "Aprobar"}
+                </button>
+                <button onClick={() => revisar(p.id, "rechazar")} disabled={pendBusy === p.id}
+                  className="rounded-lg border border-crit/40 px-3 py-1.5 text-xs font-semibold text-crit hover:bg-[rgba(240,82,82,.12)] disabled:opacity-50">
+                  Rechazar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {/* Datos de transferencia */}
       <div className="mt-6 card">
         <h2 className="font-semibold">Tus datos para transferencias</h2>
@@ -132,6 +196,11 @@ export default function CobrosPage() {
           <label className="block sm:col-span-2">
             <span className="mb-1 block text-[11px] font-semibold text-ink-2">Nota (opcional)</span>
             <input className="input" value={s.transfer_note ?? ""} onChange={(e) => set("transfer_note", e.target.value)} placeholder="Enviá el comprobante por WhatsApp." />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-[11px] font-semibold text-ink-2">WhatsApp de turnogym (para que el dueño te avise el pago)</span>
+            <input className="input" value={s.support_whatsapp ?? ""} onChange={(e) => set("support_whatsapp", e.target.value)} placeholder="Ej: 5491122334455" />
+            <span className="mt-1 block text-[11px] text-muted">Con código de país y área, sin espacios ni signos. Aparece como botón “Avisar por WhatsApp” en el pago por transferencia del dueño.</span>
           </label>
         </div>
       </div>

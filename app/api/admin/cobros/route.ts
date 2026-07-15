@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
   let body: {
     transfer_alias?: string; transfer_cbu?: string; transfer_holder?: string;
-    transfer_note?: string; convert_clear_sample?: boolean;
+    transfer_note?: string; support_whatsapp?: string; convert_clear_sample?: boolean;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
 
@@ -50,6 +50,7 @@ export async function POST(req: Request) {
   if (typeof body.transfer_cbu === "string") patch.transfer_cbu = body.transfer_cbu.trim() || null;
   if (typeof body.transfer_holder === "string") patch.transfer_holder = body.transfer_holder.trim() || null;
   if (typeof body.transfer_note === "string") patch.transfer_note = body.transfer_note.trim() || null;
+  if (typeof body.support_whatsapp === "string") patch.support_whatsapp = body.support_whatsapp.trim() || null;
   if (typeof body.convert_clear_sample === "boolean") patch.convert_clear_sample = body.convert_clear_sample;
 
   const { error } = await g.admin.from("platform_settings").upsert(patch, { onConflict: "id" });
