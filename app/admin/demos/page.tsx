@@ -342,7 +342,7 @@ export default function DemosPage() {
         <p className="text-ink-2">Cargá lo que tengas del gimnasio y la IA arma la demo branded (web + panel). No cuenta como cliente real.</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
         {/* Form */}
         <div className="card">
           {/* Traer de Google Maps (Apify) */}
@@ -484,32 +484,50 @@ export default function DemosPage() {
             </div>
           )}
 
-          <div className="card p-0">
-            <div className="border-b border-white/10 p-3 text-sm font-semibold">Demos generadas ({demos.length})</div>
-            {demos.length === 0 ? (
-              <p className="p-6 text-center text-xs text-ink-2">Todavía no generaste demos.</p>
-            ) : (
-              <ul className="divide-y divide-white/10">
-                {demos.map((d) => (
-                  <li key={d.id}>
-                    <div className="p-3">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold">{d.name}</span>
-                        {d.demo_suspended && <span className="shrink-0 rounded-full bg-[rgba(240,82,82,.14)] px-2 py-0.5 text-[10px] font-semibold text-crit">Suspendida</span>}
-                      </div>
-                      <div className="truncate text-[11px] text-muted">/{d.slug}</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
-                        <button onClick={() => toggleAcc(d)} className="text-brand hover:underline">{openId === d.id ? "Ocultar" : "Accesos"}</button>
-                        <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver web</a>
-                        <button onClick={() => startEdit(d)} className="text-ink-2 hover:text-ink">{editId === d.id ? "Cerrar" : "Editar"}</button>
-                        <button onClick={() => regenerar(d)} disabled={busyId === d.id} className="text-ink-2 hover:text-ink disabled:opacity-50">{busyId === d.id ? "…" : "Regenerar IA"}</button>
-                        <button onClick={() => suspender(d, !d.demo_suspended)} disabled={busyId === d.id} className="text-warn hover:underline disabled:opacity-50">{d.demo_suspended ? "Reactivar" : "Suspender"}</button>
-                        <button onClick={() => startConvert(d)} disabled={busyId === d.id} className="text-good hover:underline disabled:opacity-50">{convId === d.id ? "Cerrar" : "Convertir en cliente"}</button>
-                        <button onClick={() => eliminar(d)} className="text-crit hover:underline">Eliminar</button>
-                      </div>
-                    </div>
+        </div>
+      </div>
 
-                    {convId === d.id && (
+      {/* Demos generadas — formato lista, como los clientes */}
+      <div className="mt-6 card p-0">
+        <div className="flex items-center justify-between border-b border-white/10 p-4">
+          <span className="text-sm font-semibold">Demos generadas ({demos.length})</span>
+        </div>
+        {demos.length === 0 ? (
+          <p className="p-8 text-center text-ink-2">Todavía no generaste demos.</p>
+        ) : (
+          <>
+            <div className="hidden grid-cols-[minmax(0,2fr)_120px_110px_minmax(0,2.4fr)] gap-3 border-b border-white/10 px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted md:grid">
+              <span>Demo</span>
+              <span>Creada</span>
+              <span>Estado</span>
+              <span className="text-right">Acciones</span>
+            </div>
+            <ul className="divide-y divide-white/10">
+              {demos.map((d) => (
+                <li key={d.id} className="hover:bg-white/[.02]">
+                  <div className="grid grid-cols-1 gap-2 p-4 md:grid-cols-[minmax(0,2fr)_120px_110px_minmax(0,2.4fr)] md:items-center md:gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold">{d.name}</div>
+                      <div className="truncate text-[11px] text-muted">/{d.slug}</div>
+                    </div>
+                    <div className="text-xs text-ink-2">{d.created_at ? new Date(d.created_at).toLocaleDateString("es-AR") : "—"}</div>
+                    <div>
+                      {d.demo_suspended
+                        ? <span className="rounded-full bg-[rgba(240,82,82,.14)] px-2 py-0.5 text-[10px] font-semibold text-crit">Suspendida</span>
+                        : <span className="rounded-full bg-[rgba(34,197,94,.14)] px-2 py-0.5 text-[10px] font-semibold text-good">Activa</span>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold md:justify-end">
+                      <button onClick={() => toggleAcc(d)} className="text-brand hover:underline">{openId === d.id ? "Ocultar" : "Accesos"}</button>
+                      <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver web</a>
+                      <button onClick={() => startEdit(d)} className="text-ink-2 hover:text-ink">{editId === d.id ? "Cerrar" : "Editar"}</button>
+                      <button onClick={() => regenerar(d)} disabled={busyId === d.id} className="text-ink-2 hover:text-ink disabled:opacity-50">{busyId === d.id ? "…" : "Regenerar IA"}</button>
+                      <button onClick={() => suspender(d, !d.demo_suspended)} disabled={busyId === d.id} className="text-warn hover:underline disabled:opacity-50">{d.demo_suspended ? "Reactivar" : "Suspender"}</button>
+                      <button onClick={() => startConvert(d)} disabled={busyId === d.id} className="text-good hover:underline disabled:opacity-50">{convId === d.id ? "Cerrar" : "Convertir"}</button>
+                      <button onClick={() => eliminar(d)} className="text-crit hover:underline">Eliminar</button>
+                    </div>
+                  </div>
+
+                  {convId === d.id && (
                       <div className="space-y-2 border-t border-good/20 bg-[rgba(34,197,94,.04)] p-3">
                         <p className="text-xs font-semibold text-good">Convertir en cliente real</p>
                         <div className="flex flex-wrap items-center gap-2">
@@ -596,9 +614,8 @@ export default function DemosPage() {
                   </li>
                 ))}
               </ul>
-            )}
-          </div>
-        </div>
+            </>
+          )}
       </div>
     </main>
   );

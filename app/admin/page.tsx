@@ -8,7 +8,7 @@ import {
   money, fdate, venceOf, daysUntil, isProximoVence, isVencido,
 } from "@/lib/admin";
 
-interface Gym { id: string; name: string; slug: string; owner_id: string; created_at: string; whatsapp: string | null; }
+interface Gym { id: string; name: string; slug: string; owner_id: string; created_at: string; whatsapp: string | null; archived: boolean; }
 interface Sub {
   gym_id: string;
   plan: "basico" | "pro" | "elite";
@@ -51,11 +51,36 @@ export default function AdminDashboard() {
   const [planCfgs, setPlanCfgs] = useState<PlanConfig[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [busyGym, setBusyGym] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const activeGyms = useMemo(() => gyms.filter((g) => !g.archived), [gyms]);
+  const archivedGyms = useMemo(() => gyms.filter((g) => g.archived), [gyms]);
+
+  async function gestionGym(gymId: string, action: "archivar" | "desarchivar" | "eliminar") {
+    setBusyGym(gymId);
+    const r = await fetch("/api/admin/gimnasios", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gymId, action }),
+    }).then((x) => x.json()).catch(() => null);
+    setBusyGym(null);
+    if (!r?.ok) { alert(r?.error || "No se pudo completar la acción."); return; }
+    if (action === "eliminar") setGyms((gs) => gs.filter((g) => g.id !== gymId));
+    else setGyms((gs) => gs.map((g) => (g.id === gymId ? { ...g, archived: action === "archivar" } : g)));
+  }
+  function archivar(g: Gym) {
+    if (!confirm(`¿Archivar "${g.name}"? Sale de la lista de clientes y de las métricas, pero no se borra. Lo podés reactivar cuando quieras.`)) return;
+    gestionGym(g.id, "archivar");
+  }
+  function eliminar(g: Gym) {
+    if (!confirm(`¿ELIMINAR "${g.name}" para siempre? Se borran el gimnasio, sus socios, rutinas, caja y las cuentas de acceso. Esta acción NO se puede deshacer.`)) return;
+    gestionGym(g.id, "eliminar");
+  }
 
   useEffect(() => {
     (async () => {
       const [{ data: g }, { data: s }, { data: p }, { data: mem }] = await Promise.all([
-        supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp").eq("is_demo", false),
+        supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp, archived").eq("is_demo", false),
         supabase.from("subscriptions").select("gym_id, plan, status, trial_ends_at, current_period_end, payment_method"),
         supabase.from("profiles").select("id, full_name"),
         supabase.from("members").select("gym_id"),
@@ -79,9 +104,9 @@ export default function AdminDashboard() {
   }, [subs]);
   const gymById = useMemo(() => {
     const m: Record<string, Gym> = {};
-    gyms.forEach((g) => (m[g.id] = g));
+    activeGyms.forEach((g) => (m[g.id] = g));
     return m;
-  }, [gyms]);
+  }, [activeGyms]);
   const ownerName = (id: string) => owners.find((o) => o.id === id)?.full_name || "—";
   const priceOf = (k: string) => planCfgs.find((p) => p.key === k)?.price ?? (PLAN_PRICES[k] || 0);
 
@@ -99,25 +124,25 @@ export default function AdminDashboard() {
       } else if (s.status === "trial") trial++;
       if (isProximoVence(s) || isVencido(s)) porVencer++;
     });
-    return { total: gyms.length, active, trial, mrr, transfer, mp, transferN, mpN, porVencer };
+    return { total: activeGyms.length, active, trial, mrr, transfer, mp, transferN, mpN, porVencer };
     /* eslint-disable-next-line */
-  }, [subs, gyms, planCfgs, gymById]);
+  }, [subs, activeGyms, planCfgs, gymById]);
 
   // Gimnasios cuyo abono está por vencer o ya venció (para el bloque de alertas).
   const vencimientos = useMemo(() => {
-    const rows: { g: Gym; s: Sub | undefined }[] = gyms.map((g) => ({ g, s: subByGym[g.id] }));
+    const rows: { g: Gym; s: Sub | undefined }[] = activeGyms.map((g) => ({ g, s: subByGym[g.id] }));
     return rows
       .filter(({ s }) => isProximoVence(s) || isVencido(s))
       .sort((a, b) => (daysUntil(venceOf(a.s)) ?? 999) - (daysUntil(venceOf(b.s)) ?? 999));
-  }, [gyms, subByGym]);
+  }, [activeGyms, subByGym]);
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    if (!t) return gyms;
-    return gyms.filter((g) =>
+    if (!t) return activeGyms;
+    return activeGyms.filter((g) =>
       g.name.toLowerCase().includes(t) || g.slug.toLowerCase().includes(t) || ownerName(g.owner_id).toLowerCase().includes(t));
     /* eslint-disable-next-line */
-  }, [gyms, q, owners]);
+  }, [activeGyms, q, owners]);
 
   async function saveSub(gymId: string, patch: Partial<Sub>) {
     setSavingId(gymId);
@@ -144,7 +169,7 @@ export default function AdminDashboard() {
   if (loading) return <div className="grid min-h-[50vh] place-items-center text-ink-2">Cargando…</div>;
 
   return (
-    <div className="mx-auto w-full max-w-[1400px]">
+    <div className="w-full">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="mt-1 text-ink-2">Todos los gimnasios clientes, su suscripción y cómo pagan.</p>
@@ -214,7 +239,7 @@ export default function AdminDashboard() {
           />
         </div>
         {filtered.length === 0 ? (
-          <p className="p-8 text-center text-ink-2">{gyms.length === 0 ? "Todavía no hay gimnasios registrados." : "Sin resultados."}</p>
+          <p className="p-8 text-center text-ink-2">{activeGyms.length === 0 ? "Todavía no hay gimnasios registrados." : "Sin resultados."}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -246,7 +271,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3 text-ink-2">{ownerName(g.owner_id)}</td>
                       <td className="px-4 py-3">
                         <select
-                          className="input h-8 w-[100px] py-0 pr-7 text-xs"
+                          className="input h-8 w-[128px] min-w-[128px] py-0 pr-8 text-xs"
                           value={s?.plan ?? "basico"}
                           onChange={(e) => saveSub(g.id, { plan: e.target.value as Sub["plan"] })}
                         >
@@ -256,7 +281,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
                           <select
-                            className="input h-8 w-[124px] py-0 pr-7 text-xs"
+                            className="input h-8 w-[132px] min-w-[132px] py-0 pr-8 text-xs"
                             value={s?.status ?? "trial"}
                             onChange={(e) => saveSub(g.id, { status: e.target.value as Sub["status"] })}
                           >
@@ -271,7 +296,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-4 py-3">
                         <select
-                          className="input h-8 w-[128px] py-0 pr-7 text-xs"
+                          className="input h-8 w-[140px] min-w-[140px] py-0 pr-8 text-xs"
                           value={s?.payment_method ?? ""}
                           onChange={(e) => saveSub(g.id, { payment_method: e.target.value || null })}
                         >
@@ -308,6 +333,8 @@ export default function AdminDashboard() {
                             );
                           })()}
                           <a href={`/${g.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver página</a>
+                          <button onClick={() => archivar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-warn disabled:opacity-50" title="Sacar de clientes sin borrar (reversible)">Archivar</button>
+                          <button onClick={() => eliminar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-crit disabled:opacity-50" title="Borrar para siempre">Eliminar</button>
                         </div>
                       </td>
                     </tr>
@@ -321,6 +348,55 @@ export default function AdminDashboard() {
           El método se marca solo en “Mercado Pago” cuando el dueño paga con débito automático. Los cobros que registrás a mano quedan como “Transferencia”.
         </p>
       </div>
+
+      {/* Archivados */}
+      {archivedGyms.length > 0 && (
+        <div className="mt-6 card p-0">
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 p-4 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold">
+              🗄️ Archivados
+              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-ink-2">{archivedGyms.length}</span>
+            </span>
+            <span className="text-xs text-brand">{showArchived ? "Ocultar" : "Ver"}</span>
+          </button>
+          {showArchived && (
+            <div className="overflow-x-auto border-t border-white/10">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="px-4 pb-3 pt-3">Gimnasio</th>
+                    <th className="px-4 pb-3 pt-3">Dueño</th>
+                    <th className="px-4 pb-3 pt-3 text-right">Socios</th>
+                    <th className="px-4 pb-3 pt-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archivedGyms.map((g) => (
+                    <tr key={g.id} className="border-t border-white/10 hover:bg-white/[.02]">
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{g.name}</div>
+                        <div className="text-xs text-muted">/{g.slug}</div>
+                      </td>
+                      <td className="px-4 py-3 text-ink-2">{ownerName(g.owner_id)}</td>
+                      <td className="px-4 py-3 text-right text-ink-2">{counts[g.id] || 0}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-3 text-xs font-semibold">
+                          <a href={`/${g.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver página</a>
+                          <button onClick={() => gestionGym(g.id, "desarchivar")} disabled={busyGym === g.id} className="text-good hover:underline disabled:opacity-50">Reactivar</button>
+                          <button onClick={() => eliminar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-crit disabled:opacity-50">Eliminar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
