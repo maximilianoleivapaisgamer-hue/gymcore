@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   let body: { offset?: number; limit?: number };
   try { body = await req.json(); } catch { body = {}; }
   const offset = Math.max(0, Number(body.offset) || 0);
-  const limit = Math.min(25, Math.max(1, Number(body.limit) || 20));
+  const limit = Math.min(15, Math.max(1, Number(body.limit) || 12));
 
   let data: FEDB[];
   try { data = await loadData(); } catch (e) {
@@ -95,11 +95,23 @@ export async function POST(req: Request) {
 
   const total = data.length;
   const page = data.slice(offset, offset + limit);
+  const extIds = page.map((ex) => ex.id || norm(ex.name));
 
-  // Base de cada fila (todo lo que no necesita IA).
-  const rows = page.map((ex) => ({
+  // Saltear los que YA están cargados y traducidos (instrucciones no vacías).
+  // Así re-correr es barato y no se reintenta en loop una tanda ya hecha.
+  const { data: prev } = await g.admin.from("exercises")
+    .select("ext_id, instructions").in("ext_id", extIds);
+  const doneSet = new Set(
+    (prev || [])
+      .filter((p: { instructions: string[] | null }) => Array.isArray(p.instructions) && p.instructions.length > 0)
+      .map((p: { ext_id: string }) => p.ext_id)
+  );
+
+  const pending = page.filter((ex) => !doneSet.has(ex.id || norm(ex.name)));
+  const rows = pending.map((ex) => ({
     gym_id: null as string | null,
     is_global: true,
+    source: "biblioteca",
     ext_id: ex.id || norm(ex.name),
     name: ex.name, // se pisa con la traducción abajo
     image_url: IMG_BASE + ex.images[0],
@@ -112,46 +124,55 @@ export async function POST(req: Request) {
     instructions: [] as string[],
   }));
 
-  // Traducción de nombre + instrucciones: overrides primero, IA para el resto.
+  // Overrides (traducción curada) primero; el resto va a la IA.
   const needAI: { idx: number; name: string; steps: string[] }[] = [];
-  page.forEach((ex, idx) => {
+  pending.forEach((ex, idx) => {
     const ov = OVERRIDE.get(norm(ex.name));
-    if (ov) {
-      rows[idx].name = ov.es;
-      rows[idx].instructions = ov.cue;
-    } else {
-      needAI.push({ idx, name: ex.name, steps: (ex.instructions || []).slice(0, 4) });
-    }
+    if (ov) { rows[idx].name = ov.es; rows[idx].instructions = ov.cue; }
+    else needAI.push({ idx, name: ex.name, steps: (ex.instructions || []).slice(0, 4) });
   });
 
+  // Traducción con IA (2 intentos). Si falla, NO frena el proceso: deja el
+  // nombre original y sigue (esos se reintentan en la próxima corrida, porque
+  // quedan sin instrucciones y no entran en doneSet).
+  let aiFailed = 0;
   if (needAI.length) {
-    try {
-      const out = await generateJSON<{ items: { i: number; nombre: string; pasos: string[] }[] }>({
-        system: "Sos traductor experto en fitness. Traducís al español rioplatense (Argentina), claro y conciso para un gimnasio. No inventás ejercicios: solo traducís lo que te pasan.",
-        prompt:
-          "Traducí estos ejercicios al español. Devolvé el MISMO índice i. 'nombre' = nombre del ejercicio en español; 'pasos' = instrucciones en español, MÁXIMO 3 pasos cortos.\n\n" +
-          JSON.stringify(needAI.map((n) => ({ i: n.idx, name: n.name, steps: n.steps }))),
-        toolName: "traducciones",
-        toolDescription: "Devuelve las traducciones al español de cada ejercicio.",
-        schema: TRAD_SCHEMA,
-        maxTokens: 4096,
-      });
-      const byIdx = new Map((out.items || []).map((t) => [t.i, t]));
-      for (const n of needAI) {
-        const t = byIdx.get(n.idx);
-        if (t) {
-          rows[n.idx].name = t.nombre || n.name;
-          rows[n.idx].instructions = Array.isArray(t.pasos) ? t.pasos.slice(0, 3) : [];
-        }
+    let out: { items: { i: number; nombre: string; pasos: string[] }[] } | null = null;
+    for (let attempt = 0; attempt < 2 && !out; attempt++) {
+      try {
+        out = await generateJSON<{ items: { i: number; nombre: string; pasos: string[] }[] }>({
+          system: "Sos traductor experto en fitness. Traducís al español rioplatense (Argentina), claro y conciso para un gimnasio. No inventás ejercicios: solo traducís lo que te pasan.",
+          prompt:
+            "Traducí estos ejercicios al español. Devolvé el MISMO índice i. 'nombre' = nombre del ejercicio en español; 'pasos' = instrucciones en español, MÁXIMO 3 pasos cortos.\n\n" +
+            JSON.stringify(needAI.map((n) => ({ i: n.idx, name: n.name, steps: n.steps }))),
+          toolName: "traducciones",
+          toolDescription: "Devuelve las traducciones al español de cada ejercicio.",
+          schema: TRAD_SCHEMA,
+          maxTokens: 8000,
+        });
+      } catch { out = null; }
+    }
+    const byIdx = new Map((out?.items || []).map((t) => [t.i, t]));
+    for (const n of needAI) {
+      const t = byIdx.get(n.idx);
+      if (t?.nombre) {
+        rows[n.idx].name = t.nombre;
+        rows[n.idx].instructions = Array.isArray(t.pasos) ? t.pasos.slice(0, 3) : [];
+      } else {
+        aiFailed++; // se queda con el nombre original; se reintenta en otra corrida
       }
-    } catch (e) {
-      return NextResponse.json({ ok: false, error: "Falló la traducción con IA: " + (e as Error).message, offset }, { status: 502 });
     }
   }
 
-  const { error } = await g.admin.from("exercises").upsert(rows, { onConflict: "ext_id" });
-  if (error) return NextResponse.json({ ok: false, error: error.message, offset }, { status: 400 });
+  if (rows.length) {
+    const { error } = await g.admin.from("exercises").upsert(rows, { onConflict: "ext_id" });
+    if (error) return NextResponse.json({ ok: false, error: error.message, offset }, { status: 400 });
+  }
 
   const nextOffset = offset + page.length;
-  return NextResponse.json({ ok: true, total, processed: page.length, nextOffset, done: nextOffset >= total });
+  return NextResponse.json({
+    ok: true, total, processed: page.length,
+    skipped: page.length - pending.length, aiFailed,
+    nextOffset, done: nextOffset >= total,
+  });
 }

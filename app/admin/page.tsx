@@ -57,30 +57,47 @@ export default function AdminDashboard() {
   const [seedMsg, setSeedMsg] = useState("");
   const seedOffset = useRef(0);
 
-  // Carga TODA la librería en tandas (traduce con IA). Es reanudable: si se corta,
-  // volver a tocar el botón sigue desde donde quedó (el upsert no duplica).
+  // Carga TODA la librería en tandas (traduce con IA). No se frena por una tanda:
+  // si una falla la traducción, el servidor la degrada y sigue; y ante un corte
+  // de red reintenta la misma tanda varias veces. Reanudable e idempotente.
   async function seedEjercicios() {
     setSeedBusy(true);
     let offset = seedOffset.current;
-    let total = 0, done = false, guard = 0;
+    let total = 0, done = false, guard = 0, netFails = 0;
+    type Resp = { ok?: boolean; total?: number; nextOffset?: number; done?: boolean; error?: string };
     try {
-      while (!done && guard < 400) {
+      while (!done && guard < 900) {
         guard++;
-        const r = await fetch("/api/admin/exercises/seed", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ offset, limit: 20 }),
-        }).then((x) => x.json());
-        if (!r?.ok) {
-          seedOffset.current = offset;
-          setSeedMsg(`Se pausó en ${offset}${total ? `/${total}` : ""}. Tocá de nuevo para continuar. ${r?.error ? `(${r.error})` : ""}`);
-          setSeedBusy(false);
-          return;
+        let r: Resp | null = null;
+        try {
+          r = await fetch("/api/admin/exercises/seed", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ offset, limit: 12 }),
+          }).then((x) => x.json());
+        } catch { r = null; }
+
+        if (!r) { // corte de red: reintentamos la misma tanda
+          netFails++;
+          if (netFails > 6) {
+            seedOffset.current = offset;
+            setSeedMsg(`Se cortó la conexión en ${offset}${total ? `/${total}` : ""}. Tocá de nuevo para seguir.`);
+            setSeedBusy(false); return;
+          }
+          setSeedMsg(`Reintentando en ${offset}${total ? `/${total}` : ""}…`);
+          await new Promise((res) => setTimeout(res, 1500));
+          continue;
         }
-        total = r.total; offset = r.nextOffset; done = r.done;
+        if (!r.ok) {
+          seedOffset.current = offset;
+          setSeedMsg(`Se pausó en ${offset}. Tocá de nuevo para continuar. ${r.error ? `(${r.error})` : ""}`);
+          setSeedBusy(false); return;
+        }
+        netFails = 0;
+        total = r.total ?? total; offset = r.nextOffset ?? offset; done = !!r.done;
         seedOffset.current = done ? 0 : offset;
         setSeedMsg(`Cargando y traduciendo… ${Math.min(offset, total)} / ${total}`);
       }
-      setSeedMsg(`✓ Librería cargada: ${total} ejercicios en español.`);
+      setSeedMsg(`✓ Librería lista: ${total} ejercicios. Si alguno quedó en inglés, tocá de nuevo y completa solo los que faltan.`);
     } catch {
       seedOffset.current = offset;
       setSeedMsg(`Se cortó en ${offset}${total ? `/${total}` : ""}. Tocá de nuevo para continuar desde ahí.`);
