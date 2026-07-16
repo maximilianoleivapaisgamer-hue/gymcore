@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase-browser";
 import AiChat from "@/components/AiChat";
 import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
 
-interface Exercise { id: string; name: string; notes: string | null; image_url?: string | null; }
+interface Exercise { id: string; name: string; notes: string | null; image_url?: string | null; is_global?: boolean; source?: string; }
 interface Member { id: string; full_name: string; }
 interface RExercise {
   id?: string; exercise_id: string | null; day_number: number;
@@ -50,6 +50,7 @@ export default function RutinasPage() {
   const [libOpen, setLibOpen] = useState(false);
   const [picking, setPicking] = useState<{ di: number; bi: number; ri: number } | null>(null);
   const [pickSearch, setPickSearch] = useState("");
+  const [pickFilter, setPickFilter] = useState<"todos" | "demo" | "mios">("todos");
   const [newEx, setNewEx] = useState("");
   const [applyMember, setApplyMember] = useState("");
   const [applyMsg, setApplyMsg] = useState("");
@@ -70,7 +71,7 @@ export default function RutinasPage() {
       setPlans(await loadPlans(supabase));
     }
     const [{ data: ex }, { data: mem }, { data: rout }] = await Promise.all([
-      supabase.from("exercises").select("id, name, notes, image_url").order("name"),
+      supabase.from("exercises").select("id, name, notes, image_url, is_global, source").order("name"),
       supabase.from("members").select("id, full_name").order("full_name"),
       supabase.from("routines").select("*, routine_exercises(*)").order("created_at", { ascending: false }),
     ]);
@@ -91,11 +92,16 @@ export default function RutinasPage() {
     exercises.forEach((e) => { if (e.image_url) m[e.id] = e.image_url; });
     return m;
   }, [exercises]);
+  const ownExercises = useMemo(() => exercises.filter((x) => !x.is_global), [exercises]);
+  const libCount = useMemo(() => exercises.filter((x) => x.is_global).length, [exercises]);
   const pickResults = useMemo(() => {
     const q = pickSearch.trim().toLowerCase();
-    const all = q ? exercises.filter((x) => x.name.toLowerCase().includes(q)) : exercises;
+    let all = exercises;
+    if (pickFilter === "demo") all = all.filter((x) => !!x.image_url);
+    else if (pickFilter === "mios") all = all.filter((x) => x.source !== "biblioteca" && !x.is_global);
+    if (q) all = all.filter((x) => x.name.toLowerCase().includes(q));
     return { list: all.slice(0, 60), count: all.length };
-  }, [exercises, pickSearch]);
+  }, [exercises, pickSearch, pickFilter]);
 
   // Agrupa routine_exercises en días y, dentro de cada día, en bloques (por
   // block_name) preservando el orden en que aparecen.
@@ -271,7 +277,7 @@ export default function RutinasPage() {
             <span>/</span><span>Rutinas</span>
           </div>
           <h1 className="text-2xl font-bold">Rutinas</h1>
-          <p className="text-ink-2">{routines.length} rutinas · {exercises.length} ejercicios en biblioteca</p>
+          <p className="text-ink-2">{routines.length} rutinas · {ownExercises.length} propios · {libCount} de librería 🎞️</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <AiChat kind="rutina" gymId={gymId} members={members} onDone={load} enabled={allows(plans, plan, "ia")} />
@@ -459,8 +465,10 @@ export default function RutinasPage() {
       {libOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setLibOpen(false)}>
           <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 text-lg font-bold">Biblioteca de ejercicios</h3>
-            <p className="mb-4 text-sm text-ink-2">Los ejercicios que cargues acá aparecen al armar tus rutinas.</p>
+            <h3 className="mb-1 text-lg font-bold">Ejercicios propios del gimnasio</h3>
+            <p className="mb-4 text-sm text-ink-2">
+              Acá cargás y borrás los tuyos. Los <b>{libCount} de la librería</b> (con demostración) ya aparecen solos al armar rutinas y no se editan desde acá.
+            </p>
             <div className="mb-4 flex gap-2">
               <input className="input" placeholder="Nombre del ejercicio (ej: Press banca)" value={newEx}
                 onChange={(e) => setNewEx(e.target.value)}
@@ -468,14 +476,15 @@ export default function RutinasPage() {
               <button className="btn btn-primary" onClick={addExercise} disabled={!newEx.trim()}>Agregar</button>
             </div>
             <div className="max-h-72 overflow-y-auto">
-              {exercises.length === 0 ? (
-                <p className="py-6 text-center text-sm text-ink-2">Todavía no hay ejercicios.</p>
+              {ownExercises.length === 0 ? (
+                <p className="py-6 text-center text-sm text-ink-2">Todavía no cargaste ejercicios propios.</p>
               ) : (
                 <ul className="divide-y divide-white/5">
-                  {exercises.map((x) => (
-                    <li key={x.id} className="flex items-center justify-between py-2">
-                      <span className="text-sm">{x.name}</span>
-                      <button className="text-ink-2 hover:text-crit" title="Eliminar" onClick={() => removeExercise(x.id)}>🗑️</button>
+                  {ownExercises.map((x) => (
+                    <li key={x.id} className="flex items-center justify-between gap-2 py-2">
+                      <span className="min-w-0 flex-1 truncate text-sm">{x.name}</span>
+                      {x.source === "ia" && <span className="shrink-0 rounded-full bg-[rgba(139,92,246,.14)] px-2 py-0.5 text-[10px] font-semibold text-indigo">IA</span>}
+                      <button className="shrink-0 text-ink-2 hover:text-crit" title="Eliminar" onClick={() => removeExercise(x.id)}>🗑️</button>
                     </li>
                   ))}
                 </ul>
@@ -492,11 +501,21 @@ export default function RutinasPage() {
       {picking && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-14" onClick={() => setPicking(null)}>
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-bg" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2 border-b border-white/10 p-3">
-              {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
-              <input autoFocus className="input" placeholder="Buscar ejercicio (ej: sentadilla, press, bíceps)…"
-                value={pickSearch} onChange={(e) => setPickSearch(e.target.value)} />
-              <button className="shrink-0 px-2 text-muted hover:text-ink" onClick={() => setPicking(null)}>✕</button>
+            <div className="border-b border-white/10 p-3">
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+                <input autoFocus className="input" placeholder="Buscar ejercicio (ej: sentadilla, press, bíceps)…"
+                  value={pickSearch} onChange={(e) => setPickSearch(e.target.value)} />
+                <button className="shrink-0 px-2 text-muted hover:text-ink" onClick={() => setPicking(null)}>✕</button>
+              </div>
+              <div className="mt-2 flex gap-1.5 text-xs">
+                {([["todos", "Todos"], ["demo", "🎞️ Con demo"], ["mios", "Del gimnasio"]] as const).map(([k, label]) => (
+                  <button key={k} onClick={() => setPickFilter(k)}
+                    className={`rounded-full border px-3 py-1 font-semibold transition ${pickFilter === k ? "border-brand/40 bg-[rgba(34,211,238,.12)] text-brand" : "border-white/10 text-ink-2 hover:text-ink"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
               {pickResults.list.length === 0 ? (
@@ -513,7 +532,14 @@ export default function RutinasPage() {
                         ) : (
                           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-muted">—</div>
                         )}
-                        <span className="min-w-0 truncate text-sm">{x.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm">{x.name}</span>
+                        {x.image_url ? (
+                          <span className="shrink-0 rounded-full bg-[rgba(34,211,238,.12)] px-2 py-0.5 text-[10px] font-semibold text-brand">demo</span>
+                        ) : x.source === "ia" ? (
+                          <span className="shrink-0 rounded-full bg-[rgba(139,92,246,.14)] px-2 py-0.5 text-[10px] font-semibold text-indigo">IA</span>
+                        ) : (
+                          <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-ink-2">manual</span>
+                        )}
                       </button>
                     </li>
                   ))}

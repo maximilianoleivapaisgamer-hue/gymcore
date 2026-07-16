@@ -116,10 +116,16 @@ export async function saveRoutine(
   const days = Array.isArray(ai.days) ? ai.days : [];
   if (!days.length) return { ok: false, error: "La IA no generó ejercicios." };
 
-  // Mapear ejercicios contra la biblioteca del gimnasio; crear los que falten.
-  const { data: existing } = await admin.from("exercises").select("id, name").eq("gym_id", gymId);
+  // Mapear ejercicios contra la biblioteca del gimnasio Y la librería global;
+  // los que faltan se crean (marcados como creados por IA). Se prefiere la
+  // librería global (tiene demostración) cuando el nombre coincide.
+  const { data: existing } = await admin.from("exercises")
+    .select("id, name, is_global").or(`gym_id.eq.${gymId},is_global.eq.true`);
   const byName = new Map<string, string>();
-  (existing || []).forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
+  (existing || []).filter((e: { is_global: boolean }) => !e.is_global)
+    .forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
+  (existing || []).filter((e: { is_global: boolean }) => e.is_global)
+    .forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id)); // pisa: preferimos librería
 
   const wanted = new Set<string>();
   days.forEach((d) => (d.blocks || []).forEach((b) => (b.rows || []).forEach((r) => {
@@ -128,7 +134,7 @@ export async function saveRoutine(
   const toCreate = [...wanted].filter((n) => !byName.has(norm(n)));
   if (toCreate.length) {
     const { data: created } = await admin
-      .from("exercises").insert(toCreate.map((name) => ({ gym_id: gymId, name }))).select("id, name");
+      .from("exercises").insert(toCreate.map((name) => ({ gym_id: gymId, name, source: "ia" }))).select("id, name");
     (created || []).forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
   }
 
