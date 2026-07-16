@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { loadPlans, type PlanConfig } from "@/lib/plans";
 import {
@@ -55,13 +55,37 @@ export default function AdminDashboard() {
   const [showArchived, setShowArchived] = useState(false);
   const [seedBusy, setSeedBusy] = useState(false);
   const [seedMsg, setSeedMsg] = useState("");
+  const seedOffset = useRef(0);
 
+  // Carga TODA la librería en tandas (traduce con IA). Es reanudable: si se corta,
+  // volver a tocar el botón sigue desde donde quedó (el upsert no duplica).
   async function seedEjercicios() {
-    setSeedBusy(true); setSeedMsg("");
-    const r = await fetch("/api/admin/exercises/seed", { method: "POST" }).then((x) => x.json()).catch(() => null);
+    setSeedBusy(true);
+    let offset = seedOffset.current;
+    let total = 0, done = false, guard = 0;
+    try {
+      while (!done && guard < 400) {
+        guard++;
+        const r = await fetch("/api/admin/exercises/seed", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ offset, limit: 20 }),
+        }).then((x) => x.json());
+        if (!r?.ok) {
+          seedOffset.current = offset;
+          setSeedMsg(`Se pausó en ${offset}${total ? `/${total}` : ""}. Tocá de nuevo para continuar. ${r?.error ? `(${r.error})` : ""}`);
+          setSeedBusy(false);
+          return;
+        }
+        total = r.total; offset = r.nextOffset; done = r.done;
+        seedOffset.current = done ? 0 : offset;
+        setSeedMsg(`Cargando y traduciendo… ${Math.min(offset, total)} / ${total}`);
+      }
+      setSeedMsg(`✓ Librería cargada: ${total} ejercicios en español.`);
+    } catch {
+      seedOffset.current = offset;
+      setSeedMsg(`Se cortó en ${offset}${total ? `/${total}` : ""}. Tocá de nuevo para continuar desde ahí.`);
+    }
     setSeedBusy(false);
-    if (r?.ok) setSeedMsg(`✓ Librería actualizada: ${r.cargados} ejercicios cargados${r.sin_match?.length ? ` (${r.sin_match.length} sin match)` : ""}.`);
-    else setSeedMsg(r?.error || "No se pudo cargar la librería.");
   }
 
   const activeGyms = useMemo(() => gyms.filter((g) => !g.archived), [gyms]);
@@ -370,12 +394,14 @@ export default function AdminDashboard() {
             </p>
           </div>
           <button className="btn btn-primary shrink-0" disabled={seedBusy} onClick={seedEjercicios}>
-            {seedBusy ? "Cargando…" : "Cargar / actualizar librería"}
+            {seedBusy ? "Cargando…" : "Cargar / actualizar librería (800+)"}
           </button>
         </div>
         {seedMsg && <p className="mt-3 text-sm text-brand">{seedMsg}</p>}
         <p className="mt-2 text-[11px] text-muted">
-          Baja la base pública (dominio público) desde el servidor y carga el set curado. Es idempotente: podés tocarlo las veces que quieras.
+          Baja la base pública (dominio público) y carga TODOS los ejercicios con foto, traduciendo nombres e
+          instrucciones al español con IA (usa tu ANTHROPIC_API_KEY). Tarda unos minutos y va mostrando el progreso;
+          es reanudable e idempotente (no duplica). No cierres esta pestaña mientras corre.
         </p>
       </div>
 

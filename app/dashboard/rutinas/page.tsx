@@ -48,6 +48,8 @@ export default function RutinasPage() {
   const [edit, setEdit] = useState<EditRoutine | null>(null);
   const [saving, setSaving] = useState(false);
   const [libOpen, setLibOpen] = useState(false);
+  const [picking, setPicking] = useState<{ di: number; bi: number; ri: number } | null>(null);
+  const [pickSearch, setPickSearch] = useState("");
   const [newEx, setNewEx] = useState("");
   const [applyMember, setApplyMember] = useState("");
   const [applyMsg, setApplyMsg] = useState("");
@@ -89,6 +91,11 @@ export default function RutinasPage() {
     exercises.forEach((e) => { if (e.image_url) m[e.id] = e.image_url; });
     return m;
   }, [exercises]);
+  const pickResults = useMemo(() => {
+    const q = pickSearch.trim().toLowerCase();
+    const all = q ? exercises.filter((x) => x.name.toLowerCase().includes(q)) : exercises;
+    return { list: all.slice(0, 60), count: all.length };
+  }, [exercises, pickSearch]);
 
   // Agrupa routine_exercises en días y, dentro de cada día, en bloques (por
   // block_name) preservando el orden en que aparecen.
@@ -399,11 +406,12 @@ export default function RutinasPage() {
                               ) : (
                                 <div className="grid h-[34px] w-[34px] place-items-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-muted">—</div>
                               )}
-                              <select className="sel" value={row.exercise_id || ""}
-                                onChange={(e) => setRow(di, bi, ri, "exercise_id", e.target.value)}>
-                                <option value="">— Ejercicio —</option>
-                                {exercises.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                              </select>
+                              <button type="button" onClick={() => { setPicking({ di, bi, ri }); setPickSearch(""); }}
+                                className="input flex items-center truncate text-left text-sm">
+                                <span className={`truncate ${row.exercise_id ? "" : "text-muted"}`}>
+                                  {row.exercise_id ? (exMap[row.exercise_id] || "Ejercicio") : "— Buscar ejercicio —"}
+                                </span>
+                              </button>
                               <input className="input" placeholder="Series" value={row.sets || ""}
                                 onChange={(e) => setRow(di, bi, ri, "sets", e.target.value)} />
                               <input className="input" placeholder="Reps" value={row.reps || ""}
@@ -475,6 +483,46 @@ export default function RutinasPage() {
             </div>
             <div className="mt-4 flex justify-end">
               <button className="btn btn-ghost" onClick={() => setLibOpen(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Buscador de ejercicios (para la librería de 800+) */}
+      {picking && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-14" onClick={() => setPicking(null)}>
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-bg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 border-b border-white/10 p-3">
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+              <input autoFocus className="input" placeholder="Buscar ejercicio (ej: sentadilla, press, bíceps)…"
+                value={pickSearch} onChange={(e) => setPickSearch(e.target.value)} />
+              <button className="shrink-0 px-2 text-muted hover:text-ink" onClick={() => setPicking(null)}>✕</button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              {pickResults.list.length === 0 ? (
+                <p className="p-6 text-center text-sm text-ink-2">Sin resultados.</p>
+              ) : (
+                <ul className="divide-y divide-white/5">
+                  {pickResults.list.map((x) => (
+                    <li key={x.id}>
+                      <button className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5"
+                        onClick={() => { setRow(picking.di, picking.bi, picking.ri, "exercise_id", x.id); setPicking(null); }}>
+                        {x.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={x.image_url} alt="" className="h-9 w-9 shrink-0 rounded-md border border-white/10 object-cover" />
+                        ) : (
+                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-muted">—</div>
+                        )}
+                        <span className="min-w-0 truncate text-sm">{x.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="border-t border-white/10 p-2 text-center text-[11px] text-muted">
+              {pickResults.count === 0 ? "Cargá la librería desde el panel de admin." :
+                `${pickResults.list.length} mostrados${pickResults.count > pickResults.list.length ? ` de ${pickResults.count} · afiná la búsqueda` : ""}`}
             </div>
           </div>
         </div>
