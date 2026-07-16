@@ -156,6 +156,8 @@ export default function MiPlanPage() {
   }
 
   const st = sub ? SUB_STATUS_LABEL[sub.status] : null;
+  // El plan más barato lleva la frase de valor ("por lo que sale un abono…").
+  const cheapestKey = plans.length ? [...plans].sort((a, b) => (a.promo_price ?? a.price) - (b.promo_price ?? b.price))[0].key : null;
   const vence = sub ? (sub.status === "trial" ? sub.trial_ends_at : sub.current_period_end) : null;
 
   return (
@@ -280,6 +282,13 @@ export default function MiPlanPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Frase de valor en el plan más económico */}
+                  {p.key === cheapestKey && (
+                    <div className="mb-3 rounded-lg border border-good/30 bg-[rgba(34,197,94,.08)] px-3 py-2 text-xs font-semibold leading-snug text-good">
+                      💡 Por lo que te sale el abono de <b>un solo socio</b>, tenés todo el sistema profesional para sumar clientes y fidelizarlos.
+                    </div>
+                  )}
 
                   {/* Cartel de IA */}
                   {hasIA && (

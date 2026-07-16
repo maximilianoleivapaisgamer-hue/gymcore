@@ -16,17 +16,17 @@ function origin() { return (process.env.NEXT_PUBLIC_APP_URL || "https://turnogym
 function messageFor(info: AccInfo): string {
   const o = origin();
   const lines = [
-    "¡Hola! Te dejo tu gimnasio ya armado en turnogym 💪",
+    "Y acá tenés todo para tocarlo vos 👇",
     "",
     `🌐 Tu web: ${o}/${info.slug}`,
     "",
     `🖥️ Panel de gestión (para vos): ${o}${info.owner.url}`,
-    `Usuario y contraseña: ${info.owner.user}`,
+    `   Usuario y contraseña: ${info.owner.user}`,
   ];
   if (info.socio) {
-    lines.push("", `📲 App para tus socios: ${o}${info.socio.url}`, `Usuario y contraseña: ${info.socio.user}`);
+    lines.push("", `📲 App para tus socios: ${o}${info.socio.url}`, `   Usuario y contraseña: ${info.socio.user}`);
   }
-  lines.push("", "Entrá, probalo y cualquier duda me escribís. ¡Que lo disfrutes!");
+  lines.push("", "Entrá, jugá un poco y decime qué te parece 🙌");
   return lines.join("\n");
 }
 
