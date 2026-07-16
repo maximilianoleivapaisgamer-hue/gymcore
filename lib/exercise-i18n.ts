@@ -34,3 +34,10 @@ export const equipEs = (e: string | null | undefined) => (e ? EQUIP_ES[e.toLower
 export const levelEs = (l: string | null | undefined) => (l ? LEVEL_ES[l.toLowerCase()] || l : null);
 export const categoryEs = (c: string | null | undefined) => (c ? CATEGORY_ES[c.toLowerCase()] || c : null);
 export const musclesEs = (arr: string[] | null | undefined) => (arr || []).map(muscleEs);
+
+/** Normaliza el nombre de un ejercicio: recortado y con la primera letra en
+ * mayúscula (para que todos queden consistentes al cargarlos). */
+export function capExercise(s: string): string {
+  const t = (s || "").trim();
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+}

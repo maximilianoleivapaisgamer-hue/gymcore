@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { generateJSON } from "@/lib/ai/anthropic";
 import { ENTRENADOR_SKILL } from "@/lib/ai/skills/entrenador";
+import { capExercise } from "@/lib/exercise-i18n";
 
 /**
  * Entrenador IA: genera una rutina completa para un socio y la guarda asignada
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
   let body: {
     gymId?: string; memberId?: string;
     objetivo?: string; nivel?: string; dias?: number;
-    equipamiento?: string; comentarios?: string;
+    equipamiento?: string; comentarios?: string; soloLibreria?: boolean;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
 
@@ -103,12 +104,20 @@ export async function POST(req: Request) {
   const { data: lib } = await admin
     .from("exercises").select("name").eq("is_global", true).limit(1000);
   const libNames = (lib || []).map((e: { name: string }) => e.name);
+  // "Solo librería": únicamente ejercicios con demostración. Solo tiene sentido
+  // si la librería ya está cargada.
+  const soloLibreria = !!body.soloLibreria && libNames.length > 0;
   const libBlock = libNames.length
-    ? [
-        `Librería de ejercicios disponibles (tienen demostración en la app; USALOS con el nombre EXACTO siempre que sirvan):`,
-        libNames.join(" · "),
-        `Si necesitás un ejercicio que no está en la lista, podés usarlo igual (se agrega sin demostración).`,
-      ].join("\n")
+    ? (soloLibreria
+        ? [
+            `IMPORTANTE: Usá ÚNICAMENTE ejercicios de esta lista, con el nombre EXACTO. NO inventes ni uses ninguno que no esté acá. Si falta algo, reemplazalo por el más parecido de la lista:`,
+            libNames.join(" · "),
+          ].join("\n")
+        : [
+            `Librería de ejercicios disponibles (tienen demostración en la app; USALOS con el nombre EXACTO siempre que sirvan):`,
+            libNames.join(" · "),
+            `Si necesitás un ejercicio que no está en la lista, podés usarlo igual (se agrega sin demostración).`,
+          ].join("\n"))
     : "";
 
   const prompt = [
@@ -143,28 +152,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "La IA no generó ejercicios. Probá de nuevo." }, { status: 502 });
   }
 
-  // --- Mapear contra la biblioteca del gimnasio Y la librería global (preferimos
-  // la librería, que tiene demostración); crear los que falten como creados por IA.
+  // --- Mapear ejercicios. En modo "solo librería" SOLO se linkean ejercicios de
+  // la librería global (los que no matchean se descartan, no se crean). En modo
+  // normal se prefiere la librería y se crean los faltantes como creados por IA.
   const { data: existing } = await admin
     .from("exercises").select("id, name, is_global").or(`gym_id.eq.${gymId},is_global.eq.true`);
   const byName = new Map<string, string>();
-  (existing || []).filter((e: { is_global: boolean }) => !e.is_global)
-    .forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
-  (existing || []).filter((e: { is_global: boolean }) => e.is_global)
-    .forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id)); // pisa: preferimos librería
+  if (soloLibreria) {
+    (existing || []).filter((e: { is_global: boolean }) => e.is_global)
+      .forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
+  } else {
+    (existing || []).filter((e: { is_global: boolean }) => !e.is_global)
+      .forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
+    (existing || []).filter((e: { is_global: boolean }) => e.is_global)
+      .forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id)); // pisa: preferimos librería
 
-  const wantedNames = new Set<string>();
-  days.forEach((d) => (d.blocks || []).forEach((b) => (b.rows || []).forEach((r) => {
-    if (r.exercise && r.exercise.trim()) wantedNames.add(r.exercise.trim());
-  })));
-
-  const toCreate = [...wantedNames].filter((n) => !byName.has(norm(n)));
-  if (toCreate.length) {
-    const { data: created } = await admin
-      .from("exercises")
-      .insert(toCreate.map((name) => ({ gym_id: gymId, name, source: "ia" })))
-      .select("id, name");
-    (created || []).forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
+    const wantedNames = new Set<string>();
+    days.forEach((d) => (d.blocks || []).forEach((b) => (b.rows || []).forEach((r) => {
+      if (r.exercise && r.exercise.trim()) wantedNames.add(r.exercise.trim());
+    })));
+    const toCreate = [...wantedNames].filter((n) => !byName.has(norm(n)));
+    if (toCreate.length) {
+      const { data: created } = await admin
+        .from("exercises")
+        .insert(toCreate.map((name) => ({ gym_id: gymId, name: capExercise(name), source: "ia" })))
+        .select("id, name");
+      (created || []).forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
+    }
   }
 
   // --- Crear la rutina asignada al socio.

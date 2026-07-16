@@ -39,33 +39,36 @@ const MEMBERS: SeedMember[] = [
   { full_name: "Bruno Castro", dni: "26000111", plan: "Trimestral", price: 60000, wa: "5491133330010", exp: -1 },
 ];
 
+// IMPORTANTE: los nombres coinciden EXACTO con ejercicios de la librería global
+// (los 8 que siempre están cargados) para que las rutinas del demo salgan 100%
+// con demostración animada, y el prospecto pueda ver "cómo se hace".
 const ROUTINE_A: AIRoutine = {
   name: "Full Body 3 días",
   resumen: "Rutina de cuerpo completo 3 veces por semana. Subí el peso cuando llegues al tope de reps con buena técnica.",
   days: [
     { name: "Día 1 — Full A", blocks: [
-      { name: "A — Fuerza", rows: [{ exercise: "Sentadilla", sets: "4", reps: "8-10" }, { exercise: "Press de banca", sets: "4", reps: "8-10" }] },
-      { name: "B — Accesorios", rows: [{ exercise: "Remo con barra", sets: "3", reps: "10-12" }, { exercise: "Plancha abdominal", sets: "3", reps: "40 seg" }] },
+      { name: "A — Fuerza", rows: [{ exercise: "Sentadilla con barra", sets: "4", reps: "8-10" }, { exercise: "Press de banca", sets: "4", reps: "8-10" }] },
+      { name: "B — Accesorios", rows: [{ exercise: "Remo con barra", sets: "3", reps: "10-12" }, { exercise: "Curl martillo alternado", sets: "3", reps: "12" }] },
     ] },
     { name: "Día 2 — Full B", blocks: [
-      { name: "A — Fuerza", rows: [{ exercise: "Peso muerto", sets: "4", reps: "6-8" }, { exercise: "Press militar", sets: "4", reps: "8-10" }] },
-      { name: "B — Accesorios", rows: [{ exercise: "Dominadas asistidas", sets: "3", reps: "8-10" }, { exercise: "Curl de bíceps", sets: "3", reps: "12" }] },
+      { name: "A — Fuerza", rows: [{ exercise: "Peso muerto", sets: "4", reps: "6-8" }, { exercise: "Press Arnold", sets: "4", reps: "8-10" }] },
+      { name: "B — Accesorios", rows: [{ exercise: "Estocada con barra", sets: "3", reps: "12 x pierna" }, { exercise: "Press inclinado con barra", sets: "3", reps: "10-12" }] },
     ] },
     { name: "Día 3 — Full C", blocks: [
-      { name: "A — Piernas", rows: [{ exercise: "Prensa 45°", sets: "4", reps: "10-12" }, { exercise: "Zancadas", sets: "3", reps: "12 x pierna" }] },
-      { name: "B — Core", rows: [{ exercise: "Elevación de piernas", sets: "3", reps: "15" }] },
+      { name: "A — Empuje/Tirón", rows: [{ exercise: "Press de banca", sets: "4", reps: "8" }, { exercise: "Remo con barra", sets: "4", reps: "10" }] },
+      { name: "B — Piernas", rows: [{ exercise: "Sentadilla con barra", sets: "3", reps: "12" }, { exercise: "Estocada con barra", sets: "3", reps: "12 x pierna" }] },
     ] },
   ],
 };
 
 const ROUTINE_B: AIRoutine = {
   name: "Hipertrofia 4 días",
-  resumen: "Split de 4 días (empuje / tirón / pierna / full). Enfocado en volumen muscular. Descansá 60-90s entre series.",
+  resumen: "Split de 4 días enfocado en volumen muscular. Descansá 60-90s entre series.",
   days: [
-    { name: "Día 1 — Empuje", blocks: [{ name: "Pecho y hombro", rows: [{ exercise: "Press inclinado", sets: "4", reps: "8-12" }, { exercise: "Aperturas", sets: "3", reps: "12-15" }, { exercise: "Elevaciones laterales", sets: "4", reps: "15" }] }] },
-    { name: "Día 2 — Tirón", blocks: [{ name: "Espalda", rows: [{ exercise: "Jalón al pecho", sets: "4", reps: "10-12" }, { exercise: "Remo en polea", sets: "4", reps: "12" }, { exercise: "Curl de bíceps", sets: "3", reps: "12" }] }] },
-    { name: "Día 3 — Pierna", blocks: [{ name: "Tren inferior", rows: [{ exercise: "Sentadilla", sets: "4", reps: "8-10" }, { exercise: "Prensa 45°", sets: "4", reps: "12" }, { exercise: "Femoral acostado", sets: "3", reps: "12-15" }] }] },
-    { name: "Día 4 — Full", blocks: [{ name: "Cuerpo completo", rows: [{ exercise: "Peso muerto", sets: "3", reps: "6-8" }, { exercise: "Press militar", sets: "3", reps: "10" }, { exercise: "Plancha abdominal", sets: "3", reps: "45 seg" }] }] },
+    { name: "Día 1 — Empuje", blocks: [{ name: "Pecho y hombro", rows: [{ exercise: "Press de banca", sets: "4", reps: "8-12" }, { exercise: "Press inclinado con barra", sets: "3", reps: "10-12" }, { exercise: "Press Arnold", sets: "4", reps: "12-15" }] }] },
+    { name: "Día 2 — Tirón", blocks: [{ name: "Espalda y bíceps", rows: [{ exercise: "Peso muerto", sets: "4", reps: "6-8" }, { exercise: "Remo con barra", sets: "4", reps: "10-12" }, { exercise: "Curl martillo alternado", sets: "3", reps: "12-15" }] }] },
+    { name: "Día 3 — Pierna", blocks: [{ name: "Tren inferior", rows: [{ exercise: "Sentadilla con barra", sets: "4", reps: "8-10" }, { exercise: "Estocada con barra", sets: "3", reps: "12 x pierna" }, { exercise: "Peso muerto", sets: "3", reps: "8" }] }] },
+    { name: "Día 4 — Full", blocks: [{ name: "Cuerpo completo", rows: [{ exercise: "Sentadilla con barra", sets: "3", reps: "8" }, { exercise: "Press de banca", sets: "3", reps: "10" }, { exercise: "Remo con barra", sets: "3", reps: "12" }] }] },
   ],
 };
 

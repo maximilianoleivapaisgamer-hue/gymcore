@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import AiChat from "@/components/AiChat";
 import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
+import { capExercise } from "@/lib/exercise-i18n";
 
 interface Exercise { id: string; name: string; notes: string | null; image_url?: string | null; is_global?: boolean; source?: string; }
 interface Member { id: string; full_name: string; }
@@ -171,10 +172,10 @@ export default function RutinasPage() {
   }
 
   async function addExercise() {
-    const name = newEx.trim();
+    const name = capExercise(newEx);
     if (!name || !gymId) return;
     const { data } = await supabase.from("exercises")
-      .insert({ gym_id: gymId, name }).select("id, name, notes").single();
+      .insert({ gym_id: gymId, name, source: "manual" }).select("id, name, notes").single();
     if (data) setExercises((xs) => [...xs, data as Exercise].sort((a, b) => a.name.localeCompare(b.name)));
     setNewEx("");
   }

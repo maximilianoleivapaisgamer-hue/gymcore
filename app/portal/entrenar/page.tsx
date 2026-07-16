@@ -20,6 +20,13 @@ interface RExercise {
 interface Routine { id: string; name: string | null; routine_exercises: RExercise[]; }
 interface Session { id: string; day_number: number; date: string; completed_at: string | null }
 
+/** Formatea segundos a mm:ss (o h:mm:ss si pasa la hora). */
+function fmtTime(s: number): string {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const mm = String(m).padStart(2, "0"), ss = String(sec).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 export default function EntrenarPage() {
   const supabase = createClient();
   const [state, setState] = useState<"loading" | "nomember" | "noroutine" | "ok">("loading");
@@ -31,10 +38,21 @@ export default function EntrenarPage() {
   const [starting, setStarting] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [openDemo, setOpenDemo] = useState<Set<string>>(new Set());
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
 
   function toggleDemo(id: string) {
     setOpenDemo((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
+
+  // Cronómetro: corre mientras la sesión está activa y sin finalizar.
+  useEffect(() => {
+    if (!session || session.completed_at || startedAt == null) return;
+    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [session, startedAt]);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -87,7 +105,7 @@ export default function EntrenarPage() {
       day_number: dayNumber, date: new Date().toISOString().slice(0, 10),
     }).select("id, day_number, date, completed_at").single<Session>();
     setStarting(false);
-    if (!error && data) { setSession(data); setChecked(new Set()); }
+    if (!error && data) { setSession(data); setChecked(new Set()); setStartedAt(Date.now()); setElapsed(0); }
   }
 
   async function toggleExercise(reId: string) {
@@ -112,7 +130,7 @@ export default function EntrenarPage() {
   }
 
   function trainAgain() {
-    setSession(null); setChecked(new Set()); setDayNumber(null);
+    setSession(null); setChecked(new Set()); setDayNumber(null); setStartedAt(null); setElapsed(0);
   }
 
   if (state === "loading") return <main className="grid min-h-screen place-items-center text-ink-2">Cargando…</main>;
@@ -168,6 +186,15 @@ export default function EntrenarPage() {
                 <div className="text-2xl font-black text-brand">{checked.size}/{allExerciseIds.length}</div>
                 <div className="text-xs text-muted">ejercicios</div>
               </div>
+            </div>
+            <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-surface-2 py-3">
+              <span className="text-xl" aria-hidden>⏱️</span>
+              <span className="font-mono text-3xl font-black tabular-nums tracking-wider">{fmtTime(elapsed)}</span>
+              {session.completed_at ? (
+                <span className="ml-1 text-xs font-semibold text-good">· tiempo final</span>
+              ) : (
+                <span className="ml-1 text-xs text-muted">en curso</span>
+              )}
             </div>
           </div>
 

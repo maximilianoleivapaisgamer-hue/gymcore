@@ -13,7 +13,8 @@ interface Member {
   plan_name: string | null; plan_price: number | null; membership_expiry: string | null;
   height_cm: number | null;
 }
-interface RExercise { day_number: number; block_name: string | null; position: number; sets: string | null; reps: string | null; notes: string | null; exercises: { name: string } | null; }
+interface ExerciseInfo { name: string; image_url: string | null; image_url_end: string | null; instructions: string[] | null; primary_muscles: string[] | null; equipment: string | null; }
+interface RExercise { id: string; day_number: number; block_name: string | null; position: number; sets: string | null; reps: string | null; notes: string | null; exercises: ExerciseInfo | null; }
 interface Routine { id: string; name: string | null; routine_exercises: RExercise[]; }
 interface MyBooking { id: string; class_id: string; class_date: string; classes: { name: string; start_time: string | null; instructor: string | null } | null; }
 interface Klass { id: string; name: string; instructor: string | null; weekdays: string[]; start_time: string | null; duration: number | null; capacity: number | null; color: string | null; }
@@ -63,6 +64,7 @@ export default function PortalPage() {
   const [member, setMember] = useState<Member | null>(null);
   const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string } | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
+  const [openDemo, setOpenDemo] = useState<Set<string>>(new Set());
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
   const [classes, setClasses] = useState<Klass[]>([]);
   const [allBookings, setAllBookings] = useState<BookingLite[]>([]);
@@ -88,7 +90,7 @@ export default function PortalPage() {
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
       supabase.from("gyms").select("name, logo_url, whatsapp, theme, bg_style").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string }>(),
-      supabase.from("routines").select("id, name, routine_exercises(day_number, block_name, position, sets, reps, notes, exercises(name))")
+      supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
         .eq("member_id", m.id).gte("class_date", iso0).order("class_date"),
@@ -348,7 +350,7 @@ export default function PortalPage() {
           </div>
 
           {/* Al final de "Mi perfil": recomendación de bajar la webapp */}
-          <InstallAppButton appName={gym?.name || undefined} />
+          <InstallAppButton />
         </div>
       )}
 
@@ -387,17 +389,57 @@ export default function PortalPage() {
                         <div className="mb-2 text-xs font-bold uppercase tracking-wide text-brand">{block.name}</div>
                       )}
                       <div className="flex flex-col divide-y divide-white/5">
-                        {block.rows.map((re, j) => (
-                          <div key={j} className="flex items-start justify-between gap-4 py-2.5">
-                            <div className="min-w-0">
-                              <div className="text-[15px] font-medium leading-snug">{re.exercises?.name || "Ejercicio"}</div>
-                              {re.notes && <div className="mt-0.5 text-xs text-muted">{re.notes}</div>}
+                        {block.rows.map((re, j) => {
+                          const ex = re.exercises;
+                          const hasDemo = !!ex?.image_url;
+                          const open = openDemo.has(re.id);
+                          return (
+                            <div key={re.id || j} className="py-2.5">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                  <div className="text-[15px] font-medium leading-snug">{ex?.name || "Ejercicio"}</div>
+                                  {re.notes && <div className="mt-0.5 text-xs text-muted">{re.notes}</div>}
+                                  {hasDemo && (
+                                    <button
+                                      onClick={() => setOpenDemo((s) => { const n = new Set(s); n.has(re.id) ? n.delete(re.id) : n.add(re.id); return n; })}
+                                      className="mt-1 text-xs font-semibold text-brand hover:underline">
+                                      {open ? "Ocultar demostración" : "▸ Ver cómo se hace"}
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="shrink-0 whitespace-nowrap text-sm font-semibold text-ink-2">
+                                  {re.sets || "-"} × {re.reps || "-"}
+                                </div>
+                              </div>
+
+                              {open && hasDemo && (
+                                <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-surface-2">
+                                  <div className="tg-exanim" style={{ aspectRatio: "4 / 3" }}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={ex!.image_url!} alt={ex!.name} />
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img className="tg-end" src={ex!.image_url_end || ex!.image_url!} alt="" />
+                                  </div>
+                                  <div className="p-3">
+                                    {((ex!.primary_muscles?.length ?? 0) > 0 || ex!.equipment) && (
+                                      <div className="mb-2 flex flex-wrap gap-1.5">
+                                        {(ex!.primary_muscles || []).map((m, i) => (
+                                          <span key={i} className="rounded-full border border-brand/30 bg-[rgba(34,211,238,.1)] px-2 py-0.5 text-[11px] font-semibold text-brand">{m}</span>
+                                        ))}
+                                        {ex!.equipment && <span className="rounded-full border border-white/10 bg-surface px-2 py-0.5 text-[11px] text-ink-2">{ex!.equipment}</span>}
+                                      </div>
+                                    )}
+                                    {(ex!.instructions?.length ?? 0) > 0 && (
+                                      <ol className="list-decimal space-y-1 pl-4 text-xs text-ink-2">
+                                        {ex!.instructions!.map((s, i) => <li key={i}>{s}</li>)}
+                                      </ol>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <div className="shrink-0 whitespace-nowrap text-sm font-semibold text-ink-2">
-                              {re.sets || "-"} × {re.reps || "-"}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

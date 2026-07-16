@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { allows, loadPlans, type PlanFeature } from "@/lib/plans";
+import { capExercise } from "@/lib/exercise-i18n";
 
 /** ¿El plan del gimnasio habilita esta función? (chequeo del lado del servidor). */
 export async function gymHasFeature(
@@ -134,7 +135,7 @@ export async function saveRoutine(
   const toCreate = [...wanted].filter((n) => !byName.has(norm(n)));
   if (toCreate.length) {
     const { data: created } = await admin
-      .from("exercises").insert(toCreate.map((name) => ({ gym_id: gymId, name, source: "ia" }))).select("id, name");
+      .from("exercises").insert(toCreate.map((name) => ({ gym_id: gymId, name: capExercise(name), source: "ia" }))).select("id, name");
     (created || []).forEach((e: { id: string; name: string }) => byName.set(norm(e.name), e.id));
   }
 

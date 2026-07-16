@@ -37,6 +37,7 @@ export default function AiGenerate({
   // Rutina
   const [nivel, setNivel] = useState("principiante");
   const [equipamiento, setEquipamiento] = useState("gimnasio completo");
+  const [soloLibreria, setSoloLibreria] = useState(false);
 
   // Dieta
   const [calorias, setCalorias] = useState<string>("");
@@ -53,7 +54,7 @@ export default function AiGenerate({
     setLoading(true); setErr(""); setOk("");
 
     const payload = esRutina
-      ? { gymId, memberId, objetivo, nivel, dias, equipamiento, comentarios }
+      ? { gymId, memberId, objetivo, nivel, dias, equipamiento, comentarios, soloLibreria }
       : { gymId, memberId, objetivo, calorias: Number(calorias) || 0, comidas, dias, restricciones, comentarios };
 
     try {
@@ -147,6 +148,14 @@ export default function AiGenerate({
                   <label className="col-span-2 block">
                     <span className="mb-1 block text-xs font-semibold text-ink-2">Equipamiento</span>
                     <input className="input w-full" placeholder="Ej: gimnasio completo / en casa con mancuernas" value={equipamiento} onChange={(e) => setEquipamiento(e.target.value)} />
+                  </label>
+                  <label className="col-span-2 flex items-start gap-2.5 rounded-lg border border-white/10 bg-surface-2 p-3">
+                    <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" style={{ accentColor: "#22d3ee" }}
+                      checked={soloLibreria} onChange={(e) => setSoloLibreria(e.target.checked)} />
+                    <span className="text-sm">
+                      <b>Usar solo ejercicios de la librería</b> 🎞️
+                      <span className="block text-xs text-ink-2">La rutina sale 100% con ejercicios que tienen demostración animada. Si lo dejás destildado, la IA usa la librería cuando puede y agrega otros si hace falta.</span>
+                    </span>
                   </label>
                 </div>
               ) : (
