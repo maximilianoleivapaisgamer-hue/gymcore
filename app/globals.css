@@ -54,6 +54,14 @@ body {
 }
 .sel option { color: #0a0d12; }
 
+/* Demostración animada del ejercicio (librería): alterna foto de inicio y fin
+   con un fundido gradual (sin zoom) → efecto tipo GIF con fotos de dominio público. */
+.tg-exanim{position:relative;overflow:hidden;background:#000}
+.tg-exanim img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tg-exanim .tg-end{animation:tgExFade 3.4s ease-in-out infinite}
+@keyframes tgExFade{0%,10%{opacity:0}45%,55%{opacity:1}90%,100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){ .tg-exanim .tg-end{opacity:1;animation:none} }
+
 /* ── Fondo de la app (se tiñe con el color del gimnasio) ────────────────────
    Capa fija a pantalla completa, detrás de todo el contenido. */
 .app-bg {

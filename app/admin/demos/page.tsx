@@ -10,7 +10,9 @@ interface DemoGym { id: string; name: string; slug: string; created_at: string |
 interface ImgData { mediaType: string; data: string; name: string; }
 interface AccInfo { slug: string; name: string; owner: { user: string; url: string }; socio: { name: string; user: string; url: string } | null; }
 
-function origin() { return typeof window !== "undefined" ? window.location.origin : "https://turnogym.com"; }
+// Dominio público del negocio: los links que se envían a los clientes deben ser
+// SIEMPRE tu dominio, no la URL de Vercel donde tengas abierto el panel.
+function origin() { return (process.env.NEXT_PUBLIC_APP_URL || "https://turnogym.com").replace(/\/$/, ""); }
 function messageFor(info: AccInfo): string {
   const o = origin();
   const lines = [

@@ -53,6 +53,16 @@ export default function AdminDashboard() {
   const [q, setQ] = useState("");
   const [busyGym, setBusyGym] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [seedBusy, setSeedBusy] = useState(false);
+  const [seedMsg, setSeedMsg] = useState("");
+
+  async function seedEjercicios() {
+    setSeedBusy(true); setSeedMsg("");
+    const r = await fetch("/api/admin/exercises/seed", { method: "POST" }).then((x) => x.json()).catch(() => null);
+    setSeedBusy(false);
+    if (r?.ok) setSeedMsg(`✓ Librería actualizada: ${r.cargados} ejercicios cargados${r.sin_match?.length ? ` (${r.sin_match.length} sin match)` : ""}.`);
+    else setSeedMsg(r?.error || "No se pudo cargar la librería.");
+  }
 
   const activeGyms = useMemo(() => gyms.filter((g) => !g.archived), [gyms]);
   const archivedGyms = useMemo(() => gyms.filter((g) => g.archived), [gyms]);
@@ -346,6 +356,26 @@ export default function AdminDashboard() {
         )}
         <p className="border-t border-white/10 px-4 py-3 text-[11px] text-muted">
           El método se marca solo en “Mercado Pago” cuando el dueño paga con débito automático. Los cobros que registrás a mano quedan como “Transferencia”.
+        </p>
+      </div>
+
+      {/* Librería de ejercicios */}
+      <div className="mt-6 card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">💪 Librería de ejercicios</h2>
+            <p className="mt-1 text-sm text-ink-2">
+              Ejercicios con demostración animada (foto inicio/fin) e instrucciones en español, compartidos con todos los
+              gimnasios. Aparecen al armar rutinas y el socio los ve en “cómo se hace”.
+            </p>
+          </div>
+          <button className="btn btn-primary shrink-0" disabled={seedBusy} onClick={seedEjercicios}>
+            {seedBusy ? "Cargando…" : "Cargar / actualizar librería"}
+          </button>
+        </div>
+        {seedMsg && <p className="mt-3 text-sm text-brand">{seedMsg}</p>}
+        <p className="mt-2 text-[11px] text-muted">
+          Baja la base pública (dominio público) desde el servidor y carga el set curado. Es idempotente: podés tocarlo las veces que quieras.
         </p>
       </div>
 

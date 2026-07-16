@@ -5,9 +5,17 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 
 interface MemberLite { id: string; gym_id: string; }
+interface ExerciseInfo {
+  name: string;
+  image_url: string | null;
+  image_url_end: string | null;
+  instructions: string[] | null;
+  primary_muscles: string[] | null;
+  equipment: string | null;
+}
 interface RExercise {
   id: string; day_number: number; block_name: string | null; position: number;
-  sets: string | null; reps: string | null; notes: string | null; exercises: { name: string } | null;
+  sets: string | null; reps: string | null; notes: string | null; exercises: ExerciseInfo | null;
 }
 interface Routine { id: string; name: string | null; routine_exercises: RExercise[]; }
 interface Session { id: string; day_number: number; date: string; completed_at: string | null }
@@ -22,6 +30,11 @@ export default function EntrenarPage() {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [starting, setStarting] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [openDemo, setOpenDemo] = useState<Set<string>>(new Set());
+
+  function toggleDemo(id: string) {
+    setOpenDemo((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -32,7 +45,7 @@ export default function EntrenarPage() {
     setMember(m);
     const { data: r } = await supabase
       .from("routines")
-      .select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name))")
+      .select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
       .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>();
     if (!r || r.routine_exercises.length === 0) { setState("noroutine"); return; }
     setRoutine(r);
@@ -164,18 +177,54 @@ export default function EntrenarPage() {
               <ul className="divide-y divide-white/5">
                 {block.rows.map((re) => {
                   const done = checked.has(re.id);
+                  const ex = re.exercises;
+                  const hasDemo = !!ex?.image_url;
+                  const open = openDemo.has(re.id);
                   return (
-                    <li key={re.id} className="flex items-center justify-between px-4 py-3">
-                      <div>
-                        <div className={`text-sm ${done ? "text-ink-2 line-through" : ""}`}>{re.exercises?.name || "Ejercicio"}</div>
-                        <div className="text-xs text-muted">{re.sets || "-"} × {re.reps || "-"} {re.notes ? `· ${re.notes}` : ""}</div>
+                    <li key={re.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className={`text-sm ${done ? "text-ink-2 line-through" : ""}`}>{ex?.name || "Ejercicio"}</div>
+                          <div className="text-xs text-muted">{re.sets || "-"} × {re.reps || "-"} {re.notes ? `· ${re.notes}` : ""}</div>
+                          {hasDemo && (
+                            <button onClick={() => toggleDemo(re.id)} className="mt-1 text-xs font-semibold text-brand hover:underline">
+                              {open ? "Ocultar demostración" : "▸ Ver cómo se hace"}
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border text-base transition ${done ? "border-good bg-[rgba(34,197,94,.14)] text-good" : "border-white/15 text-ink-2 hover:text-ink"}`}
+                          onClick={() => toggleExercise(re.id)}
+                        >
+                          ✓
+                        </button>
                       </div>
-                      <button
-                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border text-base transition ${done ? "border-good bg-[rgba(34,197,94,.14)] text-good" : "border-white/15 text-ink-2 hover:text-ink"}`}
-                        onClick={() => toggleExercise(re.id)}
-                      >
-                        ✓
-                      </button>
+
+                      {open && hasDemo && (
+                        <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-surface-2">
+                          <div className="tg-exanim" style={{ aspectRatio: "4 / 3" }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={ex!.image_url!} alt={ex!.name} />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="tg-end" src={ex!.image_url_end || ex!.image_url!} alt="" />
+                          </div>
+                          <div className="p-3">
+                            {((ex!.primary_muscles?.length ?? 0) > 0 || ex!.equipment) && (
+                              <div className="mb-2 flex flex-wrap gap-1.5">
+                                {(ex!.primary_muscles || []).map((m, i) => (
+                                  <span key={i} className="rounded-full border border-brand/30 bg-[rgba(34,211,238,.1)] px-2 py-0.5 text-[11px] font-semibold text-brand">{m}</span>
+                                ))}
+                                {ex!.equipment && <span className="rounded-full border border-white/10 bg-surface px-2 py-0.5 text-[11px] text-ink-2">{ex!.equipment}</span>}
+                              </div>
+                            )}
+                            {(ex!.instructions?.length ?? 0) > 0 && (
+                              <ol className="list-decimal space-y-1 pl-4 text-xs text-ink-2">
+                                {ex!.instructions!.map((s, i) => <li key={i}>{s}</li>)}
+                              </ol>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </li>
                   );
                 })}

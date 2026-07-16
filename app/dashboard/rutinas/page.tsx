@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase-browser";
 import AiChat from "@/components/AiChat";
 import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
 
-interface Exercise { id: string; name: string; notes: string | null; }
+interface Exercise { id: string; name: string; notes: string | null; image_url?: string | null; }
 interface Member { id: string; full_name: string; }
 interface RExercise {
   id?: string; exercise_id: string | null; day_number: number;
@@ -68,7 +68,7 @@ export default function RutinasPage() {
       setPlans(await loadPlans(supabase));
     }
     const [{ data: ex }, { data: mem }, { data: rout }] = await Promise.all([
-      supabase.from("exercises").select("id, name, notes").order("name"),
+      supabase.from("exercises").select("id, name, notes, image_url").order("name"),
       supabase.from("members").select("id, full_name").order("full_name"),
       supabase.from("routines").select("*, routine_exercises(*)").order("created_at", { ascending: false }),
     ]);
@@ -82,6 +82,11 @@ export default function RutinasPage() {
   const exMap = useMemo(() => {
     const m: Record<string, string> = {};
     exercises.forEach((e) => (m[e.id] = e.name));
+    return m;
+  }, [exercises]);
+  const exImg = useMemo(() => {
+    const m: Record<string, string> = {};
+    exercises.forEach((e) => { if (e.image_url) m[e.id] = e.image_url; });
     return m;
   }, [exercises]);
 
@@ -387,8 +392,14 @@ export default function RutinasPage() {
 
                         <div className="space-y-2">
                           {block.rows.map((row, ri) => (
-                            <div key={ri} className="grid grid-cols-[1fr_70px_70px_1fr_28px] items-center gap-2">
-                              <select className="input" value={row.exercise_id || ""}
+                            <div key={ri} className="grid grid-cols-[34px_1fr_70px_70px_1fr_28px] items-center gap-2">
+                              {row.exercise_id && exImg[row.exercise_id] ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={exImg[row.exercise_id]} alt="" className="h-[34px] w-[34px] rounded-md border border-white/10 object-cover" title="Este ejercicio tiene demostración" />
+                              ) : (
+                                <div className="grid h-[34px] w-[34px] place-items-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-muted">—</div>
+                              )}
+                              <select className="sel" value={row.exercise_id || ""}
                                 onChange={(e) => setRow(di, bi, ri, "exercise_id", e.target.value)}>
                                 <option value="">— Ejercicio —</option>
                                 {exercises.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
