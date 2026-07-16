@@ -116,6 +116,10 @@ export default function DemosPage() {
   const [eName, setEName] = useState(""); const [eTag, setETag] = useState(""); const [eDesc, setEDesc] = useState(""); const [eColor, setEColor] = useState("#22d3ee");
   // Convertir en cliente
   const [convId, setConvId] = useState<string | null>(null);
+  // Editar usuario/contraseña del panel del dueño
+  const [credId, setCredId] = useState<string | null>(null);
+  const [eUser, setEUser] = useState("");
+  const [credBusy, setCredBusy] = useState(false);
   const [cPlan, setCPlan] = useState("basico"); const [cStatus, setCStatus] = useState("trial");
 
   const [gen, setGen] = useState(false);
@@ -212,6 +216,28 @@ export default function DemosPage() {
     setBusyId(null);
     if (!data?.ok) alert(data?.error || "No se pudo regenerar.");
     else alert("✓ Textos regenerados. Abrí la web para verlos.");
+  }
+
+  function startCred(d: DemoGym) {
+    if (credId === d.id) { setCredId(null); return; }
+    setCredId(d.id); setEUser(""); setConvId(null); setEditId(null); setOpenId(null);
+  }
+  async function guardarUser(d: DemoGym) {
+    const nuevo = eUser.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (nuevo.length < 4) { alert("El usuario debe tener al menos 4 letras/números (sin espacios ni símbolos)."); return; }
+    setCredBusy(true);
+    const r = await fetch("/api/admin/demo/credenciales", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gymId: d.id, newUser: nuevo }),
+    }).then((x) => x.json()).catch(() => null);
+    setCredBusy(false);
+    if (r?.ok) {
+      setAcc((a) => (a[d.id] ? { ...a, [d.id]: { ...a[d.id], owner: { ...a[d.id].owner, user: r.user } } } : a));
+      setCredId(null);
+      alert(`✓ Nuevo acceso del panel:\nUsuario y contraseña: ${r.user}`);
+    } else {
+      alert(r?.error || "No se pudo cambiar el usuario.");
+    }
   }
 
   function startConvert(d: DemoGym) {
@@ -524,10 +550,25 @@ export default function DemosPage() {
                       <button onClick={() => startEdit(d)} className="text-ink-2 hover:text-ink">{editId === d.id ? "Cerrar" : "Editar"}</button>
                       <button onClick={() => regenerar(d)} disabled={busyId === d.id} className="text-ink-2 hover:text-ink disabled:opacity-50">{busyId === d.id ? "…" : "Regenerar IA"}</button>
                       <button onClick={() => suspender(d, !d.demo_suspended)} disabled={busyId === d.id} className="text-warn hover:underline disabled:opacity-50">{d.demo_suspended ? "Reactivar" : "Suspender"}</button>
+                      <button onClick={() => startCred(d)} className="text-ink-2 hover:text-ink">{credId === d.id ? "Cerrar" : "Usuario"}</button>
                       <button onClick={() => startConvert(d)} disabled={busyId === d.id} className="text-good hover:underline disabled:opacity-50">{convId === d.id ? "Cerrar" : "Convertir"}</button>
                       <button onClick={() => eliminar(d)} className="text-crit hover:underline">Eliminar</button>
                     </div>
                   </div>
+
+                  {credId === d.id && (
+                      <div className="space-y-2 border-t border-white/10 bg-white/[.02] p-3">
+                        <p className="text-xs font-semibold text-ink-2">Cambiar usuario y contraseña del panel del dueño</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input className="input h-9 max-w-[220px] py-0 text-sm" value={eUser}
+                            onChange={(e) => setEUser(e.target.value)} placeholder="ej: evolutiongym" />
+                          <button className="btn btn-primary text-xs" onClick={() => guardarUser(d)} disabled={credBusy}>
+                            {credBusy ? "Guardando…" : "Guardar"}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-muted">Solo minúsculas y números. Usuario y contraseña quedan iguales. Ej: <b>evolutiongym</b> → entra con usuario y clave <b>evolutiongym</b>.</p>
+                      </div>
+                  )}
 
                   {convId === d.id && (
                       <div className="space-y-2 border-t border-good/20 bg-[rgba(34,197,94,.04)] p-3">

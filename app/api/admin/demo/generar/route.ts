@@ -257,9 +257,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: gErr?.message || "No se pudo crear el gimnasio demo." }, { status: 400 });
   }
 
-  // 5) Perfil del dueño + suscripción Elite (todo desbloqueado) + sede principal.
+  // 5) Perfil del dueño + suscripción Elite en PRUEBA de 7 días (todo desbloqueado,
+  //    pero al prospecto le figura como prueba por vencer → lo empuja a contratar).
   await admin.from("profiles").upsert({ id: ownerId, role: "owner", gym_id: gym.id, full_name: nombre }, { onConflict: "id" });
-  await admin.from("subscriptions").upsert({ gym_id: gym.id, plan: "elite", status: "active" }, { onConflict: "gym_id" });
+  const trialEnds = new Date(); trialEnds.setDate(trialEnds.getDate() + 7);
+  await admin.from("subscriptions").upsert({ gym_id: gym.id, plan: "elite", status: "trial", trial_ends_at: trialEnds.toISOString() }, { onConflict: "gym_id" });
   const { data: sede } = await admin.from("sedes").insert({ gym_id: gym.id, name: "Sede principal" }).select("id").single<{ id: string }>();
 
   // 6) Datos de ejemplo (10 socios con rutinas, dietas, clases, caja).

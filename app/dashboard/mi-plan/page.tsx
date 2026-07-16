@@ -156,8 +156,6 @@ export default function MiPlanPage() {
   }
 
   const st = sub ? SUB_STATUS_LABEL[sub.status] : null;
-  // El plan más barato lleva la frase de valor ("por lo que sale un abono…").
-  const cheapestKey = plans.length ? [...plans].sort((a, b) => (a.promo_price ?? a.price) - (b.promo_price ?? b.price))[0].key : null;
   const vence = sub ? (sub.status === "trial" ? sub.trial_ends_at : sub.current_period_end) : null;
 
   return (
@@ -283,13 +281,6 @@ export default function MiPlanPage() {
                     )}
                   </div>
 
-                  {/* Frase de valor en el plan más económico */}
-                  {p.key === cheapestKey && (
-                    <div className="mb-3 rounded-lg border border-good/30 bg-[rgba(34,197,94,.08)] px-3 py-2 text-xs font-semibold leading-snug text-good">
-                      💡 Por lo que te sale el abono de <b>un solo socio</b>, tenés todo el sistema profesional para sumar clientes y fidelizarlos.
-                    </div>
-                  )}
-
                   {/* Cartel de IA */}
                   {hasIA && (
                     <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#a78bfa]/30 bg-gradient-to-r from-[rgba(139,92,246,.14)] to-[rgba(34,211,238,.10)] px-3 py-2 text-xs font-bold text-white">
@@ -308,30 +299,38 @@ export default function MiPlanPage() {
 
                   {p.promo_note && <p className="mt-3 text-[11px] text-muted">{p.promo_note}</p>}
 
-                  {isCurrent ? (
+                  {isCurrent && sub?.status === "active" ? (
                     <div className="mt-4 rounded-lg border border-white/10 py-2 text-center text-xs font-semibold text-ink-2">
                       Es tu plan actual
                     </div>
                   ) : (
                     <div className="mt-4 space-y-2">
+                      {isCurrent && (
+                        <p className="text-center text-[11px] font-semibold text-brand">Estás probando este plan · activalo para contratarlo</p>
+                      )}
                       <button
                         className="btn btn-primary w-full"
                         disabled={changing === p.key}
                         onClick={() => cambiar(p.key)}
                       >
-                        {changing === p.key ? "Redirigiendo a Mercado Pago…" : `💳 Pagar con Mercado Pago`}
+                        {changing === p.key ? "Redirigiendo a Mercado Pago…" : (isCurrent ? "💳 Contratar con Mercado Pago" : "💳 Pagar con Mercado Pago")}
                       </button>
                       <button
                         className="btn btn-ghost w-full"
                         onClick={() => openTransfer(p.key)}
                       >
-                        🏦 Pagar por transferencia
+                        🏦 {isCurrent ? "Contratar por transferencia" : "Pagar por transferencia"}
                       </button>
                     </div>
                   )}
                 </div>
               );
             })}
+          </div>
+
+          {/* Frase de valor, centrada debajo de los 3 planes */}
+          <div className="mx-auto mt-6 max-w-2xl rounded-xl border border-good/30 bg-[rgba(34,197,94,.08)] px-4 py-3 text-center text-sm font-semibold leading-snug text-good">
+            💡 Por lo que te sale el abono de <b>un solo socio</b> en el gimnasio, tenés todo este sistema profesional para sumar clientes y fidelizarlos.
           </div>
         </>
       )}
