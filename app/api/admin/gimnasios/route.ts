@@ -51,10 +51,20 @@ export async function POST(req: Request) {
     if (gym.owner_id) userIds.add(gym.owner_id);
     (socios as { linked_user_id: string | null }[] | null)?.forEach((s) => { if (s.linked_user_id) userIds.add(s.linked_user_id); });
 
+    // NUNCA borrar una cuenta de super admin (ni la tuya): si el dueño de este
+    // gimnasio es un admin, borramos el gimnasio pero NO su usuario.
+    const ids = [...userIds];
+    const protectedIds = new Set<string>([user.id]);
+    if (ids.length) {
+      const { data: admins } = await admin.from("profiles").select("id").in("id", ids).eq("role", "super_admin");
+      (admins as { id: string }[] | null)?.forEach((a) => protectedIds.add(a.id));
+    }
+
     const { error: delErr } = await admin.from("gyms").delete().eq("id", gymId);
     if (delErr) return NextResponse.json({ ok: false, error: delErr.message }, { status: 400 });
 
-    for (const id of userIds) {
+    for (const id of ids) {
+      if (protectedIds.has(id)) continue;
       await admin.auth.admin.deleteUser(id).catch(() => {});
     }
     return NextResponse.json({ ok: true, deleted: true });

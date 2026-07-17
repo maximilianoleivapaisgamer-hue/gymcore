@@ -41,12 +41,21 @@ export async function POST(req: Request) {
   if (gym.owner_id) userIds.add(gym.owner_id);
   (socios as { linked_user_id: string | null }[] | null)?.forEach((s) => { if (s.linked_user_id) userIds.add(s.linked_user_id); });
 
+  // Nunca borrar una cuenta de super admin (ni la tuya).
+  const ids = [...userIds];
+  const protectedIds = new Set<string>([user.id]);
+  if (ids.length) {
+    const { data: admins } = await admin.from("profiles").select("id").in("id", ids).eq("role", "super_admin");
+    (admins as { id: string }[] | null)?.forEach((a) => protectedIds.add(a.id));
+  }
+
   // Borrar el gimnasio (cascadea members, rutinas, dietas, clases, caja, sedes…).
   const { error: delErr } = await admin.from("gyms").delete().eq("id", gymId);
   if (delErr) return NextResponse.json({ ok: false, error: delErr.message }, { status: 400 });
 
-  // Borrar las cuentas de acceso.
-  for (const id of userIds) {
+  // Borrar las cuentas de acceso (menos las protegidas).
+  for (const id of ids) {
+    if (protectedIds.has(id)) continue;
     await admin.auth.admin.deleteUser(id).catch(() => {});
   }
 
