@@ -16,7 +16,7 @@ function origin() { return (process.env.NEXT_PUBLIC_APP_URL || "https://turnogym
 function messageFor(info: AccInfo): string {
   const o = origin();
   const lines = [
-    "Y acá tenés todo para tocarlo vos 👇",
+    "Y acá tenés todo para probarlo vos 👇",
     "",
     `🌐 Tu web: ${o}/${info.slug}`,
     "",
@@ -24,7 +24,7 @@ function messageFor(info: AccInfo): string {
     `   Usuario y contraseña: ${info.owner.user}`,
   ];
   if (info.socio) {
-    lines.push("", `📲 App para tus socios: ${o}${info.socio.url}`, `   Usuario y contraseña: ${info.socio.user}`);
+    lines.push("", `📲 App para tus socios (podés probarla como si fueras cliente): ${o}${info.socio.url}`, `   Usuario y contraseña: ${info.socio.user}`);
   }
   lines.push("", "Entrá, jugá un poco y decime qué te parece 🙌");
   return lines.join("\n");
