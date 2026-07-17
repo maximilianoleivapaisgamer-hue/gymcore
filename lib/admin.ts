@@ -18,6 +18,7 @@ export const STATUS: Record<string, { label: string; cls: string }> = {
 export const METHOD_LABEL: Record<string, string> = {
   transferencia: "Transferencia",
   mercadopago: "Mercado Pago",
+  gratis: "Sin cobro",
 };
 
 export const money = (n: number) => "$" + Math.round(n || 0).toLocaleString("es-AR");

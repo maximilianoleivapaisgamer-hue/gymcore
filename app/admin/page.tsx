@@ -52,6 +52,7 @@ export default function AdminDashboard() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [busyGym, setBusyGym] = useState<string | null>(null);
+  const [convertId, setConvertId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [demoOwnerIds, setDemoOwnerIds] = useState<Set<string>>(new Set());
   const [seedBusy, setSeedBusy] = useState(false);
@@ -120,16 +121,34 @@ export default function AdminDashboard() {
     if (action === "eliminar") setGyms((gs) => gs.filter((g) => g.id !== gymId));
     else setGyms((gs) => gs.map((g) => (g.id === gymId ? { ...g, archived: action === "archivar" } : g)));
   }
-  async function togglePrueba(g: Gym) {
+  // Marca un gimnasio real como "prueba" (deja de contar para la plata).
+  async function marcarPrueba(g: Gym) {
     setBusyGym(g.id);
-    const action = g.is_test ? "desmarcar_prueba" : "marcar_prueba";
     const r = await fetch("/api/admin/gimnasios", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ gymId: g.id, action }),
+      body: JSON.stringify({ gymId: g.id, action: "marcar_prueba" }),
     }).then((x) => x.json()).catch(() => null);
     setBusyGym(null);
     if (!r?.ok) { alert(r?.error || "No se pudo completar la acción."); return; }
-    setGyms((gs) => gs.map((x) => (x.id === g.id ? { ...x, is_test: !g.is_test } : x)));
+    setGyms((gs) => gs.map((x) => (x.id === g.id ? { ...x, is_test: true } : x)));
+  }
+
+  // Pasa un gimnasio de prueba a CLIENTE REAL: le saca la marca y activa la
+  // suscripción con el método elegido (mantiene el plan que tenga puesto).
+  // method "gratis" = cliente real al que NO le cobrás (no suma a la plata).
+  async function convertirCliente(g: Gym, method: "transferencia" | "mercadopago" | "gratis") {
+    setBusyGym(g.id);
+    const r = await fetch("/api/admin/gimnasios", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gymId: g.id, action: "desmarcar_prueba" }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) { setBusyGym(null); alert(r?.error || "No se pudo completar la acción."); return; }
+    // Activar como cliente, con vencimiento a 30 días.
+    const vence = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    await saveSub(g.id, { status: "active", payment_method: method, current_period_end: vence });
+    setGyms((gs) => gs.map((x) => (x.id === g.id ? { ...x, is_test: false } : x)));
+    setConvertId(null);
+    setBusyGym(null);
   }
   function archivar(g: Gym) {
     if (!confirm(`¿Archivar "${g.name}"? Sale de la lista de clientes y de las métricas, pero no se borra. Lo podés reactivar cuando quieras.`)) return;
@@ -173,9 +192,12 @@ export default function AdminDashboard() {
     return m;
   }, [activeGyms]);
   const ownerName = (id: string) => owners.find((o) => o.id === id)?.full_name || "—";
-  // Un gimnasio es "de prueba" si lo marcaste como tal, o si su dueño es una
-  // cuenta demo (esos "Mi Gimnasio" se autocrean solos y no son clientes reales).
-  const isTestGym = (g: Gym) => g.is_test || demoOwnerIds.has(g.owner_id);
+  // Nació de una cuenta demo: esos "Mi Gimnasio" se autocrean cuando el dueño de
+  // una demo entra al panel. Solo cambia el cartel (DEMO en vez de PRUEBA).
+  const isDemoDerived = (g: Gym) => demoOwnerIds.has(g.owner_id);
+  // Única fuente de verdad de "no cuenta para la plata ni las métricas". Así, al
+  // pasarlo a cliente real (is_test=false), la conversión queda firme.
+  const isTestGym = (g: Gym) => g.is_test;
   const priceOf = (k: string) => planCfgs.find((p) => p.key === k)?.price ?? (PLAN_PRICES[k] || 0);
 
   const metrics = useMemo(() => {
@@ -187,10 +209,14 @@ export default function AdminDashboard() {
       if (!gg || isTestGym(gg)) return;
       if (s.status === "active") {
         active++;
-        const amt = priceOf(s.plan);
-        mrr += amt;
-        if (s.payment_method === "mercadopago") { mp += amt; mpN++; }
-        else { transfer += amt; transferN++; } // por defecto (transferencia o sin registrar)
+        if (s.payment_method === "gratis") {
+          // Cliente real sin cobro: cuenta como activo pero no suma plata.
+        } else {
+          const amt = priceOf(s.plan);
+          mrr += amt;
+          if (s.payment_method === "mercadopago") { mp += amt; mpN++; }
+          else { transfer += amt; transferN++; } // por defecto (transferencia o sin registrar)
+        }
       } else if (s.status === "trial") trial++;
       if (isProximoVence(s) || isVencido(s)) porVencer++;
     });
@@ -339,11 +365,15 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{g.name}</span>
-                          {isTestGym(g) && (
+                          {g.is_test && (isDemoDerived(g) ? (
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-[rgba(34,211,238,.16)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand" title="Nació de una cuenta demo: no cuenta para la plata ni las métricas">
+                              Demo
+                            </span>
+                          ) : (
                             <span className="inline-flex shrink-0 items-center rounded-full bg-[rgba(245,177,61,.16)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn" title="Gimnasio de prueba: no cuenta para la plata ni las métricas">
                               Prueba
                             </span>
-                          )}
+                          ))}
                         </div>
                         <div className="text-xs text-muted">/{g.slug}</div>
                       </td>
@@ -412,9 +442,21 @@ export default function AdminDashboard() {
                             );
                           })()}
                           <a href={`/${g.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver página</a>
-                          {!demoOwnerIds.has(g.owner_id) && (
-                            <button onClick={() => togglePrueba(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-warn disabled:opacity-50" title={g.is_test ? "Es un cliente real: sacar la marca de prueba" : "Marcar como prueba: no cuenta para la plata"}>
-                              {g.is_test ? "Es real" : "Marcar prueba"}
+                          {convertId === g.id ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.06)] px-2 py-1">
+                              <span className="text-[11px] text-ink-2">¿Cómo paga?</span>
+                              <button onClick={() => convertirCliente(g, "transferencia")} disabled={busyGym === g.id} className="rounded bg-good/15 px-2 py-0.5 text-[11px] font-semibold text-good hover:bg-good/25 disabled:opacity-50">Transferencia</button>
+                              <button onClick={() => convertirCliente(g, "mercadopago")} disabled={busyGym === g.id} className="rounded bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand hover:bg-brand/25 disabled:opacity-50">Mercado Pago</button>
+                              <button onClick={() => convertirCliente(g, "gratis")} disabled={busyGym === g.id} className="rounded bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-ink-2 hover:bg-white/10 disabled:opacity-50" title="Cliente real al que no le cobrás">Sin cobro</button>
+                              <button onClick={() => setConvertId(null)} className="px-1 text-[11px] text-muted hover:text-ink" title="Cancelar">✕</button>
+                            </span>
+                          ) : isTestGym(g) ? (
+                            <button onClick={() => setConvertId(g.id)} disabled={busyGym === g.id} className="font-semibold text-good hover:underline disabled:opacity-50" title="Pasar a cliente real y elegir cómo paga">
+                              Pasar a cliente real
+                            </button>
+                          ) : (
+                            <button onClick={() => marcarPrueba(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-warn disabled:opacity-50" title="Marcar como prueba: deja de contar para la plata">
+                              Marcar prueba
                             </button>
                           )}
                           <button onClick={() => archivar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-warn disabled:opacity-50" title="Sacar de clientes sin borrar (reversible)">Archivar</button>
