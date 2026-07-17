@@ -12,10 +12,6 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const token = process.env.APIFY_TOKEN;
-  if (!token) {
-    return NextResponse.json({ ok: false, error: "Falta APIFY_TOKEN en el servidor (cargalo en Vercel)." }, { status: 500 });
-  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -23,12 +19,20 @@ export async function POST(req: Request) {
   const supa = createServer();
   const { data: { user } } = await supa.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 });
+  // El token guardado en la base (que podés cambiar desde el panel cuando se te
+  // acaban los créditos) MANDA sobre el de Vercel (APIFY_TOKEN).
+  let token = process.env.APIFY_TOKEN || "";
   if (url && serviceKey) {
     const admin = createAdmin(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
     const { data: me } = await admin.from("profiles").select("role").eq("id", user.id).single<{ role: string }>();
     if (me?.role !== "super_admin") {
       return NextResponse.json({ ok: false, error: "Solo el super admin puede usar esto." }, { status: 403 });
     }
+    const { data: cfg } = await admin.from("app_config").select("value").eq("key", "apify_token").maybeSingle<{ value: string }>();
+    if (cfg?.value && cfg.value.trim()) token = cfg.value.trim();
+  }
+  if (!token) {
+    return NextResponse.json({ ok: false, error: "Falta el token de Apify. Cargalo en el panel de demos (⚙️ Token de Apify) o en Vercel." }, { status: 500 });
   }
 
   let body: { input?: string; url?: string; query?: string };

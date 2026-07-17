@@ -126,6 +126,11 @@ export default function DemosPage() {
   const [gallery, setGallery] = useState<string[]>([]);
   const [heroPick, setHeroPick] = useState<string>("");
   const [galBusy, setGalBusy] = useState(false);
+  // Token de Apify (se puede cambiar desde acá cuando se acaban los créditos)
+  const [cfgOpen, setCfgOpen] = useState(false);
+  const [apifyCfg, setApifyCfg] = useState<{ hasDbToken: boolean; dbMasked: string | null; dbUpdatedAt: string | null; hasEnvToken: boolean } | null>(null);
+  const [cfgToken, setCfgToken] = useState("");
+  const [cfgBusy, setCfgBusy] = useState(false);
 
   // Accesos por demo (panel desplegable en la lista)
   const [openId, setOpenId] = useState<string | null>(null);
@@ -424,6 +429,44 @@ export default function DemosPage() {
     /* eslint-disable-next-line */
   }, []);
 
+  // ---- Token de Apify ----
+  async function toggleApifyCfg() {
+    const next = !cfgOpen;
+    setCfgOpen(next);
+    if (next && !apifyCfg) {
+      setCfgBusy(true);
+      const r = await fetch("/api/admin/config/apify", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "get" }),
+      }).then((x) => x.json()).catch(() => null);
+      if (r?.ok) setApifyCfg(r);
+      setCfgBusy(false);
+    }
+  }
+  async function guardarApifyToken() {
+    const t = cfgToken.trim();
+    if (t.length < 20) { alert("Copiá el token completo de Apify (es largo)."); return; }
+    setCfgBusy(true);
+    const r = await fetch("/api/admin/config/apify", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "set", token: t }),
+    }).then((x) => x.json()).catch(() => null);
+    setCfgBusy(false);
+    if (r?.ok) { setApifyCfg(r); setCfgToken(""); alert("✓ Token de Apify actualizado. Ya lo usa para buscar en Google."); }
+    else alert(r?.error || "No se pudo guardar el token.");
+  }
+  async function borrarApifyToken() {
+    if (!confirm("¿Borrar el token guardado y volver a usar el de Vercel?")) return;
+    setCfgBusy(true);
+    const r = await fetch("/api/admin/config/apify", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "clear" }),
+    }).then((x) => x.json()).catch(() => null);
+    setCfgBusy(false);
+    if (r?.ok) setApifyCfg(r);
+    else alert(r?.error || "No se pudo borrar.");
+  }
+
   async function buscarGoogle() {
     setErr("");
     const val = gUrl.trim();
@@ -503,7 +546,46 @@ export default function DemosPage() {
         <div className="card">
           {/* Traer de Google Maps (Apify) */}
           <div className="mb-4 rounded-lg border border-brand/25 bg-[rgba(34,211,238,.06)] p-3">
-            <label className="mb-1 block text-xs font-semibold text-brand">🗺️ Traer de Google Maps</label>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <label className="block text-xs font-semibold text-brand">🗺️ Traer de Google Maps</label>
+              <button type="button" onClick={toggleApifyCfg} className="shrink-0 text-[11px] font-semibold text-ink-2 hover:text-brand">
+                {cfgOpen ? "Cerrar" : "⚙️ Token de Apify"}
+              </button>
+            </div>
+
+            {cfgOpen && (
+              <div className="mb-3 rounded-lg border border-white/10 bg-black/20 p-2.5">
+                <p className="text-[11px] text-ink-2">
+                  El buscador de Google usa Apify (gasta créditos). Si se te acaban, pegá acá otro token y lo cambia al instante, sin tocar Vercel.
+                </p>
+                <div className="mt-1.5 text-[11px] text-muted">
+                  {cfgBusy && !apifyCfg ? "Cargando…" : apifyCfg ? (
+                    <>
+                      Token en uso:{" "}
+                      {apifyCfg.hasDbToken
+                        ? <b className="text-good">guardado acá ({apifyCfg.dbMasked})</b>
+                        : apifyCfg.hasEnvToken
+                          ? <b className="text-ink-2">el de Vercel</b>
+                          : <b className="text-crit">ninguno cargado</b>}
+                    </>
+                  ) : null}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <input className="input h-9 flex-1 py-0 text-sm" type="password" value={cfgToken}
+                    onChange={(e) => setCfgToken(e.target.value)} placeholder="Pegá el nuevo token de Apify (apify_api_…)" />
+                  <button className="btn btn-primary text-xs" onClick={guardarApifyToken} disabled={cfgBusy}>
+                    {cfgBusy ? "Guardando…" : "Guardar token"}
+                  </button>
+                  {apifyCfg?.hasDbToken && (
+                    <button className="text-[11px] text-muted hover:text-crit" onClick={borrarApifyToken} disabled={cfgBusy}>
+                      Borrar y usar el de Vercel
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1.5 text-[10px] text-muted">Lo sacás de Apify → Settings → Integrations → API token. Queda guardado de forma protegida (solo lo lee el servidor) y nunca se muestra completo.</p>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <input className="input flex-1" value={gUrl} onChange={(e) => setGUrl(e.target.value)}
                 placeholder="Escribí: MegaCenter Gym San Miguel — o pegá el link de Maps" />
