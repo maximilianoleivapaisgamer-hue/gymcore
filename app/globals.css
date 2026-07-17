@@ -52,7 +52,7 @@ body {
   background-position: right 0.55rem center;
   background-size: 14px;
 }
-.sel option { color: #0a0d12; }
+.sel option { background-color: #141a24; color: #e6edf3; }
 
 /* Demostración animada del ejercicio (librería): alterna foto de inicio y fin
    con un fundido gradual (sin zoom) → efecto tipo GIF con fotos de dominio público. */

@@ -8,7 +8,7 @@ import {
   money, fdate, venceOf, daysUntil, isProximoVence, isVencido,
 } from "@/lib/admin";
 
-interface Gym { id: string; name: string; slug: string; owner_id: string; created_at: string; whatsapp: string | null; archived: boolean; }
+interface Gym { id: string; name: string; slug: string; owner_id: string; created_at: string; whatsapp: string | null; archived: boolean; is_test: boolean; }
 interface Sub {
   gym_id: string;
   plan: "basico" | "pro" | "elite";
@@ -53,6 +53,7 @@ export default function AdminDashboard() {
   const [q, setQ] = useState("");
   const [busyGym, setBusyGym] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [demoOwnerIds, setDemoOwnerIds] = useState<Set<string>>(new Set());
   const [seedBusy, setSeedBusy] = useState(false);
   const [seedMsg, setSeedMsg] = useState("");
   const seedOffset = useRef(0);
@@ -119,6 +120,17 @@ export default function AdminDashboard() {
     if (action === "eliminar") setGyms((gs) => gs.filter((g) => g.id !== gymId));
     else setGyms((gs) => gs.map((g) => (g.id === gymId ? { ...g, archived: action === "archivar" } : g)));
   }
+  async function togglePrueba(g: Gym) {
+    setBusyGym(g.id);
+    const action = g.is_test ? "desmarcar_prueba" : "marcar_prueba";
+    const r = await fetch("/api/admin/gimnasios", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gymId: g.id, action }),
+    }).then((x) => x.json()).catch(() => null);
+    setBusyGym(null);
+    if (!r?.ok) { alert(r?.error || "No se pudo completar la acción."); return; }
+    setGyms((gs) => gs.map((x) => (x.id === g.id ? { ...x, is_test: !g.is_test } : x)));
+  }
   function archivar(g: Gym) {
     if (!confirm(`¿Archivar "${g.name}"? Sale de la lista de clientes y de las métricas, pero no se borra. Lo podés reactivar cuando quieras.`)) return;
     gestionGym(g.id, "archivar");
@@ -130,12 +142,14 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: g }, { data: s }, { data: p }, { data: mem }] = await Promise.all([
-        supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp, archived").eq("is_demo", false),
+      const [{ data: g }, { data: s }, { data: p }, { data: mem }, { data: demoG }] = await Promise.all([
+        supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp, archived, is_test").eq("is_demo", false),
         supabase.from("subscriptions").select("gym_id, plan, status, trial_ends_at, current_period_end, payment_method"),
         supabase.from("profiles").select("id, full_name"),
         supabase.from("members").select("gym_id"),
+        supabase.from("gyms").select("owner_id").eq("is_demo", true),
       ]);
+      setDemoOwnerIds(new Set(((demoG as { owner_id: string }[]) || []).map((d) => d.owner_id).filter(Boolean)));
       setGyms((g as Gym[]) || []);
       setSubs((s as Sub[]) || []);
       setOwners((p as Profile[]) || []);
@@ -159,13 +173,18 @@ export default function AdminDashboard() {
     return m;
   }, [activeGyms]);
   const ownerName = (id: string) => owners.find((o) => o.id === id)?.full_name || "—";
+  // Un gimnasio es "de prueba" si lo marcaste como tal, o si su dueño es una
+  // cuenta demo (esos "Mi Gimnasio" se autocrean solos y no son clientes reales).
+  const isTestGym = (g: Gym) => g.is_test || demoOwnerIds.has(g.owner_id);
   const priceOf = (k: string) => planCfgs.find((p) => p.key === k)?.price ?? (PLAN_PRICES[k] || 0);
 
   const metrics = useMemo(() => {
     let active = 0, trial = 0, mrr = 0, transfer = 0, mp = 0, transferN = 0, mpN = 0, porVencer = 0;
     subs.forEach((s) => {
-      // Solo gimnasios reales (no demos): filtramos por los que están en la lista.
-      if (!gymById[s.gym_id]) return;
+      // Solo gimnasios reales (no demos ni pruebas): filtramos por los que están
+      // en la lista y no están marcados como prueba.
+      const gg = gymById[s.gym_id];
+      if (!gg || isTestGym(gg)) return;
       if (s.status === "active") {
         active++;
         const amt = priceOf(s.plan);
@@ -175,17 +194,19 @@ export default function AdminDashboard() {
       } else if (s.status === "trial") trial++;
       if (isProximoVence(s) || isVencido(s)) porVencer++;
     });
-    return { total: activeGyms.length, active, trial, mrr, transfer, mp, transferN, mpN, porVencer };
+    const total = activeGyms.filter((g) => !isTestGym(g)).length;
+    return { total, active, trial, mrr, transfer, mp, transferN, mpN, porVencer };
     /* eslint-disable-next-line */
-  }, [subs, activeGyms, planCfgs, gymById]);
+  }, [subs, activeGyms, planCfgs, gymById, demoOwnerIds]);
 
   // Gimnasios cuyo abono está por vencer o ya venció (para el bloque de alertas).
   const vencimientos = useMemo(() => {
     const rows: { g: Gym; s: Sub | undefined }[] = activeGyms.map((g) => ({ g, s: subByGym[g.id] }));
     return rows
-      .filter(({ s }) => isProximoVence(s) || isVencido(s))
+      .filter(({ g, s }) => !isTestGym(g) && (isProximoVence(s) || isVencido(s)))
       .sort((a, b) => (daysUntil(venceOf(a.s)) ?? 999) - (daysUntil(venceOf(b.s)) ?? 999));
-  }, [activeGyms, subByGym]);
+    /* eslint-disable-next-line */
+  }, [activeGyms, subByGym, demoOwnerIds]);
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -316,7 +337,14 @@ export default function AdminDashboard() {
                   return (
                     <tr key={g.id} className="border-t border-white/10 align-middle hover:bg-white/[.02]">
                       <td className="px-4 py-3">
-                        <div className="font-medium">{g.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{g.name}</span>
+                          {isTestGym(g) && (
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-[rgba(245,177,61,.16)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn" title="Gimnasio de prueba: no cuenta para la plata ni las métricas">
+                              Prueba
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted">/{g.slug}</div>
                       </td>
                       <td className="px-4 py-3 text-ink-2">{ownerName(g.owner_id)}</td>
@@ -384,6 +412,11 @@ export default function AdminDashboard() {
                             );
                           })()}
                           <a href={`/${g.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver página</a>
+                          {!demoOwnerIds.has(g.owner_id) && (
+                            <button onClick={() => togglePrueba(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-warn disabled:opacity-50" title={g.is_test ? "Es un cliente real: sacar la marca de prueba" : "Marcar como prueba: no cuenta para la plata"}>
+                              {g.is_test ? "Es real" : "Marcar prueba"}
+                            </button>
+                          )}
                           <button onClick={() => archivar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-warn disabled:opacity-50" title="Sacar de clientes sin borrar (reversible)">Archivar</button>
                           <button onClick={() => eliminar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-crit disabled:opacity-50" title="Borrar para siempre">Eliminar</button>
                         </div>

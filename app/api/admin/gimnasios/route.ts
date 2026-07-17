@@ -44,6 +44,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, archived: action === "archivar" });
   }
 
+  if (action === "marcar_prueba" || action === "desmarcar_prueba") {
+    const isTest = action === "marcar_prueba";
+    const { error } = await admin.from("gyms").update({ is_test: isTest }).eq("id", gymId);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true, is_test: isTest });
+  }
+
   if (action === "eliminar") {
     // Juntar cuentas de acceso (dueño + socios vinculados) antes de borrar.
     const { data: socios } = await admin.from("members").select("linked_user_id").eq("gym_id", gymId).not("linked_user_id", "is", null);
