@@ -30,6 +30,24 @@ function messageFor(info: AccInfo): string {
   return lines.join("\n");
 }
 
+/** Mensaje clásico (el que estaba antes). */
+function messageForClasico(info: AccInfo): string {
+  const o = origin();
+  const lines = [
+    "¡Hola! Te dejo tu gimnasio ya armado en turnogym 💪",
+    "",
+    `🌐 Tu web: ${o}/${info.slug}`,
+    "",
+    `🖥️ Panel de gestión (para vos): ${o}${info.owner.url}`,
+    `Usuario y contraseña: ${info.owner.user}`,
+  ];
+  if (info.socio) {
+    lines.push("", `📲 App para tus socios: ${o}${info.socio.url}`, `Usuario y contraseña: ${info.socio.user}`);
+  }
+  lines.push("", "Entrá, probalo y cualquier duda me escribís. ¡Que lo disfrutes!");
+  return lines.join("\n");
+}
+
 function CopyBtn({ text, label = "Copiar", full = false }: { text: string; label?: string; full?: boolean }) {
   const [ok, setOk] = useState(false);
   const cls = full
@@ -120,6 +138,8 @@ export default function DemosPage() {
   const [credId, setCredId] = useState<string | null>(null);
   const [eUser, setEUser] = useState("");
   const [credBusy, setCredBusy] = useState(false);
+  // Estilo del mensaje para copiar (nuevo / clásico)
+  const [msgStyle, setMsgStyle] = useState<"nuevo" | "clasico">("nuevo");
   const [cPlan, setCPlan] = useState("basico"); const [cStatus, setCStatus] = useState("trial");
 
   const [gen, setGen] = useState(false);
@@ -647,7 +667,18 @@ export default function DemosPage() {
                               </div>
                             )}
 
-                            <CopyBtn full text={messageFor(acc[d.id])} label="📋 Copiar mensaje para el cliente" />
+                            <div className="mb-1.5 flex items-center gap-1.5">
+                              <span className="text-[11px] text-muted">Mensaje:</span>
+                              {([["nuevo", "Nuevo"], ["clasico", "Clásico"]] as const).map(([k, label]) => (
+                                <button key={k} type="button" onClick={() => setMsgStyle(k)}
+                                  className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition ${msgStyle === k ? "border-brand/40 bg-[rgba(34,211,238,.12)] text-brand" : "border-white/10 text-ink-2 hover:text-ink"}`}>
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                            <CopyBtn full
+                              text={msgStyle === "nuevo" ? messageFor(acc[d.id]) : messageForClasico(acc[d.id])}
+                              label="📋 Copiar mensaje para el cliente" />
                           </div>
                         ) : (
                           <p className="text-xs text-crit">No se pudieron cargar los accesos.</p>
