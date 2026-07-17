@@ -13,6 +13,7 @@ const NAV: Item[] = [
   { href: "/admin/planes", label: "Planes", icon: "layers" },
   { href: "/admin/cobros", label: "Cobros", icon: "wallet" },
   { href: "/admin/demos", label: "Demos", icon: "robot" },
+  { href: "/admin/equipo", label: "Equipo", icon: "users" },
 ];
 
 function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; className?: string }) {
@@ -41,6 +42,13 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
       <>
         <rect x="4" y="8" width="16" height="11" rx="3" />
         <path d="M12 8V4M8.5 13h.01M15.5 13h.01M9 19v2M15 19v2" />
+      </>
+    ),
+    users: (
+      <>
+        <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
       </>
     ),
     logout: <path d="M15 12H3m0 0l4-4m-4 4l4 4M11 3h6a2 2 0 012 2v14a2 2 0 01-2 2h-6" />,

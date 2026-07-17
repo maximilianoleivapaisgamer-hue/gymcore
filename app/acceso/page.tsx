@@ -8,6 +8,7 @@ import { redirectForRole } from "@/lib/roles";
 import type { UserRole } from "@/types/db";
 import AppBackground from "@/components/AppBackground";
 import { BrandMark } from "@/components/BrandMark";
+import PasswordInput from "@/components/PasswordInput";
 
 /** Login. Tras autenticar, redirige según el rol del usuario. */
 export default function AccesoPage() {
@@ -64,18 +65,20 @@ export default function AccesoPage() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <input
-            className="input"
-            type="password"
-            placeholder="Contraseña"
+          <PasswordInput
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={setPassword}
+            placeholder="Contraseña"
+            autoComplete="current-password"
             required
           />
           {error && <p className="text-sm text-crit">{error}</p>}
           <button className="btn btn-primary" disabled={loading}>
             {loading ? "Entrando…" : "Entrar"}
           </button>
+          <Link href="/recuperar" className="text-center text-xs text-ink-2 hover:text-brand">
+            ¿Olvidaste tu contraseña?
+          </Link>
         </form>
         <p className="mt-4 text-center text-sm text-ink-2">
           ¿No tenés cuenta?{" "}
