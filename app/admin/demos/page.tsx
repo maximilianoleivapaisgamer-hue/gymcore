@@ -111,6 +111,7 @@ export default function DemosPage() {
   const [nombre, setNombre] = useState("");
   const [instagram, setInstagram] = useState("");
   const [ciudad, setCiudad] = useState("");
+  const [direccion, setDireccion] = useState("");
   const [website, setWebsite] = useState("");
   const [infoLibre, setInfoLibre] = useState("");
   const [images, setImages] = useState<ImgData[]>([]);
@@ -124,6 +125,7 @@ export default function DemosPage() {
   const [gBusy, setGBusy] = useState(false);
   const [gallery, setGallery] = useState<string[]>([]);
   const [heroPick, setHeroPick] = useState<string>("");
+  const [galBusy, setGalBusy] = useState(false);
 
   // Accesos por demo (panel desplegable en la lista)
   const [openId, setOpenId] = useState<string | null>(null);
@@ -132,7 +134,12 @@ export default function DemosPage() {
   // Gestión (suspender / editar / regenerar)
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [eName, setEName] = useState(""); const [eTag, setETag] = useState(""); const [eDesc, setEDesc] = useState(""); const [eColor, setEColor] = useState("#22d3ee");
+  const [eName, setEName] = useState(""); const [eTag, setETag] = useState(""); const [eDesc, setEDesc] = useState(""); const [eColor, setEColor] = useState("#22d3ee"); const [eDir, setEDir] = useState("");
+  // Editar imágenes de una demo ya creada (fondo + galería)
+  const [imgId, setImgId] = useState<string | null>(null);
+  const [imgHero, setImgHero] = useState<string | null>(null);
+  const [imgGaleria, setImgGaleria] = useState<{ src: string; alt?: string }[]>([]);
+  const [imgBusy, setImgBusy] = useState(false);
   // Convertir en cliente
   const [convId, setConvId] = useState<string | null>(null);
   // Editar usuario/contraseña del panel del dueño
@@ -187,6 +194,29 @@ export default function DemosPage() {
   const addStock = () => setGallery((prev) => Array.from(new Set([...prev, ...STOCK_GYM.slice(0, 5)])));
   const removeImg = (u: string) => { setGallery((prev) => prev.filter((x) => x !== u)); setHeroPick((h) => (h === u ? "" : h)); };
 
+  // Subir fotos propias a la galería de la web (se guardan en el bucket y su URL
+  // entra en `gallery`, igual que las fotos de Google). Se ven en la web del gym.
+  async function addGalleryFiles(files: File[]) {
+    const imgs = files.filter((f) => f.type.startsWith("image/"));
+    if (!imgs.length) return;
+    setErr("");
+    setGalBusy(true);
+    const urls: string[] = [];
+    for (const f of imgs.slice(0, 12)) {
+      try {
+        const clean = (f.name || "foto.jpg").replace(/[^a-zA-Z0-9._-]/g, "");
+        const path = `demos/gallery-manual/${crypto.randomUUID()}-${clean}`;
+        const { error } = await supabase.storage.from("gym-assets").upload(path, f, { upsert: true });
+        if (error) continue;
+        const { data } = supabase.storage.from("gym-assets").getPublicUrl(path);
+        if (data?.publicUrl) urls.push(data.publicUrl);
+      } catch { /* siguiente */ }
+    }
+    if (urls.length) setGallery((prev) => Array.from(new Set([...prev, ...urls])));
+    else setErr("No se pudieron subir las fotos. Probá de nuevo.");
+    setGalBusy(false);
+  }
+
   async function toggleAcc(d: DemoGym) {
     if (openId === d.id) { setOpenId(null); return; }
     setOpenId(d.id);
@@ -221,13 +251,14 @@ export default function DemosPage() {
   function startEdit(d: DemoGym) {
     if (editId === d.id) { setEditId(null); return; }
     setEditId(d.id); setOpenId(null);
-    setEName(d.name); setETag(""); setEDesc(""); setEColor("#22d3ee");
+    setEName(d.name); setETag(""); setEDesc(""); setEColor("#22d3ee"); setEDir("");
   }
   async function guardarEdit(d: DemoGym) {
     setBusyId(d.id);
     const data = await gestion("actualizar", {
       gymId: d.id, name: eName,
       tagline: eTag || undefined, descripcion: eDesc || undefined,
+      direccion: eDir.trim() || undefined,
       brandColor: /^#[0-9a-fA-F]{6}$/.test(eColor) ? eColor : undefined,
     }).catch(() => null);
     setBusyId(null);
@@ -241,6 +272,52 @@ export default function DemosPage() {
     setBusyId(null);
     if (!data?.ok) alert(data?.error || "No se pudo regenerar.");
     else alert("✓ Textos regenerados. Abrí la web para verlos.");
+  }
+
+  // ---- Editor de imágenes de una demo ya creada ----
+  async function uploadToBucket(file: File, kind: string): Promise<string | null> {
+    try {
+      const clean = (file.name || "foto.jpg").replace(/[^a-zA-Z0-9._-]/g, "");
+      const path = `demos/${kind}/${crypto.randomUUID()}-${clean}`;
+      const { error } = await supabase.storage.from("gym-assets").upload(path, file, { upsert: true });
+      if (error) return null;
+      const { data } = supabase.storage.from("gym-assets").getPublicUrl(path);
+      return data?.publicUrl || null;
+    } catch { return null; }
+  }
+  async function startImg(d: DemoGym) {
+    if (imgId === d.id) { setImgId(null); return; }
+    setImgId(d.id); setEditId(null); setOpenId(null); setCredId(null); setConvId(null); setActId(null);
+    setImgHero(null); setImgGaleria([]); setImgBusy(true);
+    const { data } = await supabase.from("gyms").select("hero_url, landing_config").eq("id", d.id).single<{ hero_url: string | null; landing_config: { heroImagen?: string | null; galeria?: { src: string; alt?: string }[] } | null }>();
+    const cfg = data?.landing_config || {};
+    setImgHero(data?.hero_url || cfg.heroImagen || null);
+    const gal = Array.isArray(cfg.galeria) ? cfg.galeria : [];
+    setImgGaleria(gal.filter((g) => g && g.src).map((g) => ({ src: g.src, alt: g.alt || "" })));
+    setImgBusy(false);
+  }
+  async function imgCambiarFondo(file: File) {
+    setImgBusy(true);
+    const u = await uploadToBucket(file, "hero");
+    if (u) setImgHero(u); else alert("No se pudo subir la imagen.");
+    setImgBusy(false);
+  }
+  async function imgAgregarFotos(files: File[]) {
+    const imgs = files.filter((f) => f.type.startsWith("image/"));
+    if (!imgs.length) return;
+    setImgBusy(true);
+    const nuevas: { src: string; alt?: string }[] = [];
+    for (const f of imgs.slice(0, 12)) { const u = await uploadToBucket(f, "gallery-manual"); if (u) nuevas.push({ src: u, alt: "" }); }
+    if (nuevas.length) setImgGaleria((prev) => [...prev, ...nuevas]);
+    else alert("No se pudieron subir las fotos.");
+    setImgBusy(false);
+  }
+  async function guardarImg(d: DemoGym) {
+    setImgBusy(true);
+    const data = await gestion("imagenes", { gymId: d.id, heroUrl: imgHero || undefined, galeria: imgGaleria }).catch(() => null);
+    setImgBusy(false);
+    if (data?.ok) { setImgId(null); alert("✓ Imágenes actualizadas. Abrí la web para verlas."); }
+    else alert(data?.error || "No se pudo guardar.");
   }
 
   async function toggleActividad(d: DemoGym) {
@@ -363,8 +440,8 @@ export default function DemosPage() {
       if (!nombre && p.name) setNombre(p.name);
       if (p.ciudad) setCiudad(p.ciudad);
       if (p.website) setWebsite(p.website);
+      if (p.address) setDireccion(p.address); // dirección real → campo propio
       const resumen = [
-        p.address && `Dirección: ${p.address}`,
         p.phone && `Teléfono: ${p.phone}`,
         p.horarios?.length ? `Horarios: ${p.horarios.map((h) => `${h.dia} ${h.horas}`).join(" · ")}` : "",
       ].filter(Boolean).join("\n");
@@ -372,6 +449,15 @@ export default function DemosPage() {
       if (p.images?.length) setGallery((prev) => Array.from(new Set([...prev, ...p.images])));
     } catch { setErr("Falló la conexión con Google/Apify."); }
     setGBusy(false);
+  }
+
+  // Limpia todo el formulario para armar otra demo (sin recargar la página).
+  function limpiarForm() {
+    setNombre(""); setInstagram(""); setCiudad(""); setDireccion(""); setWebsite(""); setInfoLibre("");
+    setImages([]); setLogoUrl(null); setHeroUrl(null); setBrandColor(""); setLogoNoBg(true);
+    setGUrl(""); setGallery([]); setHeroPick("");
+    setErr(""); setResult(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function generar() {
@@ -384,6 +470,7 @@ export default function DemosPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           nombre, instagram, ciudad, website, infoLibre,
+          direccion: direccion.trim() || undefined,
           images: images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
           galleryUrls: gallery,
           logoUrl, heroUrl,
@@ -422,9 +509,25 @@ export default function DemosPage() {
                 placeholder="Escribí: MegaCenter Gym San Miguel — o pegá el link de Maps" />
               <button className="btn btn-ghost shrink-0" onClick={buscarGoogle} disabled={gBusy}>{gBusy ? "Buscando…" : "Buscar"}</button>
             </div>
-            <div className="mt-2 flex items-center justify-between gap-2">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] text-muted">Autocompleta ciudad, web, dirección, horarios y trae las fotos del perfil.</p>
-              <button type="button" onClick={addStock} className="shrink-0 rounded-lg border border-white/15 px-2 py-1 text-[11px] font-semibold hover:bg-white/5">+ Fotos de ejemplo</button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <label className={`cursor-pointer rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-2.5 py-1 text-[11px] font-semibold text-brand hover:bg-[rgba(34,211,238,.16)] ${galBusy ? "opacity-60" : ""}`}>
+                  {galBusy ? "Subiendo…" : "📷 Subir fotos"}
+                  <input type="file" accept="image/*" multiple className="hidden" disabled={galBusy}
+                    onChange={(e) => { if (e.target.files?.length) addGalleryFiles(Array.from(e.target.files)); e.target.value = ""; }} />
+                </label>
+                <button type="button" onClick={addStock} className="rounded-lg border border-white/15 px-2 py-1 text-[11px] font-semibold hover:bg-white/5">+ Fotos de ejemplo</button>
+              </div>
+            </div>
+
+            {/* Zona para arrastrar fotos propias a la galería */}
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files?.length) addGalleryFiles(Array.from(e.dataTransfer.files)); }}
+              className="mt-2 rounded-lg border border-dashed border-white/20 bg-white/5 px-3 py-2 text-center text-[11px] text-ink-2"
+            >
+              📷 Arrastrá acá tus fotos (o usá “Subir fotos”) para que aparezcan en la galería de la web.
             </div>
 
             {gallery.length > 0 && (
@@ -448,7 +551,7 @@ export default function DemosPage() {
                 </div>
               </>
             )}
-            <p className="mt-1 text-[10px] text-muted">Si no cargás ninguna, la demo usa 5 fotos de ejemplo para que no quede vacía.</p>
+            <p className="mt-1 text-[10px] text-muted">La web muestra hasta 5 fotos (las primeras). Si no cargás ninguna, usa 5 de ejemplo para que no quede vacía.</p>
           </div>
 
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
@@ -456,6 +559,7 @@ export default function DemosPage() {
             <Field label="Instagram (@ o link)"><input className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@megacentergym" /></Field>
             <Field label="Ciudad / zona"><input className="input" value={ciudad} onChange={(e) => setCiudad(e.target.value)} placeholder="San Miguel, Bs As" /></Field>
             <Field label="Página web (si tiene)"><input className="input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" /></Field>
+            <Field label="Dirección (aparece en la web)"><input className="input" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Av. del Puerto 240, Local 7" /></Field>
           </div>
 
           <Field label="Contame del gimnasio (lo que sepas: horarios, servicios, estilo…)">
@@ -515,16 +619,26 @@ export default function DemosPage() {
           </Field>
 
           {err && <p className="mt-3 text-sm text-crit">{err}</p>}
-          <button className="btn btn-primary mt-4 w-full" onClick={generar} disabled={gen}>
-            {gen ? "Generando con IA… (puede tardar ~20s)" : "🤖 Generar demo con IA"}
-          </button>
+          <div className="mt-4 flex gap-2">
+            <button className="btn btn-primary flex-1" onClick={generar} disabled={gen}>
+              {gen ? "Generando con IA… (puede tardar ~20s)" : "🤖 Generar demo con IA"}
+            </button>
+            <button type="button" className="btn btn-ghost shrink-0" onClick={limpiarForm} disabled={gen} title="Vaciar el formulario para armar otra demo">
+              🧹 Limpiar
+            </button>
+          </div>
         </div>
 
         {/* Resultado + lista */}
         <div className="space-y-4">
           {result && (
             <div className="card border-good/30">
-              <div className="mb-2 text-sm font-bold text-good">¡Demo lista! 🎉</div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-good">¡Demo lista! 🎉</span>
+                <button type="button" onClick={limpiarForm} className="shrink-0 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-2.5 py-1 text-[11px] font-semibold text-brand hover:bg-[rgba(34,211,238,.16)]">
+                  ➕ Armar otra demo
+                </button>
+              </div>
               <div className="space-y-2 text-sm">
                 <div>
                   <div className="text-xs text-muted">🌐 Web pública</div>
@@ -590,6 +704,7 @@ export default function DemosPage() {
                       <button onClick={() => toggleAcc(d)} className="text-brand hover:underline">{openId === d.id ? "Ocultar" : "Accesos"}</button>
                       <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver web</a>
                       <button onClick={() => startEdit(d)} className="text-ink-2 hover:text-ink">{editId === d.id ? "Cerrar" : "Editar"}</button>
+                      <button onClick={() => startImg(d)} className="text-ink-2 hover:text-ink">{imgId === d.id ? "Cerrar" : "🖼️ Imágenes"}</button>
                       <button onClick={() => regenerar(d)} disabled={busyId === d.id} className="text-ink-2 hover:text-ink disabled:opacity-50">{busyId === d.id ? "…" : "Regenerar IA"}</button>
                       <button onClick={() => suspender(d, !d.demo_suspended)} disabled={busyId === d.id} className="text-warn hover:underline disabled:opacity-50">{d.demo_suspended ? "Reactivar" : "Suspender"}</button>
                       <button onClick={() => startCred(d)} className="text-ink-2 hover:text-ink">{credId === d.id ? "Cerrar" : "Usuario"}</button>
@@ -663,6 +778,7 @@ export default function DemosPage() {
                       <div className="space-y-2 border-t border-white/10 bg-white/[.02] p-3">
                         <input className="input" value={eName} onChange={(e) => setEName(e.target.value)} placeholder="Nombre" />
                         <input className="input" value={eTag} onChange={(e) => setETag(e.target.value)} placeholder="Frase principal (vacío = no cambiar)" />
+                        <input className="input" value={eDir} onChange={(e) => setEDir(e.target.value)} placeholder="Dirección (vacío = no cambiar) — ej: Av. del Puerto 240" />
                         <textarea className="input" rows={2} value={eDesc} onChange={(e) => setEDesc(e.target.value)} placeholder="Descripción (vacío = no cambiar)" />
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-ink-2">Color:</span>
@@ -670,6 +786,66 @@ export default function DemosPage() {
                           <button className="btn btn-primary ml-auto text-xs" onClick={() => guardarEdit(d)} disabled={busyId === d.id}>{busyId === d.id ? "Guardando…" : "Guardar"}</button>
                         </div>
                         <p className="text-[11px] text-muted">Para editar todo (secciones, fotos, planes) entrá con el login del dueño (botón Accesos) → Configurar página.</p>
+                      </div>
+                    )}
+
+                    {imgId === d.id && (
+                      <div className="space-y-3 border-t border-white/10 bg-white/[.02] p-3">
+                        <p className="text-xs font-semibold text-ink-2">🖼️ Imágenes de la web</p>
+
+                        {/* Foto de fondo (hero) */}
+                        <div>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-semibold text-ink-2">Foto de fondo</span>
+                            <label className={`cursor-pointer rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-2.5 py-1 text-[11px] font-semibold text-brand hover:bg-[rgba(34,211,238,.16)] ${imgBusy ? "opacity-60" : ""}`}>
+                              Cambiar fondo
+                              <input type="file" accept="image/*" className="hidden" disabled={imgBusy}
+                                onChange={(e) => { if (e.target.files?.[0]) imgCambiarFondo(e.target.files[0]); e.target.value = ""; }} />
+                            </label>
+                          </div>
+                          {imgHero ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={imgHero} alt="" className="h-24 w-full rounded-lg object-cover" />
+                          ) : (
+                            <div className="grid h-24 w-full place-items-center rounded-lg border border-dashed border-white/15 text-[11px] text-muted">Sin foto de fondo</div>
+                          )}
+                        </div>
+
+                        {/* Galería */}
+                        <div>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-semibold text-ink-2">Galería ({imgGaleria.length})</span>
+                            <label className={`cursor-pointer rounded-lg border border-brand/30 bg-[rgba(34,211,238,.08)] px-2.5 py-1 text-[11px] font-semibold text-brand hover:bg-[rgba(34,211,238,.16)] ${imgBusy ? "opacity-60" : ""}`}>
+                              + Agregar fotos
+                              <input type="file" accept="image/*" multiple className="hidden" disabled={imgBusy}
+                                onChange={(e) => { if (e.target.files?.length) imgAgregarFotos(Array.from(e.target.files)); e.target.value = ""; }} />
+                            </label>
+                          </div>
+                          {imgGaleria.length > 0 ? (
+                            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
+                              {imgGaleria.map((g, i) => (
+                                <div key={i} className="group relative overflow-hidden rounded-md border border-white/10">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={g.src} alt="" className="h-14 w-full object-cover" />
+                                  <button type="button" onClick={() => setImgHero(g.src)} title="Poner de fondo"
+                                    className="absolute left-0.5 top-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white hover:bg-brand hover:text-[#04121a]">Fondo</button>
+                                  <button type="button" onClick={() => setImgGaleria((prev) => prev.filter((_, idx) => idx !== i))} title="Sacar"
+                                    className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-[10px] text-white">✕</button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="grid h-14 w-full place-items-center rounded-lg border border-dashed border-white/15 text-[11px] text-muted">Sin fotos en la galería</div>
+                          )}
+                          <p className="mt-1 text-[10px] text-muted">La web muestra hasta 5 (las primeras).</p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button className="btn btn-primary text-xs" onClick={() => guardarImg(d)} disabled={imgBusy}>
+                            {imgBusy ? "Guardando…" : "Guardar imágenes"}
+                          </button>
+                          <button className="text-xs text-muted hover:text-ink" onClick={() => setImgId(null)} disabled={imgBusy}>Cancelar</button>
+                        </div>
                       </div>
                     )}
 

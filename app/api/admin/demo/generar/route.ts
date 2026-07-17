@@ -145,6 +145,7 @@ export async function POST(req: Request) {
 
   let body: {
     nombre?: string; instagram?: string; ciudad?: string; website?: string; infoLibre?: string;
+    direccion?: string;
     images?: { mediaType: string; data: string }[]; logoUrl?: string; heroUrl?: string;
     galleryUrls?: string[]; brandColor?: string; heroPick?: string;
     ownerEmail?: string; ownerPassword?: string;
@@ -214,6 +215,15 @@ export async function POST(req: Request) {
     ubicacion: ai.ubicacion,
     secciones: { beneficios: true, clases: true, planes: true, galeria: true },
   };
+
+  // La dirección REAL (de Google o escrita a mano) manda sobre la que adivine la
+  // IA (que suele poner solo la zona). Así el texto de la web coincide con el mapa.
+  const dirReal = String(body.direccion || "").trim();
+  if (dirReal) {
+    cfg.ubicacion.direccion = dirReal;
+    if (body.ciudad) cfg.ubicacion.ciudad = String(body.ciudad).trim();
+    cfg.ubicacion.mapsQuery = `${dirReal}${body.ciudad ? `, ${String(body.ciudad).trim()}` : ""}`;
+  }
 
   // 4) Usuario dueño (login del panel). Usuario = nombre del gym todo junto;
   //    la contraseña es la misma. Entra en /acceso escribiendo ese usuario.

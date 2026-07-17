@@ -33,6 +33,8 @@ export async function POST(req: Request) {
   let body: {
     action?: string; gymId?: string; suspended?: boolean;
     name?: string; tagline?: string; descripcion?: string; brandColor?: string; infoLibre?: string;
+    direccion?: string;
+    heroUrl?: string; galeria?: { src: string; alt?: string }[];
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
 
@@ -56,10 +58,33 @@ export async function POST(req: Request) {
     if (typeof body.tagline === "string") patch.tagline = body.tagline;
     if (typeof body.descripcion === "string") patch.description = body.descripcion;
     if (/^#[0-9a-fA-F]{6}$/.test(body.brandColor || "")) patch.accent_color = body.brandColor;
+    // La dirección se guarda en la columna, que manda sobre la config al resolver
+    // la landing (así el texto de la web coincide con el mapa).
+    if (typeof body.direccion === "string" && body.direccion.trim()) patch.address = body.direccion.trim();
     if (Object.keys(patch).length === 0) return NextResponse.json({ ok: false, error: "Nada para actualizar." }, { status: 400 });
     const { error } = await admin.from("gyms").update(patch).eq("id", gymId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true });
+  }
+
+  // ---- Cambiar imágenes (foto de fondo + galería) ----
+  if (body.action === "imagenes") {
+    const cfg: LandingConfig = resolveLandingConfig(gym);
+    const patch: Record<string, unknown> = {};
+    if (typeof body.heroUrl === "string" && body.heroUrl.trim()) {
+      cfg.heroImagen = body.heroUrl.trim();
+      patch.hero_url = body.heroUrl.trim();
+    }
+    if (Array.isArray(body.galeria)) {
+      cfg.galeria = body.galeria
+        .filter((g) => g && typeof g.src === "string" && g.src.trim())
+        .slice(0, 12)
+        .map((g) => ({ src: g.src.trim(), alt: typeof g.alt === "string" ? g.alt : "" }));
+    }
+    patch.landing_config = cfg;
+    const { error } = await admin.from("gyms").update(patch).eq("id", gymId);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true, heroUrl: cfg.heroImagen, galeria: cfg.galeria });
   }
 
   // ---- Regenerar textos con IA (mantiene marca, fotos, logins) ----
