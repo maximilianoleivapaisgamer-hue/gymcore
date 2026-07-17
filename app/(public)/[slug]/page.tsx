@@ -5,6 +5,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import type { Gym } from "@/types/db";
 import { resolveLandingConfig } from "@/lib/landing-config";
 import LandingSite from "@/components/landing/site/LandingSite";
+import DemoVisitPing from "@/components/DemoVisitPing";
 import "../landing.css";
 
 /**
@@ -62,6 +63,7 @@ export default async function GymLanding({ params }: { params: { slug: string } 
 
   return (
     <div className={`${inter.variable} ${grotesk.variable}`}>
+      {gym.is_demo && <DemoVisitPing gymId={gym.id} kind="web" />}
       <LandingSite config={config} slug={gym.slug} />
     </div>
   );

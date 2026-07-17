@@ -9,6 +9,7 @@ import { STOCK_GYM } from "@/lib/stock-images";
 interface DemoGym { id: string; name: string; slug: string; created_at: string | null; demo_suspended?: boolean; }
 interface ImgData { mediaType: string; data: string; name: string; }
 interface AccInfo { slug: string; name: string; owner: { user: string; url: string }; socio: { name: string; user: string; url: string } | null; }
+interface Metric { count: number; last: string | null; }
 
 // Dominio público del negocio: los links que se envían a los clientes deben ser
 // SIEMPRE tu dominio, no la URL de Vercel donde tengas abierto el panel.
@@ -140,6 +141,10 @@ export default function DemosPage() {
   const [credBusy, setCredBusy] = useState(false);
   // Estilo del mensaje para copiar (nuevo / clásico)
   const [msgStyle, setMsgStyle] = useState<"nuevo" | "clasico">("nuevo");
+  // Actividad del prospecto (web / panel / socio)
+  const [actId, setActId] = useState<string | null>(null);
+  const [actBusy, setActBusy] = useState<string | null>(null);
+  const [act, setAct] = useState<Record<string, { web: Metric; panel: Metric; socio: Metric }>>({});
   const [cPlan, setCPlan] = useState("basico"); const [cStatus, setCStatus] = useState("trial");
 
   const [gen, setGen] = useState(false);
@@ -236,6 +241,22 @@ export default function DemosPage() {
     setBusyId(null);
     if (!data?.ok) alert(data?.error || "No se pudo regenerar.");
     else alert("✓ Textos regenerados. Abrí la web para verlos.");
+  }
+
+  async function toggleActividad(d: DemoGym) {
+    if (actId === d.id) { setActId(null); return; }
+    setActId(d.id); setCredId(null); setConvId(null); setEditId(null); setOpenId(null);
+    if (!act[d.id]) {
+      setActBusy(d.id);
+      try {
+        const r = await fetch("/api/admin/demo/actividad", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ gymId: d.id }),
+        }).then((x) => x.json());
+        if (r?.ok) setAct((a) => ({ ...a, [d.id]: r.actividad }));
+      } catch { /* noop */ }
+      setActBusy(null);
+    }
   }
 
   function startCred(d: DemoGym) {
@@ -565,6 +586,7 @@ export default function DemosPage() {
                         : <span className="rounded-full bg-[rgba(34,197,94,.14)] px-2 py-0.5 text-[10px] font-semibold text-good">Activa</span>}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold md:justify-end">
+                      <button onClick={() => toggleActividad(d)} className="text-indigo hover:underline">{actId === d.id ? "Cerrar" : "📊 Actividad"}</button>
                       <button onClick={() => toggleAcc(d)} className="text-brand hover:underline">{openId === d.id ? "Ocultar" : "Accesos"}</button>
                       <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver web</a>
                       <button onClick={() => startEdit(d)} className="text-ink-2 hover:text-ink">{editId === d.id ? "Cerrar" : "Editar"}</button>
@@ -575,6 +597,30 @@ export default function DemosPage() {
                       <button onClick={() => eliminar(d)} className="text-crit hover:underline">Eliminar</button>
                     </div>
                   </div>
+
+                  {actId === d.id && (
+                      <div className="border-t border-white/10 bg-[rgba(129,140,248,.05)] p-3">
+                        <p className="mb-2 text-xs font-semibold text-indigo">📊 Actividad del prospecto <span className="font-normal text-muted">(no cuenta tus propias entradas)</span></p>
+                        {actBusy === d.id && !act[d.id] ? (
+                          <p className="text-xs text-muted">Cargando…</p>
+                        ) : act[d.id] ? (
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            {(([["web", "🌐 Abrió la web"], ["panel", "🖥️ Entró al panel"], ["socio", "📲 Entró a la app"]] as const)).map(([k, label]) => {
+                              const m = act[d.id][k];
+                              return (
+                                <div key={k} className="rounded-lg border border-white/10 bg-white/5 p-2.5">
+                                  <div className="text-[11px] text-ink-2">{label}</div>
+                                  <div className={`text-lg font-bold ${m.count > 0 ? "text-good" : "text-muted"}`}>{m.count > 0 ? `${m.count} ${m.count === 1 ? "vez" : "veces"}` : "—"}</div>
+                                  <div className="text-[10px] text-muted">{m.last ? `última: ${new Date(m.last).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}` : "todavía no"}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-crit">No se pudo cargar la actividad.</p>
+                        )}
+                      </div>
+                  )}
 
                   {credId === d.id && (
                       <div className="space-y-2 border-t border-white/10 bg-white/[.02] p-3">

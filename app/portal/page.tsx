@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { allows, loadPlans } from "@/lib/plans";
 import InstallAppButton from "@/components/InstallAppButton";
 import ThemeApply from "@/components/ThemeApply";
+import DemoVisitPing from "@/components/DemoVisitPing";
 import AppBackground from "@/components/AppBackground";
 
 interface Member {
@@ -62,7 +63,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean } | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [openDemo, setOpenDemo] = useState<Set<string>>(new Set());
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
@@ -89,7 +90,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("name, logo_url, whatsapp, theme, bg_style").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string }>(),
+      supabase.from("gyms").select("name, logo_url, whatsapp, theme, bg_style, is_demo").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -257,6 +258,7 @@ export default function PortalPage() {
   return (
     <main className="mx-auto max-w-2xl px-5 py-6">
       <ThemeApply theme={gym?.theme} />
+      {gym?.is_demo && member?.gym_id && <DemoVisitPing gymId={member.gym_id} kind="socio" />}
       <AppBackground style={gym?.bg_style} />
       <header className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">

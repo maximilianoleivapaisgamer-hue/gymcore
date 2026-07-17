@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { allows, minPlanLabel, loadPlans, DEFAULT_PLANS, type PlanFeature, type PlanConfig } from "@/lib/plans";
 import { staffCanAccess } from "@/lib/staff";
 import ThemeApply from "@/components/ThemeApply";
+import DemoVisitPing from "@/components/DemoVisitPing";
 import { BrandMark, BrandWordmark } from "@/components/BrandMark";
 import SedeSwitcher from "@/components/SedeSwitcher";
 
@@ -47,7 +48,6 @@ const NAV: NavGroup[] = [
     label: "Tu negocio",
     items: [
       { href: "/admin", label: "Super Admin", icon: "shield", superAdmin: true },
-      { href: "/admin/demos", label: "Demos", icon: "sparkles", superAdmin: true },
       { href: "/dashboard/mi-plan", label: "Mi plan", icon: "star" },
     ],
   },
@@ -139,7 +139,6 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
         <path d="M9 21v-6h6v6M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
       </>
     ),
-    sparkles: <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 14l.9 2.4 2.4.9-2.4.9L19 21l-.9-2.4-2.4-.9 2.4-.9z" />,
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -153,7 +152,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const supabase = createClient();
   const pathname = usePathname();
   const router = useRouter();
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; theme: string; bg_style: string } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; theme: string; bg_style: string; is_demo?: boolean } | null>(null);
+  const [gymId, setGymId] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
   const [open, setOpen] = useState(false);
@@ -174,9 +174,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setFullName(profile?.full_name || "");
       setPerms(profile?.permissions || []);
       if (profile?.gym_id) {
+        setGymId(profile.gym_id);
         const [{ data: g }, { data: sub }] = await Promise.all([
-          supabase.from("gyms").select("name, logo_url, theme, bg_style").eq("id", profile.gym_id)
-            .single<{ name: string; logo_url: string | null; theme: string; bg_style: string }>(),
+          supabase.from("gyms").select("name, logo_url, theme, bg_style, is_demo").eq("id", profile.gym_id)
+            .single<{ name: string; logo_url: string | null; theme: string; bg_style: string; is_demo: boolean }>(),
           supabase.from("subscriptions").select("plan").eq("gym_id", profile.gym_id)
             .maybeSingle<{ plan: string }>(),
         ]);
@@ -216,6 +217,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       <ThemeApply theme={gym?.theme} />
+      {gym?.is_demo && gymId && <DemoVisitPing gymId={gymId} kind="panel" />}
       {/* Sidebar */}
       <aside
         className={`fixed z-40 flex h-screen w-64 flex-col gap-1 overflow-y-auto border-r border-white/[.08] bg-gradient-to-b from-[#0c1017] to-bg px-3.5 py-5 transition-transform md:sticky md:top-0 md:translate-x-0 ${

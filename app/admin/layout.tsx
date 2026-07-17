@@ -67,7 +67,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setEmail(user.email || "");
       const { data: me } = await supabase
         .from("profiles").select("role").eq("id", user.id).single<{ role: string }>();
-      setState(me?.role === "super_admin" ? "ok" : "denied");
+      const isAdmin = me?.role === "super_admin";
+      if (isAdmin) {
+        // Marca este navegador como "tuyo" y registra tu IP (hasheada) para NO
+        // contar tus propias visitas/logins a las demos.
+        try { localStorage.setItem("tg_owner", "1"); } catch { /* ignore */ }
+        fetch("/api/admin/registrar-ip", { method: "POST" }).catch(() => {});
+      }
+      setState(isAdmin ? "ok" : "denied");
     })();
     /* eslint-disable-next-line */
   }, []);
