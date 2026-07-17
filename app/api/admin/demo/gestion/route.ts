@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   let body: {
     action?: string; gymId?: string; suspended?: boolean;
     name?: string; tagline?: string; descripcion?: string; brandColor?: string; infoLibre?: string;
-    direccion?: string;
+    direccion?: string; tipo?: string;
     heroUrl?: string; galeria?: { src: string; alt?: string }[];
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
@@ -61,6 +61,12 @@ export async function POST(req: Request) {
     // La dirección se guarda en la columna, que manda sobre la config al resolver
     // la landing (así el texto de la web coincide con el mapa).
     if (typeof body.direccion === "string" && body.direccion.trim()) patch.address = body.direccion.trim();
+    // Tipo de negocio (gimnasio / personal): se guarda en la config de la landing.
+    if (body.tipo === "gimnasio" || body.tipo === "personal") {
+      const cfg = resolveLandingConfig(gym);
+      cfg.tipo = body.tipo;
+      patch.landing_config = cfg;
+    }
     if (Object.keys(patch).length === 0) return NextResponse.json({ ok: false, error: "Nada para actualizar." }, { status: 400 });
     const { error } = await admin.from("gyms").update(patch).eq("id", gymId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
@@ -90,12 +96,15 @@ export async function POST(req: Request) {
   // ---- Regenerar textos con IA (mantiene marca, fotos, logins) ----
   if (body.action === "regenerar") {
     const base: LandingConfig = resolveLandingConfig(gym);
+    const ptSteer = base.tipo === "personal"
+      ? "IMPORTANTE: Esto NO es un gimnasio, es un ENTRENADOR PERSONAL / personal trainer independiente. Escribí toda la web en primera persona como el entrenador, hablando de entrenamiento personalizado 1 a 1, planes a medida y seguimiento cercano. No uses 'socios', 'sala de musculación', 'instalaciones' ni 'clases grupales'. Las 'clases' son los servicios o modalidades (ej: Entrenamiento personalizado presencial, Plan online, Evaluación física, Entrenamiento a domicilio). Los 'planes' son sus paquetes (ej: 2 sesiones por semana, Plan online mensual). Los 'beneficios' son las ventajas de entrenar con un profesional dedicado."
+      : "";
     let ai;
     try {
       ai = await generateDemoConfig({
         nombre: gym.name,
         ciudad: base.ubicacion.ciudad || gym.address || undefined,
-        infoLibre: body.infoLibre || `${gym.name}. ${base.descripcion}`,
+        infoLibre: [ptSteer, body.infoLibre || `${gym.name}. ${base.descripcion}`].filter(Boolean).join("\n\n"),
       });
     } catch (e) {
       return NextResponse.json({ ok: false, error: (e as Error).message || "La IA no pudo regenerar." }, { status: 502 });

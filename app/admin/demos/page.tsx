@@ -108,6 +108,7 @@ export default function DemosPage() {
   const [demos, setDemos] = useState<DemoGym[]>([]);
 
   // form
+  const [tipo, setTipo] = useState<"gimnasio" | "personal">("gimnasio");
   const [nombre, setNombre] = useState("");
   const [instagram, setInstagram] = useState("");
   const [ciudad, setCiudad] = useState("");
@@ -139,7 +140,7 @@ export default function DemosPage() {
   // Gestión (suspender / editar / regenerar)
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [eName, setEName] = useState(""); const [eTag, setETag] = useState(""); const [eDesc, setEDesc] = useState(""); const [eColor, setEColor] = useState("#22d3ee"); const [eDir, setEDir] = useState("");
+  const [eName, setEName] = useState(""); const [eTag, setETag] = useState(""); const [eDesc, setEDesc] = useState(""); const [eColor, setEColor] = useState("#22d3ee"); const [eDir, setEDir] = useState(""); const [eTipo, setETipo] = useState<"" | "gimnasio" | "personal">("");
   // Editar imágenes de una demo ya creada (fondo + galería)
   const [imgId, setImgId] = useState<string | null>(null);
   const [imgHero, setImgHero] = useState<string | null>(null);
@@ -256,7 +257,7 @@ export default function DemosPage() {
   function startEdit(d: DemoGym) {
     if (editId === d.id) { setEditId(null); return; }
     setEditId(d.id); setOpenId(null);
-    setEName(d.name); setETag(""); setEDesc(""); setEColor("#22d3ee"); setEDir("");
+    setEName(d.name); setETag(""); setEDesc(""); setEColor("#22d3ee"); setEDir(""); setETipo("");
   }
   async function guardarEdit(d: DemoGym) {
     setBusyId(d.id);
@@ -264,6 +265,7 @@ export default function DemosPage() {
       gymId: d.id, name: eName,
       tagline: eTag || undefined, descripcion: eDesc || undefined,
       direccion: eDir.trim() || undefined,
+      tipo: eTipo || undefined,
       brandColor: /^#[0-9a-fA-F]{6}$/.test(eColor) ? eColor : undefined,
     }).catch(() => null);
     setBusyId(null);
@@ -496,6 +498,7 @@ export default function DemosPage() {
 
   // Limpia todo el formulario para armar otra demo (sin recargar la página).
   function limpiarForm() {
+    setTipo("gimnasio");
     setNombre(""); setInstagram(""); setCiudad(""); setDireccion(""); setWebsite(""); setInfoLibre("");
     setImages([]); setLogoUrl(null); setHeroUrl(null); setBrandColor(""); setLogoNoBg(true);
     setGUrl(""); setGallery([]); setHeroPick("");
@@ -512,7 +515,7 @@ export default function DemosPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          nombre, instagram, ciudad, website, infoLibre,
+          nombre, instagram, ciudad, website, infoLibre, tipo,
           direccion: direccion.trim() || undefined,
           images: images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
           galleryUrls: gallery,
@@ -544,6 +547,18 @@ export default function DemosPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
         {/* Form */}
         <div className="card">
+          {/* Tipo de negocio: cambia los textos de la web y guía a la IA */}
+          <Field label="Tipo de negocio">
+            <div className="flex gap-2">
+              {(([["gimnasio", "🏋️ Gimnasio"], ["personal", "🧑‍🏫 Personal trainer"]] as const)).map(([k, label]) => (
+                <button key={k} type="button" onClick={() => setTipo(k)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition ${tipo === k ? "border-brand/40 bg-[rgba(34,211,238,.12)] text-brand" : "border-white/10 text-ink-2 hover:text-ink"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
           {/* Traer de Google Maps (Apify) */}
           <div className="mb-4 rounded-lg border border-brand/25 bg-[rgba(34,211,238,.06)] p-3">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -637,16 +652,16 @@ export default function DemosPage() {
           </div>
 
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            <Field label="Nombre del gimnasio *"><input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: MegaCenter Gym" /></Field>
+            <Field label={tipo === "personal" ? "Nombre del entrenador *" : "Nombre del gimnasio *"}><input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={tipo === "personal" ? "Ej: Juan Pérez Training" : "Ej: MegaCenter Gym"} /></Field>
             <Field label="Instagram (@ o link)"><input className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@megacentergym" /></Field>
             <Field label="Ciudad / zona"><input className="input" value={ciudad} onChange={(e) => setCiudad(e.target.value)} placeholder="San Miguel, Bs As" /></Field>
             <Field label="Página web (si tiene)"><input className="input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" /></Field>
             <Field label="Dirección (aparece en la web)"><input className="input" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Av. del Puerto 240, Local 7" /></Field>
           </div>
 
-          <Field label="Contame del gimnasio (lo que sepas: horarios, servicios, estilo…)">
+          <Field label={tipo === "personal" ? "Contame del entrenador (servicios, modalidades, horarios…)" : "Contame del gimnasio (lo que sepas: horarios, servicios, estilo…)"}>
             <textarea className="input" rows={4} value={infoLibre} onChange={(e) => setInfoLibre(e.target.value)}
-              placeholder="Ej: gimnasio 24hs en San Miguel, tiene sala de musculación, funcional y clases de spinning. Cuota $18.000. Instagram con logo rojo." />
+              placeholder={tipo === "personal" ? "Ej: entrenador personal en Nordelta, atiende presencial y online, planes a medida, evaluación inicial. Sesiones desde $12.000. Instagram con fotos de entrenamientos." : "Ej: gimnasio 24hs en San Miguel, tiene sala de musculación, funcional y clases de spinning. Cuota $18.000. Instagram con logo rojo."} />
           </Field>
 
           <Field label={`Capturas (Instagram / WhatsApp / web) — hasta ${MAX_IMAGES}`}>
@@ -862,7 +877,13 @@ export default function DemosPage() {
                         <input className="input" value={eTag} onChange={(e) => setETag(e.target.value)} placeholder="Frase principal (vacío = no cambiar)" />
                         <input className="input" value={eDir} onChange={(e) => setEDir(e.target.value)} placeholder="Dirección (vacío = no cambiar) — ej: Av. del Puerto 240" />
                         <textarea className="input" rows={2} value={eDesc} onChange={(e) => setEDesc(e.target.value)} placeholder="Descripción (vacío = no cambiar)" />
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-ink-2">Tipo:</span>
+                          <select className="sel w-auto text-xs" value={eTipo} onChange={(e) => setETipo(e.target.value as "" | "gimnasio" | "personal")}>
+                            <option value="">(sin cambiar)</option>
+                            <option value="gimnasio">🏋️ Gimnasio</option>
+                            <option value="personal">🧑‍🏫 Personal trainer</option>
+                          </select>
                           <span className="text-xs text-ink-2">Color:</span>
                           <input type="color" value={eColor} onChange={(e) => setEColor(e.target.value)} className="h-8 w-12 rounded" />
                           <button className="btn btn-primary ml-auto text-xs" onClick={() => guardarEdit(d)} disabled={busyId === d.id}>{busyId === d.id ? "Guardando…" : "Guardar"}</button>

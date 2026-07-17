@@ -145,7 +145,7 @@ export async function POST(req: Request) {
 
   let body: {
     nombre?: string; instagram?: string; ciudad?: string; website?: string; infoLibre?: string;
-    direccion?: string;
+    direccion?: string; tipo?: string;
     images?: { mediaType: string; data: string }[]; logoUrl?: string; heroUrl?: string;
     galleryUrls?: string[]; brandColor?: string; heroPick?: string;
     ownerEmail?: string; ownerPassword?: string;
@@ -154,6 +154,13 @@ export async function POST(req: Request) {
 
   const nombre = String(body.nombre || "").trim();
   if (!nombre) return NextResponse.json({ ok: false, error: "Poné al menos el nombre del gimnasio." }, { status: 400 });
+
+  // ¿Es un entrenador personal? Cambia los textos de la web y guía a la IA.
+  const esPersonal = String(body.tipo || "").toLowerCase() === "personal";
+  const ptSteer = esPersonal
+    ? "IMPORTANTE: Esto NO es un gimnasio, es un ENTRENADOR PERSONAL / personal trainer independiente. Escribí toda la web en primera persona como el entrenador, hablando de entrenamiento personalizado 1 a 1, planes a medida y seguimiento cercano. No uses las palabras 'socios', 'sala de musculación', 'instalaciones' ni 'clases grupales'. Las 'clases' representan los SERVICIOS o modalidades que ofrece (ej: Entrenamiento personalizado presencial, Plan de entrenamiento online, Evaluación física, Entrenamiento a domicilio, Grupos reducidos) con sus días y horarios de atención. Los 'planes' son sus paquetes (ej: 2 sesiones por semana, Plan online mensual, Pack de 12 sesiones). Los 'beneficios' son las ventajas de entrenar con un profesional dedicado (seguimiento personalizado, planes a medida, flexibilidad de horarios, etc.)."
+    : "";
+  const infoLibreFinal = [ptSteer, body.infoLibre].filter(Boolean).join("\n\n") || undefined;
 
   // 1) IA: armar la config de la landing.
   const webTexto = body.website ? await fetchWebText(String(body.website)) : "";
@@ -164,7 +171,7 @@ export async function POST(req: Request) {
       instagram: body.instagram,
       ciudad: body.ciudad,
       webTexto,
-      infoLibre: body.infoLibre,
+      infoLibre: infoLibreFinal,
       images: Array.isArray(body.images) ? body.images.slice(0, 10) : undefined,
     });
   } catch (e) {
@@ -189,6 +196,7 @@ export async function POST(req: Request) {
   const heroImagen = body.heroUrl || galeria[0]?.src || null;
   const cfg: LandingConfig = {
     ...JSON.parse(JSON.stringify(DEFAULT_LANDING)),
+    tipo: esPersonal ? "personal" : "gimnasio",
     nombre,
     tagline: ai.tagline,
     descripcion: ai.descripcion,

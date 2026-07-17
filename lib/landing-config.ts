@@ -59,6 +59,9 @@ export interface LSecciones {
 }
 
 export interface LandingConfig {
+  /** Tipo de negocio: cambia los textos fijos de la web (gimnasio vs entrenador
+   *  personal). Por defecto "gimnasio". */
+  tipo?: "gimnasio" | "personal";
   nombre: string;
   tagline: string;
   descripcion: string;
@@ -86,6 +89,7 @@ export interface LandingConfig {
 
 /** Contenido demo por defecto (editable por el dueño). */
 export const DEFAULT_LANDING: LandingConfig = {
+  tipo: "gimnasio",
   nombre: "Tu Gimnasio",
   tagline: "Entrená como en casa. Rendí como un atleta.",
   descripcion:

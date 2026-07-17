@@ -30,7 +30,27 @@ function SectionHeading({ eyebrow, titulo, descripcion }: { eyebrow: string; tit
  */
 export default function LandingSite({ config, slug, preview = false }: { config: LandingConfig; slug: string; preview?: boolean }) {
   const { portalUrl, joinHref } = landingLinks(slug);
-  const wa = waLink(config.whatsapp, "Hola, vengo desde la web. Quiero info del gimnasio.");
+  // Personal trainer vs gimnasio: cambia los textos fijos de la web.
+  const personal = config.tipo === "personal";
+  const T = {
+    waInfo: personal ? "Hola, vengo desde la web. Quiero info de tus entrenamientos." : "Hola, vengo desde la web. Quiero info del gimnasio.",
+    navClases: personal ? "Servicios" : "Clases",
+    heroCta: personal ? "Reservá tu sesión" : "Reservá tu clase",
+    benefEyebrow: personal ? "Por qué entrenar conmigo" : "Por qué elegirnos",
+    benefTitulo: personal ? "Todo lo que necesitás para lograr tus objetivos" : "Todo lo que necesitás para entrenar en serio",
+    benefDesc: personal ? "Entrenamiento a tu medida, con seguimiento cercano y resultados de verdad." : "Sin vueltas: buen equipamiento, buenas clases y gente que te acompaña.",
+    clasesEyebrow: personal ? "Servicios" : "Grilla semanal",
+    clasesTitulo: personal ? "Entrenamientos y planes" : "Clases para todos los días",
+    clasesDesc: personal ? "Elegí cómo querés entrenar. Reservá tu lugar desde el portal." : "Elegí la disciplina que va con vos. Reservá tu lugar desde el portal.",
+    galeriaEyebrow: personal ? "Galería" : "Nuestras instalaciones",
+    galeriaTitulo: personal ? "Mirá los entrenamientos" : "Conocé el gimnasio por dentro",
+    ubicEyebrow: personal ? "Dónde entreno" : "Dónde estamos",
+    ubicTitulo: personal ? "Vení a entrenar conmigo" : "Vení a conocernos",
+    ubicDesc: personal ? "Coordinamos el lugar y el horario que mejor te queden." : "Estamos cerca tuyo. Pasá cuando quieras y hacé tu primera clase.",
+    ctaTitulo: personal ? `Empezá a entrenar con ${config.nombre} esta semana` : `Empezá a entrenar en ${config.nombre} esta semana`,
+    ctaDesc: personal ? "Reservá tu sesión o escribime por WhatsApp. La primera consulta es gratis." : "Reservá tu lugar o escribinos por WhatsApp. Tu primera clase de prueba es gratis.",
+  };
+  const wa = waLink(config.whatsapp, T.waInfo);
   const s = config.secciones;
 
   const showBeneficios = s.beneficios && config.beneficios.length > 0;
@@ -40,7 +60,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
 
   const links = [
     showBeneficios && { href: "#beneficios", label: "Beneficios" },
-    showClases && { href: "#clases", label: "Clases" },
+    showClases && { href: "#clases", label: T.navClases },
     showPlanes && { href: "#planes", label: "Planes" },
     showGaleria && { href: "#galeria", label: "Galería" },
     { href: "#ubicacion", label: "Ubicación" },
@@ -71,7 +91,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
 
             <div className="mt-2 flex flex-col gap-3 sm:flex-row">
               <a href={portalUrl} className="tg-btn tg-btn-primary tg-btn-lg">
-                <Icon name="LogIn" className="size-5" /> Reservá tu clase
+                <Icon name="LogIn" className="size-5" /> {T.heroCta}
               </a>
               {wa && (
                 <a href={wa} target="_blank" rel="noopener noreferrer" className="tg-btn tg-btn-secondary tg-btn-lg">
@@ -91,7 +111,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
         {showBeneficios && (
           <section id="beneficios" className="py-20 sm:py-28">
             <div className="tg-container flex flex-col gap-12">
-              <SectionHeading eyebrow="Por qué elegirnos" titulo="Todo lo que necesitás para entrenar en serio" descripcion="Sin vueltas: buen equipamiento, buenas clases y gente que te acompaña." />
+              <SectionHeading eyebrow={T.benefEyebrow} titulo={T.benefTitulo} descripcion={T.benefDesc} />
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {config.beneficios.map((b, i) => (
                   <Reveal key={i} delay={i * 0.05}>
@@ -113,7 +133,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
         {showClases && (
           <section id="clases" className="tg-surface2 py-20 sm:py-28">
             <div className="tg-container flex flex-col gap-12">
-              <SectionHeading eyebrow="Grilla semanal" titulo="Clases para todos los días" descripcion="Elegí la disciplina que va con vos. Reservá tu lugar desde el portal." />
+              <SectionHeading eyebrow={T.clasesEyebrow} titulo={T.clasesTitulo} descripcion={T.clasesDesc} />
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {config.clases.map((c, i) => (
                   <Reveal key={i} delay={i * 0.04}>
@@ -186,7 +206,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
         {showGaleria && (
           <section id="galeria" className="tg-surface2 py-20 sm:py-28">
             <div className="tg-container flex flex-col gap-12">
-              <SectionHeading eyebrow="Nuestras instalaciones" titulo="Conocé el gimnasio por dentro" descripcion="Tocá cualquier foto para verla en grande." />
+              <SectionHeading eyebrow={T.galeriaEyebrow} titulo={T.galeriaTitulo} descripcion="Tocá cualquier foto para verla en grande." />
               <Gallery images={config.galeria} />
             </div>
           </section>
@@ -195,7 +215,7 @@ export default function LandingSite({ config, slug, preview = false }: { config:
         {/* UBICACIÓN (siempre) */}
         <section id="ubicacion" className="py-20 sm:py-28">
           <div className="tg-container flex flex-col gap-12">
-            <SectionHeading eyebrow="Dónde estamos" titulo="Vení a conocernos" descripcion="Estamos cerca tuyo. Pasá cuando quieras y hacé tu primera clase." />
+            <SectionHeading eyebrow={T.ubicEyebrow} titulo={T.ubicTitulo} descripcion={T.ubicDesc} />
             <div className="grid gap-6 lg:grid-cols-5">
               <Reveal className="lg:col-span-2">
                 <div className="tg-card flex h-full flex-col gap-6 p-6">
@@ -253,8 +273,8 @@ export default function LandingSite({ config, slug, preview = false }: { config:
               <div aria-hidden className="absolute -right-16 -top-16 size-64 rounded-full bg-white/10 blur-2xl" />
               <div aria-hidden className="absolute -bottom-20 -left-10 size-64 rounded-full bg-black/10 blur-2xl" />
               <div className="relative flex flex-col items-center gap-6">
-                <h2 className="max-w-2xl text-3xl font-bold sm:text-4xl" style={{ color: "var(--l-brand-fg)" }}>Empezá a entrenar en {config.nombre} esta semana</h2>
-                <p className="max-w-xl" style={{ color: "color-mix(in srgb, var(--l-brand-fg) 85%, transparent)" }}>Reservá tu lugar o escribinos por WhatsApp. Tu primera clase de prueba es gratis.</p>
+                <h2 className="max-w-2xl text-3xl font-bold sm:text-4xl" style={{ color: "var(--l-brand-fg)" }}>{T.ctaTitulo}</h2>
+                <p className="max-w-xl" style={{ color: "color-mix(in srgb, var(--l-brand-fg) 85%, transparent)" }}>{T.ctaDesc}</p>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <a href={portalUrl} className="tg-btn tg-btn-lg" style={{ background: "var(--l-brand-fg)", color: "var(--l-brand)" }}>
                     <Icon name="LogIn" className="size-5" /> Reservar ahora
