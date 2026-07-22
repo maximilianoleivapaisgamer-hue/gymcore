@@ -14,6 +14,7 @@ const NAV: Item[] = [
   { href: "/admin/cobros", label: "Cobros", icon: "wallet" },
   { href: "/admin/demos", label: "Demos", icon: "robot" },
   { href: "/admin/equipo", label: "Equipo", icon: "users" },
+  { href: "/admin/configuracion", label: "Configuración", icon: "cog" },
 ];
 
 function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; className?: string }) {
@@ -49,6 +50,12 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
         <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
         <circle cx="9" cy="7" r="4" />
         <path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+      </>
+    ),
+    cog: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.14.63.64 1.12 1.28 1.28H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
       </>
     ),
     logout: <path d="M15 12H3m0 0l4-4m-4 4l4 4M11 3h6a2 2 0 012 2v14a2 2 0 01-2 2h-6" />,

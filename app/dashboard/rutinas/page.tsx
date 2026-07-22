@@ -406,26 +406,36 @@ export default function RutinasPage() {
 
                         <div className="space-y-2">
                           {block.rows.map((row, ri) => (
-                            <div key={ri} className="grid grid-cols-[34px_1fr_70px_70px_1fr_28px] items-center gap-2">
-                              {row.exercise_id && exImg[row.exercise_id] ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={exImg[row.exercise_id]} alt="" className="h-[34px] w-[34px] rounded-md border border-white/10 object-cover" title="Este ejercicio tiene demostración" />
-                              ) : (
-                                <div className="grid h-[34px] w-[34px] place-items-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-muted">—</div>
-                              )}
-                              <button type="button" onClick={() => { setPicking({ di, bi, ri }); setPickSearch(""); }}
-                                className="input flex items-center truncate text-left text-sm">
-                                <span className={`truncate ${row.exercise_id ? "" : "text-muted"}`}>
-                                  {row.exercise_id ? (exMap[row.exercise_id] || "Ejercicio") : "— Buscar ejercicio —"}
-                                </span>
-                              </button>
-                              <input className="input" placeholder="Series" value={row.sets || ""}
-                                onChange={(e) => setRow(di, bi, ri, "sets", e.target.value)} />
-                              <input className="input" placeholder="Reps" value={row.reps || ""}
-                                onChange={(e) => setRow(di, bi, ri, "reps", e.target.value)} />
-                              <input className="input" placeholder="Nota (opcional)" value={row.notes || ""}
-                                onChange={(e) => setRow(di, bi, ri, "notes", e.target.value)} />
-                              <button className="grid h-8 w-7 place-items-center rounded-lg text-ink-2 hover:text-crit"
+                            <div key={ri}
+                              className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[.02] p-2.5 sm:grid sm:grid-cols-[34px_1fr_72px_72px_1fr_28px] sm:items-center sm:gap-2 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0">
+                              {/* En celular: foto + nombre + quitar en una línea. En desktop cada uno es una celda. */}
+                              <div className="flex items-center gap-2 sm:contents">
+                                {row.exercise_id && exImg[row.exercise_id] ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={exImg[row.exercise_id]} alt="" className="h-[34px] w-[34px] shrink-0 rounded-md border border-white/10 object-cover" title="Este ejercicio tiene demostración" />
+                                ) : (
+                                  <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-muted">—</div>
+                                )}
+                                <button type="button" onClick={() => { setPicking({ di, bi, ri }); setPickSearch(""); }}
+                                  className="input flex min-w-0 flex-1 items-center truncate text-left text-sm sm:flex-none">
+                                  <span className={`truncate ${row.exercise_id ? "" : "text-muted"}`}>
+                                    {row.exercise_id ? (exMap[row.exercise_id] || "Ejercicio") : "— Buscar ejercicio —"}
+                                  </span>
+                                </button>
+                                <button className="grid h-8 w-7 shrink-0 place-items-center rounded-lg text-ink-2 hover:text-crit sm:hidden"
+                                  title="Quitar" onClick={() => removeRow(di, bi, ri)}>×</button>
+                              </div>
+                              {/* En celular: series / reps / nota en una segunda línea. En desktop, celdas del grid. */}
+                              <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2 sm:contents">
+                                <input className="input" placeholder="Series" value={row.sets || ""}
+                                  onChange={(e) => setRow(di, bi, ri, "sets", e.target.value)} />
+                                <input className="input" placeholder="Reps" value={row.reps || ""}
+                                  onChange={(e) => setRow(di, bi, ri, "reps", e.target.value)} />
+                                <input className="input" placeholder="Nota (opcional)" value={row.notes || ""}
+                                  onChange={(e) => setRow(di, bi, ri, "notes", e.target.value)} />
+                              </div>
+                              {/* Quitar (solo desktop, última celda del grid) */}
+                              <button className="hidden h-8 w-7 place-items-center rounded-lg text-ink-2 hover:text-crit sm:grid"
                                 title="Quitar" onClick={() => removeRow(di, bi, ri)}>×</button>
                             </div>
                           ))}
