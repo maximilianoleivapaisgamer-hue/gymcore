@@ -11,16 +11,23 @@ export default function DemoChooser({
   nombre,
   ownerHref,
   socioHref,
+  logoUrl,
 }: {
   nombre?: string;
   ownerHref: string;
   socioHref: string;
+  logoUrl?: string | null;
 }) {
   return (
     <main className="grid min-h-screen place-items-center px-6 py-12">
       <AppBackground style="aurora" />
       <div className="relative z-10 w-full max-w-md text-center">
-        <BrandMark size={56} className="mx-auto mb-4 rounded-2xl" />
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt={nombre || "Logo"} className="mx-auto mb-4 h-16 w-16 rounded-2xl object-contain" />
+        ) : (
+          <BrandMark size={56} className="mx-auto mb-4 rounded-2xl" />
+        )}
         <h1 className="text-3xl font-bold">Probá {nombre || "turnogym"}</h1>
         <p className="mt-2 text-ink-2">
           Entrá sin registrarte y con todo cargado (5 socios, rutinas, dietas, clases y caja). Elegí desde dónde querés mirarlo:

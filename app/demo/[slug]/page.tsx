@@ -11,13 +11,14 @@ export const dynamic = "force-dynamic";
 export default async function DemoSlugPage({ params }: { params: { slug: string } }) {
   const slug = params.slug;
   let nombre = "";
+  let logoUrl: string | null = null;
   try {
     const supa = createClient();
-    const { data } = await supa.from("gyms").select("name, is_demo").eq("slug", slug).maybeSingle<{ name: string; is_demo: boolean }>();
-    if (data?.is_demo) nombre = data.name || "";
-  } catch { /* si no se puede leer el nombre, mostramos genérico */ }
+    const { data } = await supa.from("gyms").select("name, is_demo, logo_url").eq("slug", slug).maybeSingle<{ name: string; is_demo: boolean; logo_url: string | null }>();
+    if (data?.is_demo) { nombre = data.name || ""; logoUrl = data.logo_url || null; }
+  } catch { /* si no se puede leer, mostramos genérico */ }
 
   const owner = `/demo/entrar?slug=${encodeURIComponent(slug)}&rol=owner`;
   const socio = `/demo/entrar?slug=${encodeURIComponent(slug)}&rol=socio`;
-  return <DemoChooser nombre={nombre} ownerHref={owner} socioHref={socio} />;
+  return <DemoChooser nombre={nombre} logoUrl={logoUrl} ownerHref={owner} socioHref={socio} />;
 }
