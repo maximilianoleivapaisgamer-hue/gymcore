@@ -44,7 +44,7 @@ function messageSinClave(info: AccInfo): string {
     "*Probá el sistema (panel dueño, finanzas, rutinas, app de cliente):*",
     `👉 ${o}/demo/${info.slug}`,
     "",
-    "Cualquier duda me escribís 🙌",
+    "Podés ingresar tanto para ver el panel de dueño como el de tus clientes, sin necesidad de registrarte. Probala y contame qué te pareció, que te comento las promos que tenemos disponibles para esta semana. ¿Te parece?",
   ].join("\n");
 }
 
