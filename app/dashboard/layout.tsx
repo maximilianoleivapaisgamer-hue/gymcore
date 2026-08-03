@@ -152,7 +152,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const supabase = createClient();
   const pathname = usePathname();
   const router = useRouter();
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; theme: string; bg_style: string; is_demo?: boolean } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string } | null>(null);
   const [gymId, setGymId] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
@@ -176,8 +176,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (profile?.gym_id) {
         setGymId(profile.gym_id);
         const [{ data: g }, { data: sub }] = await Promise.all([
-          supabase.from("gyms").select("name, logo_url, theme, bg_style, is_demo").eq("id", profile.gym_id)
-            .single<{ name: string; logo_url: string | null; theme: string; bg_style: string; is_demo: boolean }>(),
+          supabase.from("gyms").select("name, logo_url, theme, bg_style, is_demo, slug").eq("id", profile.gym_id)
+            .single<{ name: string; logo_url: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string }>(),
           supabase.from("subscriptions").select("plan").eq("gym_id", profile.gym_id)
             .maybeSingle<{ plan: string }>(),
         ]);
@@ -337,6 +337,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Link>
           </div>
         </header>
+
+        {/* Barra de demo: saltar a la vista del cliente (solo en demos) */}
+        {gym?.is_demo && gym?.slug && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand/20 bg-[rgba(34,211,238,.06)] px-4 py-2 text-xs md:px-7">
+            <span className="text-ink-2">🎮 Estás probando el <b className="text-ink">panel del dueño</b>.</span>
+            <a href={`/demo/entrar?slug=${gym.slug}&rol=socio`}
+              className="inline-flex items-center gap-1 rounded-lg bg-brand/15 px-3 py-1 font-semibold text-brand transition hover:bg-brand/25">
+              👀 Ver como cliente (app del socio) →
+            </a>
+          </div>
+        )}
 
         <div className="flex-1">{children}</div>
       </div>

@@ -63,7 +63,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string } | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [openDemo, setOpenDemo] = useState<Set<string>>(new Set());
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
@@ -90,7 +90,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("name, logo_url, whatsapp, theme, bg_style, is_demo").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean }>(),
+      supabase.from("gyms").select("name, logo_url, whatsapp, theme, bg_style, is_demo, slug").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -260,6 +260,16 @@ export default function PortalPage() {
       <ThemeApply theme={gym?.theme} />
       {gym?.is_demo && member?.gym_id && <DemoVisitPing gymId={member.gym_id} kind="socio" />}
       <AppBackground style={gym?.bg_style} />
+      {/* Barra de demo: volver al panel del dueño (solo en demos) */}
+      {gym?.is_demo && gym?.slug && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/20 bg-[rgba(34,211,238,.06)] px-3 py-2 text-xs">
+          <span className="text-ink-2">📲 Estás viendo la <b className="text-ink">app del cliente</b>.</span>
+          <a href={`/demo/entrar?slug=${gym.slug}&rol=owner`}
+            className="inline-flex items-center gap-1 rounded-lg bg-brand/15 px-3 py-1 font-semibold text-brand transition hover:bg-brand/25">
+            🖥️ Volver al panel del dueño →
+          </a>
+        </div>
+      )}
       <header className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {gym?.logo_url ? (

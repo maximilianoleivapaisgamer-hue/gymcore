@@ -31,17 +31,18 @@ function messageFor(info: AccInfo): string {
   return lines.join("\n");
 }
 
-/** Mensaje SIN CLAVE: solo dos links (su web + su demo para probar sin registro). */
+/** Mensaje SIN CLAVE: solo dos links (su web + su demo para probar sin registro).
+ *  Las *negritas* de WhatsApp resaltan lo importante al pegarlo. */
 function messageSinClave(info: AccInfo): string {
   const o = origin();
   return [
-    "¡Hola! Te armé tu gimnasio en turnogym para que lo pruebes 👇",
+    "Ya *tengo lista tu DEMO* para que la pruebes, la hice con tus datos e imágenes que figuran en redes:",
     "",
-    `🌐 Tu web lista: ${o}/${info.slug}`,
+    "*Tu web lista*",
+    `👉 ${o}/${info.slug}`,
     "",
-    "🎮 Probá el sistema (sin registrarte, ya viene todo cargado):",
-    `${o}/demo/${info.slug}`,
-    "Entrás como dueño (tu panel de gestión) o como cliente (la app) — vos elegís.",
+    "*Probá el sistema (panel dueño, finanzas, rutinas, app de cliente):*",
+    `👉 ${o}/demo/${info.slug}`,
     "",
     "Cualquier duda me escribís 🙌",
   ].join("\n");
