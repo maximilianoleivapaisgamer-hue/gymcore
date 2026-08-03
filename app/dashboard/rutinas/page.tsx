@@ -7,7 +7,12 @@ import AiChat from "@/components/AiChat";
 import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
 import { capExercise } from "@/lib/exercise-i18n";
 
-interface Exercise { id: string; name: string; notes: string | null; image_url?: string | null; is_global?: boolean; source?: string; }
+interface Exercise {
+  id: string; name: string; notes: string | null;
+  image_url?: string | null; image_url_end?: string | null;
+  instructions?: string[] | null; primary_muscles?: string[] | null; equipment?: string | null;
+  is_global?: boolean; source?: string;
+}
 interface Member { id: string; full_name: string; }
 interface RExercise {
   id?: string; exercise_id: string | null; day_number: number;
@@ -50,6 +55,7 @@ export default function RutinasPage() {
   const [saving, setSaving] = useState(false);
   const [libOpen, setLibOpen] = useState(false);
   const [picking, setPicking] = useState<{ di: number; bi: number; ri: number } | null>(null);
+  const [demoId, setDemoId] = useState<string | null>(null); // ejercicio a mostrar en el modal de demostración
   const [pickSearch, setPickSearch] = useState("");
   const [pickFilter, setPickFilter] = useState<"todos" | "demo" | "mios">("todos");
   const [newEx, setNewEx] = useState("");
@@ -72,7 +78,7 @@ export default function RutinasPage() {
       setPlans(await loadPlans(supabase));
     }
     const [{ data: ex }, { data: mem }, { data: rout }] = await Promise.all([
-      supabase.from("exercises").select("id, name, notes, image_url, is_global, source").order("name"),
+      supabase.from("exercises").select("id, name, notes, image_url, image_url_end, instructions, primary_muscles, equipment, is_global, source").order("name"),
       supabase.from("members").select("id, full_name").order("full_name"),
       supabase.from("routines").select("*, routine_exercises(*)").order("created_at", { ascending: false }),
     ]);
@@ -91,6 +97,11 @@ export default function RutinasPage() {
   const exImg = useMemo(() => {
     const m: Record<string, string> = {};
     exercises.forEach((e) => { if (e.image_url) m[e.id] = e.image_url; });
+    return m;
+  }, [exercises]);
+  const exById = useMemo(() => {
+    const m: Record<string, Exercise> = {};
+    exercises.forEach((e) => (m[e.id] = e));
     return m;
   }, [exercises]);
   const ownExercises = useMemo(() => exercises.filter((x) => !x.is_global), [exercises]);
@@ -379,12 +390,12 @@ export default function RutinasPage() {
               {edit.days.map((day, di) => (
                 <div key={di} className="rounded-xl border border-white/10 bg-surface-2 p-3">
                   <div className="mb-3 flex items-center gap-2">
-                    <input className="input max-w-[200px] font-semibold" value={day.name}
+                    <input className="input min-w-0 flex-1 font-semibold sm:max-w-[200px]" value={day.name}
                       onChange={(e) => setDayName(di, e.target.value)} />
-                    <div className="ml-auto flex gap-2">
-                      <button className="text-xs text-ink-2 hover:text-brand" onClick={() => addBlock(di)}>+ Bloque</button>
+                    <div className="flex shrink-0 gap-2">
+                      <button className="whitespace-nowrap text-xs text-ink-2 hover:text-brand" onClick={() => addBlock(di)}>+ Bloque</button>
                       {edit.days.length > 1 && (
-                        <button className="text-xs text-ink-2 hover:text-crit" onClick={() => removeDay(di)}>Quitar día</button>
+                        <button className="whitespace-nowrap text-xs text-ink-2 hover:text-crit" onClick={() => removeDay(di)}>Quitar día</button>
                       )}
                     </div>
                   </div>
@@ -393,13 +404,13 @@ export default function RutinasPage() {
                     {day.blocks.map((block, bi) => (
                       <div key={bi} className="rounded-lg border border-white/10 bg-black/20 p-3">
                         <div className="mb-2 flex items-center gap-2">
-                          <input className="input max-w-[220px] text-sm font-semibold text-brand" value={block.name}
+                          <input className="input min-w-0 flex-1 text-sm font-semibold text-brand sm:max-w-[220px]" value={block.name}
                             placeholder="Ej: Bloque brazos"
                             onChange={(e) => setBlockName(di, bi, e.target.value)} />
-                          <div className="ml-auto flex gap-2">
-                            <button className="text-xs text-ink-2 hover:text-brand" onClick={() => addRow(di, bi)}>+ Ejercicio</button>
+                          <div className="flex shrink-0 gap-2">
+                            <button className="whitespace-nowrap text-xs text-ink-2 hover:text-brand" onClick={() => addRow(di, bi)}>+ Ejercicio</button>
                             {day.blocks.length > 1 && (
-                              <button className="text-xs text-ink-2 hover:text-crit" onClick={() => removeBlock(di, bi)}>Quitar bloque</button>
+                              <button className="whitespace-nowrap text-xs text-ink-2 hover:text-crit" onClick={() => removeBlock(di, bi)}>Quitar bloque</button>
                             )}
                           </div>
                         </div>
@@ -411,8 +422,12 @@ export default function RutinasPage() {
                               {/* En celular: foto + nombre + quitar en una línea. En desktop cada uno es una celda. */}
                               <div className="flex items-center gap-2 sm:contents">
                                 {row.exercise_id && exImg[row.exercise_id] ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={exImg[row.exercise_id]} alt="" className="h-[34px] w-[34px] shrink-0 rounded-md border border-white/10 object-cover" title="Este ejercicio tiene demostración" />
+                                  <button type="button" onClick={() => setDemoId(row.exercise_id!)} title="Ver cómo se hace"
+                                    className="relative h-[34px] w-[34px] shrink-0 overflow-hidden rounded-md border border-white/10">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={exImg[row.exercise_id]} alt="" className="h-full w-full object-cover" />
+                                    <span className="absolute bottom-0 right-0 rounded-tl bg-black/75 px-[3px] text-[9px] leading-[14px]" aria-hidden>👁</span>
+                                  </button>
                                 ) : (
                                   <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-muted">—</div>
                                 )}
@@ -534,8 +549,8 @@ export default function RutinasPage() {
               ) : (
                 <ul className="divide-y divide-white/5">
                   {pickResults.list.map((x) => (
-                    <li key={x.id}>
-                      <button className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5"
+                    <li key={x.id} className="flex items-center gap-2 px-3 py-2 hover:bg-white/5">
+                      <button className="flex min-w-0 flex-1 items-center gap-3 text-left"
                         onClick={() => { setRow(picking.di, picking.bi, picking.ri, "exercise_id", x.id); setPicking(null); }}>
                         {x.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -552,6 +567,10 @@ export default function RutinasPage() {
                           <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-ink-2">manual</span>
                         )}
                       </button>
+                      {x.image_url && (
+                        <button type="button" title="Ver cómo se hace" onClick={() => setDemoId(x.id)}
+                          className="shrink-0 rounded-lg border border-white/10 px-2 py-1 text-xs text-ink-2 hover:border-brand/40 hover:text-brand">👁 Ver</button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -560,6 +579,45 @@ export default function RutinasPage() {
             <div className="border-t border-white/10 p-2 text-center text-[11px] text-muted">
               {pickResults.count === 0 ? "Cargá la librería desde el panel de admin." :
                 `${pickResults.list.length} mostrados${pickResults.count > pickResults.list.length ? ` de ${pickResults.count} · afiná la búsqueda` : ""}`}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: ver cómo se hace el ejercicio (demostración de la librería) */}
+      {demoId && exById[demoId] && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4" onClick={() => setDemoId(null)}>
+          <div className="card w-full max-w-md overflow-hidden p-0" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-2 border-b border-white/10 p-3">
+              <h3 className="truncate text-sm font-bold">{exById[demoId].name}</h3>
+              <button className="shrink-0 px-2 text-muted hover:text-ink" onClick={() => setDemoId(null)}>✕</button>
+            </div>
+            {exById[demoId].image_url ? (
+              <div className="tg-exanim" style={{ aspectRatio: "4 / 3" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={exById[demoId].image_url!} alt={exById[demoId].name} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="tg-end" src={exById[demoId].image_url_end || exById[demoId].image_url!} alt="" />
+              </div>
+            ) : (
+              <div className="grid h-40 place-items-center text-sm text-ink-2">Este ejercicio no tiene demostración.</div>
+            )}
+            <div className="p-3">
+              {((exById[demoId].primary_muscles?.length ?? 0) > 0 || exById[demoId].equipment) && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {(exById[demoId].primary_muscles || []).map((m, i) => (
+                    <span key={i} className="rounded-full border border-brand/30 bg-[rgba(34,211,238,.1)] px-2 py-0.5 text-[11px] font-semibold text-brand">{m}</span>
+                  ))}
+                  {exById[demoId].equipment && <span className="rounded-full border border-white/10 bg-surface px-2 py-0.5 text-[11px] text-ink-2">{exById[demoId].equipment}</span>}
+                </div>
+              )}
+              {(exById[demoId].instructions?.length ?? 0) > 0 ? (
+                <ol className="list-decimal space-y-1 pl-4 text-xs text-ink-2">
+                  {exById[demoId].instructions!.map((s, i) => <li key={i}>{s}</li>)}
+                </ol>
+              ) : (
+                <p className="text-xs text-muted">Sin instrucciones cargadas.</p>
+              )}
             </div>
           </div>
         </div>

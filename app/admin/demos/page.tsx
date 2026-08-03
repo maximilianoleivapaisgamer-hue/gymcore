@@ -31,6 +31,22 @@ function messageFor(info: AccInfo): string {
   return lines.join("\n");
 }
 
+/** Mensaje SIN CLAVE: solo dos links (su web + su demo para probar sin registro). */
+function messageSinClave(info: AccInfo): string {
+  const o = origin();
+  return [
+    "¡Hola! Te armé tu gimnasio en turnogym para que lo pruebes 👇",
+    "",
+    `🌐 Tu web lista: ${o}/${info.slug}`,
+    "",
+    "🎮 Probá el sistema (sin registrarte, ya viene todo cargado):",
+    `${o}/demo/${info.slug}`,
+    "Entrás como dueño (tu panel de gestión) o como cliente (la app) — vos elegís.",
+    "",
+    "Cualquier duda me escribís 🙌",
+  ].join("\n");
+}
+
 /** Mensaje clásico (el que estaba antes). */
 function messageForClasico(info: AccInfo): string {
   const o = origin();
@@ -106,6 +122,7 @@ export default function DemosPage() {
   const [role, setRole] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [demos, setDemos] = useState<DemoGym[]>([]);
+  const [publicSlug, setPublicSlug] = useState(""); // demo que usa turnogym.com/demo (sin clave)
 
   // form
   const [tipo, setTipo] = useState<"gimnasio" | "personal">("gimnasio");
@@ -153,7 +170,7 @@ export default function DemosPage() {
   const [eUser, setEUser] = useState("");
   const [credBusy, setCredBusy] = useState(false);
   // Estilo del mensaje para copiar (nuevo / clásico)
-  const [msgStyle, setMsgStyle] = useState<"nuevo" | "clasico">("nuevo");
+  const [msgStyle, setMsgStyle] = useState<"sinclave" | "nuevo" | "clasico">("sinclave");
   // Actividad del prospecto (web / panel / socio)
   const [actId, setActId] = useState<string | null>(null);
   const [actBusy, setActBusy] = useState<string | null>(null);
@@ -175,7 +192,14 @@ export default function DemosPage() {
       if (user) {
         const { data: p } = await supabase.from("profiles").select("role").eq("id", user.id).single<{ role: string }>();
         setRole(p?.role || "");
-        if (p?.role === "super_admin") await loadDemos();
+        if (p?.role === "super_admin") {
+          await loadDemos();
+          const pr = await fetch("/api/admin/demo/publica", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "get" }),
+          }).then((x) => x.json()).catch(() => null);
+          if (pr?.ok) setPublicSlug(pr.slug || "");
+        }
       }
       setLoading(false);
     })();
@@ -385,6 +409,16 @@ export default function DemosPage() {
     } else {
       alert(res?.error || "No se pudo convertir.");
     }
+  }
+
+  async function togglePublica(d: DemoGym) {
+    const esPublica = publicSlug === d.slug;
+    const r = await fetch("/api/admin/demo/publica", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify(esPublica ? { action: "clear" } : { action: "set", slug: d.slug }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) setPublicSlug(r.slug || "");
+    else alert(r?.error || "No se pudo cambiar la demo pública.");
   }
 
   async function eliminar(d: DemoGym) {
@@ -738,8 +772,17 @@ export default function DemosPage() {
               </div>
               <div className="space-y-2 text-sm">
                 <div>
-                  <div className="text-xs text-muted">🌐 Web pública</div>
+                  <div className="text-xs text-muted">🌐 Su web</div>
                   <a href={result.url} target="_blank" rel="noreferrer" className="break-all text-brand hover:underline">{origin()}{result.url}</a>
+                </div>
+
+                <div className="rounded-lg border border-brand/25 bg-[rgba(34,211,238,.06)] p-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-brand">🎮 Link para probar (sin clave)</div>
+                    <CopyBtn text={`${origin()}/demo/${result.slug}`} label="Copiar" />
+                  </div>
+                  <a href={`/demo/${result.slug}`} target="_blank" rel="noreferrer" className="mt-0.5 block break-all text-brand hover:underline">{origin()}/demo/{result.slug}</a>
+                  <p className="mt-1 text-[11px] text-muted">Entra directo como dueño o como socio, sin usuario ni clave. Este y el de la web son los dos links que le mandás.</p>
                 </div>
 
                 <div className="rounded-lg border border-white/10 bg-white/5 p-2.5">
@@ -791,10 +834,11 @@ export default function DemosPage() {
                       <div className="truncate text-[11px] text-muted">/{d.slug}</div>
                     </div>
                     <div className="text-xs text-ink-2">{d.created_at ? new Date(d.created_at).toLocaleDateString("es-AR") : "—"}</div>
-                    <div>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {d.demo_suspended
                         ? <span className="rounded-full bg-[rgba(240,82,82,.14)] px-2 py-0.5 text-[10px] font-semibold text-crit">Suspendida</span>
                         : <span className="rounded-full bg-[rgba(34,197,94,.14)] px-2 py-0.5 text-[10px] font-semibold text-good">Activa</span>}
+                      {publicSlug === d.slug && <span className="rounded-full bg-[rgba(34,211,238,.14)] px-2 py-0.5 text-[10px] font-semibold text-brand" title="Es la demo del botón Probar de la web">★ Pública</span>}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold md:justify-end">
                       <button onClick={() => toggleActividad(d)} className="text-indigo hover:underline">{actId === d.id ? "Cerrar" : "📊 Actividad"}</button>
@@ -994,7 +1038,7 @@ export default function DemosPage() {
 
                             <div className="mb-1.5 flex items-center gap-1.5">
                               <span className="text-[11px] text-muted">Mensaje:</span>
-                              {([["nuevo", "Nuevo"], ["clasico", "Clásico"]] as const).map(([k, label]) => (
+                              {([["sinclave", "🔓 Sin clave"], ["nuevo", "Nuevo"], ["clasico", "Clásico"]] as const).map(([k, label]) => (
                                 <button key={k} type="button" onClick={() => setMsgStyle(k)}
                                   className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition ${msgStyle === k ? "border-brand/40 bg-[rgba(34,211,238,.12)] text-brand" : "border-white/10 text-ink-2 hover:text-ink"}`}>
                                   {label}
@@ -1002,8 +1046,37 @@ export default function DemosPage() {
                               ))}
                             </div>
                             <CopyBtn full
-                              text={msgStyle === "nuevo" ? messageFor(acc[d.id]) : messageForClasico(acc[d.id])}
+                              text={msgStyle === "sinclave" ? messageSinClave(acc[d.id]) : msgStyle === "nuevo" ? messageFor(acc[d.id]) : messageForClasico(acc[d.id])}
                               label="📋 Copiar mensaje para el cliente" />
+
+                            {/* Entrar sin clave (para vender): auto-login directo */}
+                            <div className="mt-1 rounded-lg border border-brand/25 bg-[rgba(34,211,238,.05)] p-2">
+                              <div className="mb-1 font-semibold text-brand">🔓 Entrar sin clave (para vender)</div>
+                              <div className="mb-2 rounded-md border border-brand/20 bg-black/20 p-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="truncate font-semibold text-ink">🎮 Link de prueba (elige dueño/socio)</span>
+                                  <CopyBtn text={`${origin()}/demo/${d.slug}`} label="Copiar" />
+                                </div>
+                                <div className="mt-0.5 truncate text-[10px] text-muted">{origin()}/demo/{d.slug}</div>
+                              </div>
+                              <div className="mb-1 text-[10px] text-muted">O directo a una vista:</div>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate">🖥️ Como dueño (entra directo)</span>
+                                <CopyBtn text={`${origin()}/demo/entrar?slug=${d.slug}&rol=owner`} label="Link" />
+                              </div>
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <span className="truncate">📲 Como socio (entra directo)</span>
+                                <CopyBtn text={`${origin()}/demo/entrar?slug=${d.slug}&rol=socio`} label="Link" />
+                              </div>
+                              <button
+                                onClick={() => togglePublica(d)}
+                                className={`mt-2 w-full rounded-md border px-2 py-1 text-[11px] font-semibold transition ${publicSlug === d.slug ? "border-good/40 bg-[rgba(34,197,94,.12)] text-good" : "border-white/15 text-ink-2 hover:text-ink"}`}>
+                                {publicSlug === d.slug ? "★ Es la demo pública (turnogym.com/demo) · quitar" : "Usar esta para el botón “Probar” de la web"}
+                              </button>
+                              {publicSlug === d.slug && (
+                                <p className="mt-1 text-[10px] text-muted">El link genérico <b>{origin()}/demo</b> entra a esta demo.</p>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <p className="text-xs text-crit">No se pudieron cargar los accesos.</p>
