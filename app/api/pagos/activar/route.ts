@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import { createPreapproval, mpConfigured } from "@/lib/mercadopago";
+import { createPreapproval, createPreference, mpConfigured } from "@/lib/mercadopago";
 
 /**
  * Checkout PÚBLICO de activación de una demo (sin login).
@@ -73,11 +73,12 @@ export async function POST(req: Request) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ ok: false, error: "Falta configuración del servidor." }, { status: 500 });
   if (!mpConfigured()) return NextResponse.json({ ok: false, error: "Mercado Pago todavía no está configurado. Probá por transferencia." }, { status: 503 });
 
-  let body: { slug?: string; plan?: string; email?: string };
+  let body: { slug?: string; plan?: string; email?: string; metodo?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
   const slug = String(body.slug || "").trim();
   const plan = String(body.plan || "").trim();
   const email = String(body.email || "").trim();
+  const metodo = body.metodo === "pago" ? "pago" : "suscripcion"; // suscripción (débito automático) o pago con MP
   if (!slug) return NextResponse.json({ ok: false, error: "Falta el gimnasio." }, { status: 400 });
   if (!["basico", "pro", "elite"].includes(plan)) return NextResponse.json({ ok: false, error: "Elegí un plan." }, { status: 400 });
   if (!email.includes("@")) return NextResponse.json({ ok: false, error: "Escribí un email válido para el pago." }, { status: 400 });
@@ -91,21 +92,29 @@ export async function POST(req: Request) {
   if (amount <= 0) return NextResponse.json({ ok: false, error: "Ese plan no tiene precio configurado." }, { status: 400 });
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin).replace(/\/$/, "");
+  const backUrl = `${appUrl}/activar/${slug}/listo`;
+  const notificationUrl = `${appUrl}/api/pagos/webhook`;
+  const externalReference = `${gym.id}|${plan}`;
+  // Mercado Pago limita el "reason" de la suscripción a 60 caracteres.
+  const reason = `turnogym Plan ${planCfg?.label || plan} - ${gym.name}`.slice(0, 60);
 
-  let pre: { id: string; init_point: string };
   try {
-    pre = await createPreapproval({
-      reason: `turnogym - Plan ${planCfg?.label || plan} (${gym.name})`,
-      amount,
-      payerEmail: email,
-      backUrl: `${appUrl}/activar/${slug}/listo`,
-      notificationUrl: `${appUrl}/api/pagos/webhook`,
-      externalReference: `${gym.id}|${plan}`,
+    if (metodo === "pago") {
+      // Pago con Mercado Pago (Checkout Pro, sin débito automático).
+      const pref = await createPreference({
+        title: reason,
+        amount, payerEmail: email, backUrl, notificationUrl, externalReference,
+      });
+      return NextResponse.json({ ok: true, init_point: pref.init_point });
+    }
+    // Suscripción (débito automático mensual).
+    const pre = await createPreapproval({
+      reason,
+      amount, payerEmail: email, backUrl, notificationUrl, externalReference,
     });
+    await a.from("subscriptions").update({ mp_preapproval_id: pre.id }).eq("gym_id", gym.id);
+    return NextResponse.json({ ok: true, init_point: pre.init_point });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 502 });
   }
-
-  await a.from("subscriptions").update({ mp_preapproval_id: pre.id }).eq("gym_id", gym.id);
-  return NextResponse.json({ ok: true, init_point: pre.init_point });
 }

@@ -24,7 +24,7 @@ export default function ActivarPage() {
   const [err, setErr] = useState("");
   const [plan, setPlan] = useState("pro");
   const [email, setEmail] = useState("");
-  const [metodo, setMetodo] = useState<"mp" | "transfer">("mp");
+  const [metodo, setMetodo] = useState<"suscripcion" | "pago" | "transfer">("suscripcion");
   const [paying, setPaying] = useState(false);
 
   useEffect(() => {
@@ -41,13 +41,13 @@ export default function ActivarPage() {
     })();
   }, [slug]);
 
-  async function pagarMP() {
+  async function pagar(m: "suscripcion" | "pago") {
     setErr("");
     if (!email.includes("@")) { setErr("Escribí tu email para el pago."); return; }
     setPaying(true);
     const r = await fetch("/api/pagos/activar", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ slug, plan, email: email.trim() }),
+      body: JSON.stringify({ slug, plan, email: email.trim(), metodo: m }),
     }).then((x) => x.json()).catch(() => null);
     setPaying(false);
     if (r?.ok && r.init_point) { window.location.href = r.init_point; return; }
@@ -110,28 +110,39 @@ export default function ActivarPage() {
             {/* Método */}
             <div>
               <div className="mb-1.5 text-sm font-semibold">Cómo querés pagar</div>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
                 {data.mp && (
-                  <button type="button" onClick={() => setMetodo("mp")}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition ${metodo === "mp" ? "border-brand/50 bg-[rgba(34,211,238,.1)] text-brand" : "border-white/10 text-ink-2"}`}>
-                    💳 Mercado Pago
+                  <button type="button" onClick={() => setMetodo("suscripcion")}
+                    className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-semibold transition ${metodo === "suscripcion" ? "border-brand/50 bg-[rgba(34,211,238,.1)] text-brand" : "border-white/10 text-ink-2"}`}>
+                    <span>🔁 Suscripción <span className="text-xs font-normal text-ink-2">· se debita solo cada mes</span></span>
+                    <span className="shrink-0 rounded-full bg-[rgba(34,197,94,.14)] px-2 py-0.5 text-[10px] font-bold text-good">Recomendado</span>
+                  </button>
+                )}
+                {data.mp && (
+                  <button type="button" onClick={() => setMetodo("pago")}
+                    className={`rounded-lg border px-3 py-2.5 text-left text-sm font-semibold transition ${metodo === "pago" ? "border-brand/50 bg-[rgba(34,211,238,.1)] text-brand" : "border-white/10 text-ink-2"}`}>
+                    💳 Pago con Mercado Pago <span className="text-xs font-normal text-ink-2">· un pago</span>
                   </button>
                 )}
                 <button type="button" onClick={() => setMetodo("transfer")}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition ${metodo === "transfer" ? "border-brand/50 bg-[rgba(34,211,238,.1)] text-brand" : "border-white/10 text-ink-2"}`}>
+                  className={`rounded-lg border px-3 py-2.5 text-left text-sm font-semibold transition ${metodo === "transfer" ? "border-brand/50 bg-[rgba(34,211,238,.1)] text-brand" : "border-white/10 text-ink-2"}`}>
                   🏦 Transferencia
                 </button>
               </div>
             </div>
 
-            {metodo === "mp" ? (
+            {metodo !== "transfer" ? (
               <div className="flex flex-col gap-2">
                 <input className="input" type="email" placeholder="Tu email (para el pago)" value={email} onChange={(e) => setEmail(e.target.value)} />
                 {err && <p className="text-sm text-crit">{err}</p>}
-                <button className="btn btn-primary" onClick={pagarMP} disabled={paying}>
-                  {paying ? "Redirigiendo…" : `Pagar ${money(planActual?.price || 0)}/mes con Mercado Pago`}
+                <button className="btn btn-primary" onClick={() => pagar(metodo === "pago" ? "pago" : "suscripcion")} disabled={paying}>
+                  {paying ? "Redirigiendo…" : metodo === "pago" ? `Pagar ${money(planActual?.price || 0)} con Mercado Pago` : `Suscribirme por ${money(planActual?.price || 0)}/mes`}
                 </button>
-                <p className="text-center text-[11px] text-muted">Autorizás el débito automático en Mercado Pago. Apenas se acredita, tu gimnasio queda activo solo.</p>
+                <p className="text-center text-[11px] text-muted">
+                  {metodo === "pago"
+                    ? "Un pago con Mercado Pago (tarjeta o dinero en cuenta). Tu gimnasio queda activo al acreditarse."
+                    : "Autorizás el débito automático en Mercado Pago. Apenas se acredita, tu gimnasio queda activo solo."}
+                </p>
               </div>
             ) : (
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm">
