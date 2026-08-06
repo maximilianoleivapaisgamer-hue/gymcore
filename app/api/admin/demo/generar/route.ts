@@ -236,8 +236,13 @@ export async function POST(req: Request) {
   // 4) Usuario dueño (login del panel). Usuario = nombre del gym todo junto;
   //    la contraseña es la misma. Entra en /acceso escribiendo ese usuario.
   const slug = `demo-${slugify(nombre)}-${rand(4)}`;
-  let ownerUser = slugify(nombre).replace(/-/g, "").slice(0, 24) || "demo";
-  if (ownerUser.length < 6) ownerUser = (ownerUser + "000000").slice(0, 6);
+  // Usuario corto y simple: la primera palabra del nombre (ej "CEFA (Centro…)" → "cefa").
+  // Si la primera es muy corta, suma la segunda. Máximo 16 caracteres.
+  const segs = slugify(nombre).split("-").filter(Boolean);
+  let ownerUser = segs[0] || "gym";
+  if (ownerUser.length < 4 && segs[1]) ownerUser += segs[1];
+  ownerUser = ownerUser.slice(0, 16);
+  if (ownerUser.length < 4) ownerUser = (ownerUser + "gym000").slice(0, 6);
   const userBase = ownerUser;
   let ownerId = "";
   for (let attempt = 0; attempt < 6; attempt++) {

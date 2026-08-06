@@ -49,6 +49,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/admin", label: "Super Admin", icon: "shield", superAdmin: true },
       { href: "/dashboard/mi-plan", label: "Mi plan", icon: "star" },
+      { href: "/dashboard/cuenta", label: "Mi cuenta", icon: "account" },
     ],
   },
 ];
@@ -132,6 +133,12 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
     ),
     plus: <path d="M12 5v14M5 12h14" />,
     logo: <path d="M6.5 6.5v11M17.5 6.5v11M4 9v6M20 9v6M6.5 12h11" />,
+    account: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1" />
+      </>
+    ),
     logout: <path d="M15 12H3m0 0l4-4m-4 4l4 4M11 3h6a2 2 0 012 2v14a2 2 0 01-2 2h-6" />,
     building: (
       <>

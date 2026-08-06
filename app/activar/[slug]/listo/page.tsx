@@ -54,9 +54,9 @@ export default function ActivarListoPage() {
               <div className="rounded-lg border border-brand/25 bg-[rgba(34,211,238,.06)] p-3">
                 <div className="text-xs font-semibold text-brand">🖥️ Tu panel de gestión</div>
                 <a href="/acceso" className="break-all text-brand hover:underline">{origin}/acceso</a>
-                <div className="mt-1.5 text-xs text-muted">Usuario y contraseña (iguales):</div>
+                <div className="mt-1.5 text-xs text-muted">Tu usuario y tu contraseña son <b className="text-ink">el mismo</b>:</div>
                 <div className="text-lg font-bold">{data.ownerUser}</div>
-                <p className="mt-1 text-[11px] text-muted">Entrá y cambiá tu contraseña en cualquier momento.</p>
+                <p className="mt-1 text-[11px] text-muted">O sea: en <b>usuario</b> ponés <b className="text-ink">{data.ownerUser}</b> y en <b>contraseña</b> también <b className="text-ink">{data.ownerUser}</b>. Cuando entres, podés cambiar tu usuario y contraseña desde tu panel → <b>Mi cuenta</b>.</p>
               </div>
             )}
             <div className="rounded-lg border border-white/10 bg-white/5 p-3">
