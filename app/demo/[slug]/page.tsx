@@ -20,5 +20,5 @@ export default async function DemoSlugPage({ params }: { params: { slug: string 
 
   const owner = `/demo/entrar?slug=${encodeURIComponent(slug)}&rol=owner`;
   const socio = `/demo/entrar?slug=${encodeURIComponent(slug)}&rol=socio`;
-  return <DemoChooser nombre={nombre} logoUrl={logoUrl} ownerHref={owner} socioHref={socio} />;
+  return <DemoChooser nombre={nombre} logoUrl={logoUrl} ownerHref={owner} socioHref={socio} activarHref={`/activar/${slug}`} />;
 }

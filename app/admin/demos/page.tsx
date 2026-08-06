@@ -1060,6 +1060,13 @@ export default function DemosPage() {
                                 </div>
                                 <div className="mt-0.5 truncate text-[10px] text-muted">{origin()}/demo/{d.slug}</div>
                               </div>
+                              <div className="mb-2 rounded-md border border-good/25 bg-[rgba(34,197,94,.06)] p-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="truncate font-semibold text-good">💳 Link para activar (pagar)</span>
+                                  <CopyBtn text={`${origin()}/activar/${d.slug}`} label="Copiar" />
+                                </div>
+                                <div className="mt-0.5 truncate text-[10px] text-muted">{origin()}/activar/{d.slug}</div>
+                              </div>
                               <div className="mb-1 text-[10px] text-muted">O directo a una vista:</div>
                               <div className="flex items-center justify-between gap-2">
                                 <span className="truncate">🖥️ Como dueño (entra directo)</span>

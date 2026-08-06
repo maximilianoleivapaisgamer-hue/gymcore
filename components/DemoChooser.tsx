@@ -12,11 +12,13 @@ export default function DemoChooser({
   ownerHref,
   socioHref,
   logoUrl,
+  activarHref,
 }: {
   nombre?: string;
   ownerHref: string;
   socioHref: string;
   logoUrl?: string | null;
+  activarHref?: string;
 }) {
   return (
     <main className="grid min-h-screen place-items-center px-6 py-12">
@@ -56,9 +58,13 @@ export default function DemoChooser({
         </div>
 
         <p className="mt-6 text-xs text-muted">Es una demo de prueba. Podés tocar todo sin miedo.</p>
-        <p className="mt-4 text-sm">
-          <Link href="/registro" className="font-semibold text-brand hover:underline">¿Te gustó? Registrá tu gimnasio →</Link>
-        </p>
+        {activarHref ? (
+          <a href={activarHref} className="btn btn-primary mt-4 inline-block w-full text-center">✅ Activar mi gimnasio</a>
+        ) : (
+          <p className="mt-4 text-sm">
+            <Link href="/registro" className="font-semibold text-brand hover:underline">¿Te gustó? Registrá tu gimnasio →</Link>
+          </p>
+        )}
       </div>
     </main>
   );
