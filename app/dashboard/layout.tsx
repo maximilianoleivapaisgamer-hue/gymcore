@@ -42,6 +42,7 @@ const NAV: NavGroup[] = [
     label: "Experiencia socio",
     items: [
       { href: "/dashboard/configuracion", label: "Página pública", icon: "globe" },
+      { href: "/dashboard/whatsapp", label: "Recordatorios WhatsApp", icon: "whatsapp" },
     ],
   },
   {
@@ -139,6 +140,7 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
         <path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1" />
       </>
     ),
+    whatsapp: <path d="M4 20l1.3-3.9A7.5 7.5 0 1120 10.5 7.5 7.5 0 018.9 18.7L4 20zM9 9c.2 1.4 2.6 3.8 4 4 .5 0 1-.4 1.2-.9" />,
     logout: <path d="M15 12H3m0 0l4-4m-4 4l4 4M11 3h6a2 2 0 012 2v14a2 2 0 01-2 2h-6" />,
     building: (
       <>
