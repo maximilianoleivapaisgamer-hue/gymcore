@@ -26,7 +26,6 @@ function admin() {
 function nextMonthIso(): string {
   const d = new Date();
   d.setMonth(d.getMonth() + 1);
-  d.setDate(d.getDate() + 3); // 3 días de regalo sin cargo para configurar
   return d.toISOString();
 }
 

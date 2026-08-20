@@ -63,7 +63,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null } | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [openDemo, setOpenDemo] = useState<Set<string>>(new Set());
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
@@ -90,7 +90,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("name, logo_url, whatsapp, theme, bg_style, is_demo, slug").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string }>(),
+      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -246,6 +246,14 @@ export default function PortalPage() {
   // La pestaña Dieta aparece si el gimnasio es Elite o si el socio ya tiene una dieta asignada.
   const showDiet = isElite || !!diet;
 
+  // Secciones que el dueño ocultó a los socios desde "Secciones" (app del cliente).
+  const hiddenMember = gym?.hidden_member_sections || [];
+  const visibleTabs = BASE_TABS.filter(
+    (t) => (t.key !== "dieta" || showDiet) && !hiddenMember.includes(t.key)
+  );
+  // Si la pestaña activa quedó oculta, mostramos "Mi perfil" (siempre disponible).
+  const effTab: TabKey = visibleTabs.some((t) => t.key === tab) ? tab : "perfil";
+
   const waHref = gym?.whatsapp
     ? `https://wa.me/${gym.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
         `Hola! Quiero abonar mi cuota${member!.plan_name ? ` del plan ${member!.plan_name}` : ""}.`
@@ -289,19 +297,20 @@ export default function PortalPage() {
       </header>
 
       {/* Tabs */}
-      <div className={`mb-5 grid gap-1 rounded-xl border border-white/10 bg-surface-2 p-1 ${showDiet ? "grid-cols-4" : "grid-cols-3"}`}>
-        {BASE_TABS.filter((t) => t.key !== "dieta" || showDiet).map((t) => (
+      <div className="mb-5 grid gap-1 rounded-xl border border-white/10 bg-surface-2 p-1"
+        style={{ gridTemplateColumns: `repeat(${Math.max(visibleTabs.length, 1)}, minmax(0, 1fr))` }}>
+        {visibleTabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-lg py-2 text-sm font-semibold transition ${tab === t.key ? "bg-brand text-black" : "text-ink-2 hover:text-ink"}`}
+            className={`rounded-lg py-2 text-sm font-semibold transition ${effTab === t.key ? "bg-brand text-black" : "text-ink-2 hover:text-ink"}`}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      {tab === "perfil" && (
+      {effTab === "perfil" && (
         <div className="flex flex-col gap-4">
           {/* Card 1: identidad del socio (centrada) */}
           <div className="card text-center">
@@ -366,7 +375,7 @@ export default function PortalPage() {
         </div>
       )}
 
-      {tab === "rutina" && (
+      {effTab === "rutina" && (
         <div className="flex flex-col gap-4">
           <div className="card p-0">
             <div className="border-b border-white/10 p-4">
@@ -468,7 +477,7 @@ export default function PortalPage() {
         </div>
       )}
 
-      {tab === "dieta" && showDiet && (
+      {effTab === "dieta" && showDiet && (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-surface-2 p-1">
             <button onClick={() => setDietSub("plan")}
@@ -562,7 +571,7 @@ export default function PortalPage() {
         </div>
       )}
 
-      {tab === "clases" && (
+      {effTab === "clases" && (
         <div className="flex flex-col gap-4">
           <div className="card p-0">
             <div className="border-b border-white/10 p-4">

@@ -28,6 +28,21 @@ export const TOGGLEABLE_SECTIONS: PanelSection[] = [
 
 export const TOGGLEABLE_KEYS: string[] = TOGGLEABLE_SECTIONS.map((s) => s.key);
 
+/**
+ * Secciones que ve el SOCIO en su app (portal). El dueño puede ocultarlas para
+ * sus clientes de forma independiente a su propio panel: podés seguir usando
+ * Rutinas vos, pero que a los socios no les aparezca. Las claves coinciden con
+ * las pestañas del portal ("rutina", "dieta", "clases"). Se guardan las claves
+ * OCULTAS en gyms.hidden_member_sections.
+ */
+export const MEMBER_SECTIONS: PanelSection[] = [
+  { key: "rutina", label: "Rutina", hint: "Que el socio vea su rutina en la app." },
+  { key: "dieta", label: "Dieta", hint: "Que el socio vea su plan de comidas en la app." },
+  { key: "clases", label: "Clases y reservas", hint: "Que el socio vea y reserve clases en la app." },
+];
+
+export const MEMBER_KEYS: string[] = MEMBER_SECTIONS.map((s) => s.key);
+
 /** ¿La sección está activa para este gimnasio? (por defecto sí). */
 export function sectionOn(hidden: string[] | null | undefined, key: string): boolean {
   return !(hidden || []).includes(key);

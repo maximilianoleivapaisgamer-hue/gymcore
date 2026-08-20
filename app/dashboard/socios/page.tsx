@@ -65,13 +65,15 @@ export default function SociosPage() {
   const [gymId, setGymId] = useState<string | null>(null);
   const [gymSlug, setGymSlug] = useState<string | null>(null);
   const [plans, setPlans] = useState<RealPlan[]>([]);
-  const [welcome, setWelcome] = useState<{ name: string; whatsapp: string; planName: string | null; planPrice: number | null } | null>(null);
+  const [welcome, setWelcome] = useState<{ name: string; whatsapp: string | null; planName: string | null; planPrice: number | null } | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState("");
+  const [copied, setCopied] = useState("");
   // Cobro al alta (solo efectivo / transferencia / terminal POS)
   const COBRO_METHODS: { value: string; label: string }[] = [
     { value: "efectivo", label: "Efectivo" },
@@ -110,8 +112,8 @@ export default function SociosPage() {
       m.full_name.toLowerCase().includes(q) || (m.dni || "").includes(q));
   }, [members, search]);
 
-  function openNew() { setEditing({ ...EMPTY }); setCharge(false); setMethod("efectivo"); setInitialWeight(""); setModal(true); }
-  function openEdit(m: Member) { setEditing({ ...m }); setCharge(false); setMethod("efectivo"); setInitialWeight(""); setModal(true); }
+  function openNew() { setSaveErr(""); setEditing({ ...EMPTY }); setCharge(false); setMethod("efectivo"); setInitialWeight(""); setModal(true); }
+  function openEdit(m: Member) { setSaveErr(""); setEditing({ ...m }); setCharge(false); setMethod("efectivo"); setInitialWeight(""); setModal(true); }
 
   // Al elegir un plan del listado, autocompleta nombre y precio.
   function selectPlan(name: string) {
@@ -141,7 +143,7 @@ export default function SociosPage() {
     }
 
     const isNew = !editing.id;
-    setSaving(true);
+    setSaving(true); setSaveErr("");
     const price = editing.plan_price ? Number(editing.plan_price) : null;
     const payload = {
       gym_id: gymId,
@@ -159,10 +161,12 @@ export default function SociosPage() {
     };
     let memberId = editing.id || null;
     if (memberId) {
-      await supabase.from("members").update(payload).eq("id", memberId);
+      const { error } = await supabase.from("members").update(payload).eq("id", memberId);
+      if (error) { setSaving(false); setSaveErr(`No se pudo guardar: ${error.message}`); return; }
     } else {
-      const { data: inserted } = await supabase.from("members").insert(payload).select("id").single<{ id: string }>();
-      memberId = inserted?.id || null;
+      const { data: inserted, error } = await supabase.from("members").insert(payload).select("id").single<{ id: string }>();
+      if (error || !inserted?.id) { setSaving(false); setSaveErr(`No se pudo crear el socio: ${error?.message || "no se obtuvo el ID"}`); return; }
+      memberId = inserted.id;
     }
     // Cobro directo → registra ingreso en la caja, vinculado al socio y al plan cobrado
     if (charge && price && price > 0) {
@@ -204,10 +208,10 @@ export default function SociosPage() {
     }
     // Bienvenida automática → después de dar de alta a un socio nuevo, ofrece
     // mandarle por WhatsApp el detalle de su plan + el link para bajar la app.
-    if (isNew && editing.whatsapp) {
+    if (isNew) {
       setWelcome({
         name: editing.full_name || "tu nuevo socio",
-        whatsapp: editing.whatsapp,
+        whatsapp: editing.whatsapp || null,
         planName: editing.plan_name || null,
         planPrice: price,
       });
@@ -215,17 +219,29 @@ export default function SociosPage() {
     setSaving(false); setModal(false); setEditing(null); load();
   }
 
-  function welcomeHref() {
-    if (!welcome) return "#";
-    const link = gymSlug ? `${window.location.origin}/g/${gymSlug}` : `${window.location.origin}/acceso`;
+  // Link con el que el socio entra a su app (o /acceso si no hay slug).
+  function socioLink() {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://turnogym.com";
+    return gymSlug ? `${origin}/g/${gymSlug}` : `${origin}/acceso`;
+  }
+  // Mensaje de bienvenida listo para mandar por donde quieras (con el link + acceso).
+  function welcomeText() {
+    if (!welcome) return "";
     const planTxt = welcome.planName
       ? `Tu plan: ${welcome.planName}${welcome.planPrice ? ` ($${welcome.planPrice})` : ""}.\n`
       : "";
-    const text =
+    return (
       `¡Hola ${welcome.name}! 👋 Bienvenido/a. ${planTxt}` +
       `Ya te creamos tu cuenta en la app para ver tu rutina, tus clases y pagar tu cuota.\n` +
-      `Entrá acá: ${link}\nUsuario y contraseña: tu DNI.`;
-    return `https://wa.me/${welcome.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+      `Entrá acá: ${socioLink()}\nUsuario y contraseña: tu DNI.`
+    );
+  }
+  function welcomeHref() {
+    if (!welcome?.whatsapp) return "#";
+    return `https://wa.me/${welcome.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(welcomeText())}`;
+  }
+  async function copiar(text: string, tag: string) {
+    try { await navigator.clipboard.writeText(text); setCopied(tag); setTimeout(() => setCopied(""), 2000); } catch { /* noop */ }
   }
 
   async function remove(id: string) {
@@ -253,15 +269,33 @@ export default function SociosPage() {
         <button className="btn btn-primary" onClick={openNew}>+ Agregar socio</button>
       </div>
 
+      {/* Link para que los socios entren a su app */}
+      <div className="card mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">🔗 Link para tus socios</div>
+          <div className="text-xs text-ink-2">Con este link entran a su app (usuario y contraseña = su DNI). Mandáselo por donde quieras.</div>
+          <div className="mt-1 truncate text-sm font-medium text-brand">{socioLink()}</div>
+        </div>
+        <button className="btn btn-primary shrink-0" onClick={() => copiar(socioLink(), "link")}>{copied === "link" ? "✓ ¡Copiado!" : "📋 Copiar link"}</button>
+      </div>
+
       {welcome && (
-        <div className="card mb-4 flex flex-wrap items-center justify-between gap-3 border-brand/30 bg-[rgba(34,211,238,.06)]">
-          <div>
-            <div className="font-semibold">✅ {welcome.name} fue dado de alta</div>
-            <div className="text-sm text-ink-2">Ya tiene su cuenta creada (usuario y clave = DNI). Mandale por WhatsApp cómo entrar a la app.</div>
+        <div className="card mb-4 border-brand/30 bg-[rgba(34,211,238,.06)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold">✅ {welcome.name} fue dado de alta</div>
+              <div className="text-sm text-ink-2">Ya tiene su cuenta (usuario y clave = su DNI). Pasale el link para que entre a la app.</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {welcome.whatsapp && (
+                <a href={welcomeHref()} target="_blank" rel="noreferrer" className="btn btn-primary">💬 Enviar por WhatsApp</a>
+              )}
+              <button className="btn btn-ghost" onClick={() => copiar(welcomeText(), "welcome")}>{copied === "welcome" ? "✓ ¡Copiado!" : "📋 Copiar mensaje"}</button>
+              <button className="btn btn-ghost" onClick={() => setWelcome(null)}>Cerrar</button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <a href={welcomeHref()} target="_blank" rel="noreferrer" className="btn btn-primary">💬 Enviar bienvenida</a>
-            <button className="btn btn-ghost" onClick={() => setWelcome(null)}>Ahora no</button>
+          <div className="mt-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-ink-2">
+            Link para el socio: <b className="text-ink">{socioLink()}</b>
           </div>
         </div>
       )}
@@ -439,6 +473,7 @@ export default function SociosPage() {
                 )}
               </div>
             </div>
+            {saveErr && <p className="mt-4 rounded-lg border border-crit/30 bg-[rgba(239,68,68,.08)] px-3 py-2 text-sm text-crit">{saveErr}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-ghost" onClick={() => setModal(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={save} disabled={saving || !editing.full_name}>

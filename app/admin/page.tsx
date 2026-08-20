@@ -66,6 +66,7 @@ export default function AdminDashboard() {
   const [accesoNewUser, setAccesoNewUser] = useState("");
   const [accesoMsg, setAccesoMsg] = useState("");
   const [accesoErr, setAccesoErr] = useState("");
+  const [accesoCopiado, setAccesoCopiado] = useState(false);
 
   // Carga TODA la librería en tandas (traduce con IA). No se frena por una tanda:
   // si una falla la traducción, el servidor la degrada y sigue; y ante un corte
@@ -151,19 +152,12 @@ export default function AdminDashboard() {
       body: JSON.stringify({ gymId: g.id, action: "desmarcar_prueba" }),
     }).then((x) => x.json()).catch(() => null);
     if (!r?.ok) { setBusyGym(null); alert(r?.error || "No se pudo completar la acción."); return; }
-    // Activar como cliente, con vencimiento a 30 días + 3 de regalo sin cargo (33).
-    const vence = new Date(Date.now() + 33 * 864e5).toISOString().slice(0, 10);
+    // Activar como cliente, con vencimiento a 30 días.
+    const vence = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
     await saveSub(g.id, { status: "active", payment_method: method, current_period_end: vence });
     setGyms((gs) => gs.map((x) => (x.id === g.id ? { ...x, is_test: false } : x)));
     setConvertId(null);
     setBusyGym(null);
-  }
-  // Le da al gimnasio unos días sin cargo para que configure todo (prueba gratis).
-  // Lo deja en estado "trial" con vencimiento a N días y sin método de pago.
-  async function darGracia(g: Gym, dias = 3) {
-    if (!confirm(`¿Darle a "${g.name}" ${dias} días sin cargo para que configure? Queda como prueba gratis (no se le cobra) y vence en ${dias} días.`)) return;
-    const fin = new Date(Date.now() + dias * 864e5).toISOString().slice(0, 10);
-    await saveSub(g.id, { status: "trial", trial_ends_at: fin, current_period_end: null, payment_method: null });
   }
   // Abre el panel de accesos del dueño de un gimnasio (demo o cliente real):
   // muestra el usuario y permite reiniciar usuario + contraseña.
@@ -191,6 +185,16 @@ export default function AdminDashboard() {
     setAccesoBusy(false);
     if (r?.ok) { setAccesoData((d) => (d ? { ...d, owner: { user: r.user } } : d)); setAccesoNewUser(r.user); setAccesoMsg(`Listo. Usuario y contraseña ahora son: ${r.user}`); }
     else setAccesoErr(r?.error || "No se pudo cambiar el acceso.");
+  }
+  // Copia un mensaje listo para pegarle al dueño por WhatsApp con su acceso.
+  function copiarAcceso() {
+    const u = accesoData?.owner?.user || "";
+    if (!u) return;
+    const msg = `¡Hola! 👋 Te paso los accesos a tu panel de turnogym:\n\n🔗 turnogym.com/acceso\n👤 Usuario: ${u}\n🔑 Contraseña: ${u}\n\nCuando entres podés cambiar la contraseña desde "Mi cuenta".`;
+    navigator.clipboard?.writeText(msg).then(() => {
+      setAccesoCopiado(true);
+      setTimeout(() => setAccesoCopiado(false), 2000);
+    }).catch(() => { setAccesoErr("No se pudo copiar. Copialo a mano."); });
   }
   function archivar(g: Gym) {
     if (!confirm(`¿Archivar "${g.name}"? Sale de la lista de clientes y de las métricas, pero no se borra. Lo podés reactivar cuando quieras.`)) return;
@@ -277,12 +281,14 @@ export default function AdminDashboard() {
   }, [activeGyms, subByGym, demoOwnerIds]);
 
   const filtered = useMemo(() => {
+    // Dashboard: solo clientes activos (estado "active" y que no sean prueba).
+    const base = activeGyms.filter((g) => !isTestGym(g) && subByGym[g.id]?.status === "active");
     const t = q.trim().toLowerCase();
-    if (!t) return activeGyms;
-    return activeGyms.filter((g) =>
+    if (!t) return base;
+    return base.filter((g) =>
       g.name.toLowerCase().includes(t) || g.slug.toLowerCase().includes(t) || ownerName(g.owner_id).toLowerCase().includes(t));
     /* eslint-disable-next-line */
-  }, [activeGyms, q, owners]);
+  }, [activeGyms, subByGym, q, owners]);
 
   async function saveSub(gymId: string, patch: Partial<Sub>) {
     setSavingId(gymId);
@@ -502,7 +508,6 @@ export default function AdminDashboard() {
                               Marcar prueba
                             </button>
                           )}
-                          <button onClick={() => darGracia(g, 3)} disabled={busyGym === g.id || savingId === g.id} className="font-semibold text-brand hover:underline disabled:opacity-50" title="Darle 3 días sin cargo para que configure (prueba gratis, no se le cobra)">3 días gratis</button>
                           <button onClick={() => archivar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-warn disabled:opacity-50" title="Sacar de clientes sin borrar (reversible)">Archivar</button>
                           <button onClick={() => eliminar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-crit disabled:opacity-50" title="Borrar para siempre">Eliminar</button>
                         </div>
@@ -606,7 +611,11 @@ export default function AdminDashboard() {
                   <div className="text-xs uppercase tracking-wide text-muted">Dueño (panel)</div>
                   <div className="mt-1">Entra en <b>turnogym.com/acceso</b></div>
                   <div>Usuario: <b className="text-ink">{accesoData?.owner?.user || "—"}</b></div>
-                  <div className="mt-0.5 text-xs text-ink-2">La contraseña es igual al usuario (salvo que el dueño la haya cambiado desde “Mi cuenta”).</div>
+                  <div>Contraseña: <b className="text-ink">{accesoData?.owner?.user || "—"}</b> <span className="text-xs text-ink-2">(igual al usuario)</span></div>
+                  <button onClick={copiarAcceso} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-brand/40 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/10">
+                    {accesoCopiado ? "✓ ¡Copiado!" : "📋 Copiar acceso para WhatsApp"}
+                  </button>
+                  <div className="mt-2 text-xs text-ink-2">Si el dueño cambió la contraseña y necesitás asistirlo, reiniciala abajo: queda de nuevo igual al usuario.</div>
                   {accesoData?.socio && (
                     <div className="mt-2 border-t border-white/10 pt-2">
                       <div className="text-xs uppercase tracking-wide text-muted">Socio de ejemplo</div>

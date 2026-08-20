@@ -247,7 +247,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {gym?.is_demo && gymId && <DemoVisitPing gymId={gymId} kind="panel" />}
       {/* Sidebar */}
       <aside
-        className={`fixed z-40 flex h-screen w-64 flex-col gap-1 overflow-y-auto border-r border-white/[.08] bg-gradient-to-b from-[#0c1017] to-bg px-3.5 py-5 transition-transform md:sticky md:top-0 md:translate-x-0 ${
+        className={`fixed z-40 flex h-screen w-64 flex-col gap-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-white/[.08] bg-gradient-to-b from-[#0c1017] to-bg px-3.5 py-5 transition-transform md:sticky md:top-0 md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >

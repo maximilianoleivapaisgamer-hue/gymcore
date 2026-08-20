@@ -46,10 +46,8 @@ export async function POST(req: Request) {
   if (!res.converted) return NextResponse.json({ ok: false, error: "Ese gimnasio no es una demo (o ya es cliente)." }, { status: 400 });
 
   // Dejamos la suscripción según lo elegido.
-  // Al cliente real (active) le regalamos 3 días arriba del mes (30 + 3 = 33)
-  // para que tenga margen de configuración sin cargo.
   const now = new Date();
-  const end = new Date(now); end.setDate(end.getDate() + (status === "trial" ? days : 33));
+  const end = new Date(now); end.setDate(end.getDate() + (status === "trial" ? days : 30));
   const row: Record<string, unknown> = {
     gym_id: gymId,
     plan,

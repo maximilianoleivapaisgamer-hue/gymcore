@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
-import { TOGGLEABLE_SECTIONS, TOGGLEABLE_KEYS } from "@/lib/sections";
+import { TOGGLEABLE_SECTIONS, TOGGLEABLE_KEYS, MEMBER_SECTIONS, MEMBER_KEYS } from "@/lib/sections";
 
 /**
  * Ajustes del panel: el dueño elige qué secciones usar. Las que apaga se guardan
@@ -13,6 +13,7 @@ export default function SeccionesPage() {
   const supabase = createClient();
   const [gymId, setGymId] = useState<string | null>(null);
   const [hidden, setHidden] = useState<string[]>([]);
+  const [hiddenMember, setHiddenMember] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -27,8 +28,8 @@ export default function SeccionesPage() {
       if (profile?.gym_id) {
         // select("*") para que no rompa si la columna todavía no está migrada.
         const { data } = await supabase.from("gyms").select("*").eq("id", profile.gym_id)
-          .single<{ id: string; hidden_sections?: string[] | null }>();
-        if (data) { setGymId(data.id); setHidden(data.hidden_sections || []); }
+          .single<{ id: string; hidden_sections?: string[] | null; hidden_member_sections?: string[] | null }>();
+        if (data) { setGymId(data.id); setHidden(data.hidden_sections || []); setHiddenMember(data.hidden_member_sections || []); }
       }
       setLoading(false);
     })();
@@ -40,12 +41,18 @@ export default function SeccionesPage() {
     setMsg(""); setErr("");
     setHidden((h) => (h.includes(key) ? h.filter((k) => k !== key) : [...h, key]));
   }
+  const isOnMember = (key: string) => !hiddenMember.includes(key);
+  function toggleMember(key: string) {
+    setMsg(""); setErr("");
+    setHiddenMember((h) => (h.includes(key) ? h.filter((k) => k !== key) : [...h, key]));
+  }
 
   async function guardar() {
     if (!gymId) return;
     setSaving(true); setMsg(""); setErr("");
     const clean = Array.from(new Set(hidden.filter((k) => TOGGLEABLE_KEYS.includes(k))));
-    const { error } = await supabase.from("gyms").update({ hidden_sections: clean }).eq("id", gymId);
+    const cleanMember = Array.from(new Set(hiddenMember.filter((k) => MEMBER_KEYS.includes(k))));
+    const { error } = await supabase.from("gyms").update({ hidden_sections: clean, hidden_member_sections: cleanMember }).eq("id", gymId);
     setSaving(false);
     if (error) { setErr("No se pudo guardar. ¿Corriste la migración en Supabase?"); return; }
     setMsg("¡Guardado! Actualizando el menú…");
@@ -58,10 +65,12 @@ export default function SeccionesPage() {
   return (
     <div className="mx-auto w-full max-w-2xl p-5 md:p-7">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Secciones del panel</h1>
-        <p className="mt-1 text-ink-2">Prendé o apagá las secciones según lo que uses. Las que apagues desaparecen del menú (no se borra nada, las volvés a prender cuando quieras).</p>
+        <h1 className="text-2xl font-bold">Secciones</h1>
+        <p className="mt-1 text-ink-2">Elegí qué secciones usás vos en el panel y qué ven tus clientes en la app. No se borra nada: lo volvés a prender cuando quieras.</p>
       </div>
 
+      <div className="mb-2 text-sm font-semibold text-ink">Tu panel</div>
+      <p className="mb-3 text-xs text-ink-2">Las que apagues desaparecen de tu menú lateral.</p>
       <div className="card divide-y divide-white/[.06]">
         {TOGGLEABLE_SECTIONS.map((s) => (
           <div key={s.key} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
@@ -73,6 +82,24 @@ export default function SeccionesPage() {
               aria-pressed={isOn(s.key)} aria-label={`Usar ${s.label}`}
               className={`relative h-7 w-12 shrink-0 rounded-full transition ${isOn(s.key) ? "bg-brand" : "bg-white/15"}`}>
               <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${isOn(s.key) ? "left-6" : "left-1"}`} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-2 mt-6 text-sm font-semibold text-ink">Lo que ven tus clientes en la app</div>
+      <p className="mb-3 text-xs text-ink-2">Es aparte de tu panel: podés seguir usando una sección vos y aun así ocultársela a tus socios. Si la apagás, no les aparece en su app.</p>
+      <div className="card divide-y divide-white/[.06]">
+        {MEMBER_SECTIONS.map((s) => (
+          <div key={s.key} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">{s.label}</div>
+              <p className="text-xs text-ink-2">{s.hint}</p>
+            </div>
+            <button type="button" onClick={() => toggleMember(s.key)}
+              aria-pressed={isOnMember(s.key)} aria-label={`Mostrar ${s.label} a los socios`}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition ${isOnMember(s.key) ? "bg-brand" : "bg-white/15"}`}>
+              <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${isOnMember(s.key) ? "left-6" : "left-1"}`} />
             </button>
           </div>
         ))}
