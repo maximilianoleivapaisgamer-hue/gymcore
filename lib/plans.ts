@@ -8,7 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * se rompa el gateo de funciones.
  */
 
-export type PlanFeature = "clases" | "dietas" | "control_acceso" | "ia";
+export type PlanFeature = "clases" | "dietas" | "control_acceso" | "ia" | "whatsapp";
 export type SubPlanKey = "basico" | "pro" | "elite";
 
 /** Funciones que se pueden asignar a un plan (para el editor del Super Admin). */
@@ -17,6 +17,7 @@ export const ALL_FEATURES: { key: PlanFeature; label: string }[] = [
   { key: "dietas", label: "Dietas / nutrición" },
   { key: "control_acceso", label: "Control de acceso (QR/DNI)" },
   { key: "ia", label: "IA que genera rutinas y dietas" },
+  { key: "whatsapp", label: "Recordatorios de cuota por WhatsApp" },
 ];
 
 export interface PlanConfig {
@@ -43,14 +44,14 @@ export const DEFAULT_PLANS: PlanConfig[] = [
   {
     key: "pro", sort: 2, label: "Pro", tagline: "Para gimnasios en crecimiento.",
     price: 79000, promo_price: null, promo_note: null, featured: true,
-    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Recordatorios automáticos", "Configurá tu dominio propio (ej: tugim.com.ar)"],
-    capabilities: ["clases", "dietas", "control_acceso"],
+    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Recordatorios de cuota por WhatsApp", "Configurá tu dominio propio (ej: tugim.com.ar)"],
+    capabilities: ["clases", "dietas", "control_acceso", "whatsapp"],
   },
   {
     key: "elite", sort: 3, label: "Elite", tagline: "Para cadenas y multi-sede.",
     price: 119000, promo_price: 90000, promo_note: "Primer mes a $90.000 para gimnasios que contraten ahora.", featured: false,
     features: ["Sucursales ilimitadas", "Todo lo del Pro", "Control de acceso por QR", "Cobros online (Mercado Pago)", "Soporte prioritario"],
-    capabilities: ["clases", "dietas", "control_acceso", "ia"],
+    capabilities: ["clases", "dietas", "control_acceso", "ia", "whatsapp"],
   },
 ];
 

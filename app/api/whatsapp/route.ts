@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient as createServer } from "@/lib/supabase-server";
 import { sendTemplate, waConfigured } from "@/lib/whatsapp";
+import { allows, loadPlans } from "@/lib/plans";
 
 /**
  * Configuración de recordatorios por WhatsApp del gimnasio (dueño logueado).
- *  GET  → { central, phoneId, enabled, daysBefore, gymName }
+ *  GET  → { allowed, central, phoneId, enabled, daysBefore, gymName }
  *  POST { action: "save", phoneId, enabled, daysBefore } → guarda la config
  *  POST { action: "test", to } → manda una plantilla de prueba a ese número
+ *
+ * Es una función del plan Pro (y superior): si el plan del gimnasio no la
+ * incluye, no se puede guardar ni probar.
  */
 export const runtime = "nodejs";
 
@@ -23,6 +27,17 @@ async function meGym() {
   return { admin, gymId: prof.gym_id };
 }
 
+/** ¿El plan del gimnasio incluye los recordatorios por WhatsApp?
+ *  Salvaguarda: si NINGÚN plan tiene la capacidad "whatsapp" (todavía no se
+ *  corrió el SQL que la marca como Pro), no bloqueamos a nadie. */
+async function gymAllowsWhatsapp(admin: ReturnType<typeof createAdmin>, gymId: string): Promise<boolean> {
+  const { data: sub } = await admin.from("subscriptions").select("plan").eq("gym_id", gymId).maybeSingle<{ plan: string }>();
+  const plans = await loadPlans(admin as never);
+  const gated = plans.some((p) => (p.capabilities || []).includes("whatsapp"));
+  if (!gated) return true;
+  return allows(plans, sub?.plan ?? null, "whatsapp");
+}
+
 export async function GET() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ ok: false, error: "Falta configuración del servidor." }, { status: 500 });
   const m = await meGym();
@@ -31,6 +46,7 @@ export async function GET() {
     .maybeSingle<{ name: string; wa_phone_id: string | null; wa_reminders: boolean; wa_days_before: number }>();
   return NextResponse.json({
     ok: true,
+    allowed: await gymAllowsWhatsapp(m.admin, m.gymId),
     central: waConfigured(),
     gymName: gym?.name || "",
     phoneId: gym?.wa_phone_id || "",
@@ -43,6 +59,10 @@ export async function POST(req: Request) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ ok: false, error: "Falta configuración del servidor." }, { status: 500 });
   const m = await meGym();
   if ("error" in m) return NextResponse.json({ ok: false, error: m.error }, { status: m.status });
+
+  if (!(await gymAllowsWhatsapp(m.admin, m.gymId))) {
+    return NextResponse.json({ ok: false, error: "Los recordatorios por WhatsApp están disponibles a partir del plan Pro." }, { status: 403 });
+  }
 
   let body: { action?: string; phoneId?: string; enabled?: boolean; daysBefore?: number; to?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }

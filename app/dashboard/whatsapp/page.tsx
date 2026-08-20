@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function WhatsAppPage() {
   const [loading, setLoading] = useState(true);
+  const [allowed, setAllowed] = useState(true);
   const [central, setCentral] = useState(false);
   const [gymName, setGymName] = useState("");
   const [phoneId, setPhoneId] = useState("");
@@ -22,7 +24,7 @@ export default function WhatsAppPage() {
   useEffect(() => {
     (async () => {
       const r = await fetch("/api/whatsapp").then((x) => x.json()).catch(() => null);
-      if (r?.ok) { setCentral(r.central); setGymName(r.gymName); setPhoneId(r.phoneId); setEnabled(r.enabled); setDaysBefore(r.daysBefore); }
+      if (r?.ok) { setAllowed(r.allowed !== false); setCentral(r.central); setGymName(r.gymName); setPhoneId(r.phoneId); setEnabled(r.enabled); setDaysBefore(r.daysBefore); }
       setLoading(false);
     })();
   }, []);
@@ -50,6 +52,28 @@ export default function WhatsAppPage() {
   }
 
   if (loading) return <div className="grid min-h-[40vh] place-items-center text-ink-2">Cargando…</div>;
+
+  if (!allowed) {
+    return (
+      <main className="mx-auto max-w-2xl px-6 py-14">
+        <div className="text-center">
+          <div className="mb-2 text-4xl">💬</div>
+          <h1 className="text-2xl font-bold">Los recordatorios <span className="text-brand">automáticos</span> por WhatsApp están en el plan Pro</h1>
+          <p className="mx-auto mt-2 max-w-xl text-ink-2">
+            Con el plan Pro, el sistema le avisa <b>solo</b> por WhatsApp a cada socio que tiene la cuota por vencer o vencida —desde el número de tu gimnasio— sin que hagas nada.
+          </p>
+          <Link href="/dashboard/mi-plan" className="btn btn-primary mt-5 inline-block">Pasar al plan Pro</Link>
+        </div>
+
+        <div className="card mt-8 border-good/25 bg-[rgba(52,211,153,.06)]">
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-good">✅ En tu plan actual ya podés recordar a mano</div>
+          <p className="text-sm text-ink-2">
+            Andá a <Link href="/dashboard/socios" className="font-semibold text-brand hover:underline">Socios</Link> y, al lado de cada persona que debe, tocá el ícono de <b>WhatsApp</b>: se abre el chat con ese socio para mandarle el recordatorio vos mismo. Es manual, pero no te cuesta nada y sirve igual.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-2xl p-5 md:p-7">

@@ -44,7 +44,7 @@ const NAV: NavGroup[] = [
     label: "Experiencia socio",
     items: [
       { href: "/dashboard/configuracion", label: "Página pública", icon: "globe", section: "pagina-publica" },
-      { href: "/dashboard/whatsapp", label: "Recordatorios WhatsApp", icon: "whatsapp", section: "whatsapp" },
+      { href: "/dashboard/whatsapp", label: "Recordatorios WhatsApp", icon: "whatsapp", feature: "whatsapp", section: "whatsapp" },
     ],
   },
   {
