@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   const { data: gym } = await admin.from("gyms")
     .select("id, slug, name, owner_id, is_demo").eq("id", gymId)
     .single<{ id: string; slug: string; name: string; owner_id: string; is_demo: boolean }>();
-  if (!gym || !gym.is_demo) return NextResponse.json({ ok: false, error: "No es una demo válida." }, { status: 404 });
+  if (!gym) return NextResponse.json({ ok: false, error: "No existe ese gimnasio." }, { status: 404 });
 
   // Usuario del dueño = parte antes del @ de su email (la contraseña es igual).
   let ownerUser = "";

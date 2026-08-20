@@ -59,6 +59,14 @@ export default function AdminDashboard() {
   const [seedMsg, setSeedMsg] = useState("");
   const seedOffset = useRef(0);
 
+  // Accesos del dueño (ver usuario / reiniciar usuario+contraseña) desde el admin.
+  const [accesoGym, setAccesoGym] = useState<Gym | null>(null);
+  const [accesoData, setAccesoData] = useState<{ owner: { user: string }; socio: { name: string; user: string } | null } | null>(null);
+  const [accesoBusy, setAccesoBusy] = useState(false);
+  const [accesoNewUser, setAccesoNewUser] = useState("");
+  const [accesoMsg, setAccesoMsg] = useState("");
+  const [accesoErr, setAccesoErr] = useState("");
+
   // Carga TODA la librería en tandas (traduce con IA). No se frena por una tanda:
   // si una falla la traducción, el servidor la degrada y sigue; y ante un corte
   // de red reintenta la misma tanda varias veces. Reanudable e idempotente.
@@ -156,6 +164,33 @@ export default function AdminDashboard() {
     if (!confirm(`¿Darle a "${g.name}" ${dias} días sin cargo para que configure? Queda como prueba gratis (no se le cobra) y vence en ${dias} días.`)) return;
     const fin = new Date(Date.now() + dias * 864e5).toISOString().slice(0, 10);
     await saveSub(g.id, { status: "trial", trial_ends_at: fin, current_period_end: null, payment_method: null });
+  }
+  // Abre el panel de accesos del dueño de un gimnasio (demo o cliente real):
+  // muestra el usuario y permite reiniciar usuario + contraseña.
+  async function abrirAccesos(g: Gym) {
+    setAccesoGym(g); setAccesoData(null); setAccesoNewUser(""); setAccesoMsg(""); setAccesoErr(""); setAccesoBusy(true);
+    const r = await fetch("/api/admin/demo/acceso", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gymId: g.id }),
+    }).then((x) => x.json()).catch(() => null);
+    setAccesoBusy(false);
+    if (r?.ok) { setAccesoData({ owner: r.owner, socio: r.socio }); setAccesoNewUser(r.owner?.user || ""); }
+    else setAccesoErr(r?.error || "No se pudieron traer los accesos.");
+  }
+  // Reinicia el usuario y la contraseña del dueño (quedan iguales entre sí).
+  async function cambiarAcceso() {
+    if (!accesoGym) return;
+    setAccesoErr(""); setAccesoMsg("");
+    const nuevo = accesoNewUser.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (nuevo.length < 4) { setAccesoErr("El usuario necesita al menos 4 letras o números (sin espacios ni símbolos)."); return; }
+    setAccesoBusy(true);
+    const r = await fetch("/api/admin/demo/credenciales", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gymId: accesoGym.id, newUser: nuevo }),
+    }).then((x) => x.json()).catch(() => null);
+    setAccesoBusy(false);
+    if (r?.ok) { setAccesoData((d) => (d ? { ...d, owner: { user: r.user } } : d)); setAccesoNewUser(r.user); setAccesoMsg(`Listo. Usuario y contraseña ahora son: ${r.user}`); }
+    else setAccesoErr(r?.error || "No se pudo cambiar el acceso.");
   }
   function archivar(g: Gym) {
     if (!confirm(`¿Archivar "${g.name}"? Sale de la lista de clientes y de las métricas, pero no se borra. Lo podés reactivar cuando quieras.`)) return;
@@ -449,6 +484,7 @@ export default function AdminDashboard() {
                             );
                           })()}
                           <a href={`/${g.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver página</a>
+                          <button onClick={() => abrirAccesos(g)} disabled={busyGym === g.id} className="text-brand hover:underline disabled:opacity-50" title="Ver o reiniciar el usuario y la contraseña del dueño">Accesos</button>
                           {convertId === g.id ? (
                             <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.06)] px-2 py-1">
                               <span className="text-[11px] text-ink-2">¿Cómo paga?</span>
@@ -551,6 +587,46 @@ export default function AdminDashboard() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal de accesos del dueño (ver / reiniciar usuario y contraseña) */}
+      {accesoGym && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setAccesoGym(null)}>
+          <div className="w-full max-w-md card" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="font-semibold">Accesos · {accesoGym.name}</h3>
+              <button onClick={() => setAccesoGym(null)} className="text-muted hover:text-ink" title="Cerrar">✕</button>
+            </div>
+            {accesoBusy && !accesoData ? (
+              <p className="py-6 text-center text-ink-2">Cargando…</p>
+            ) : (
+              <>
+                <div className="rounded-lg border border-white/10 bg-white/[.02] p-3 text-sm">
+                  <div className="text-xs uppercase tracking-wide text-muted">Dueño (panel)</div>
+                  <div className="mt-1">Entra en <b>turnogym.com/acceso</b></div>
+                  <div>Usuario: <b className="text-ink">{accesoData?.owner?.user || "—"}</b></div>
+                  <div className="mt-0.5 text-xs text-ink-2">La contraseña es igual al usuario (salvo que el dueño la haya cambiado desde “Mi cuenta”).</div>
+                  {accesoData?.socio && (
+                    <div className="mt-2 border-t border-white/10 pt-2">
+                      <div className="text-xs uppercase tracking-wide text-muted">Socio de ejemplo</div>
+                      <div>{accesoData.socio.name} · usuario y clave: <b>{accesoData.socio.user}</b></div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4">
+                  <label className="mb-1 block text-sm font-semibold">Reiniciar usuario y contraseña</label>
+                  <p className="mb-2 text-xs text-ink-2">Elegí un usuario nuevo (solo minúsculas y números). La contraseña queda igual al usuario, para que sea fácil de pasárselo.</p>
+                  <div className="flex gap-2">
+                    <input className="input flex-1" value={accesoNewUser} onChange={(e) => setAccesoNewUser(e.target.value)} placeholder="ej: danzarte" />
+                    <button className="btn btn-primary shrink-0" onClick={cambiarAcceso} disabled={accesoBusy}>{accesoBusy ? "Guardando…" : "Guardar"}</button>
+                  </div>
+                  {accesoMsg && <p className="mt-2 text-sm text-good">{accesoMsg}</p>}
+                  {accesoErr && <p className="mt-2 text-sm text-crit">{accesoErr}</p>}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

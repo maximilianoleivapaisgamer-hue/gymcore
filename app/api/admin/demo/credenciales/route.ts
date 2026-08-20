@@ -37,8 +37,7 @@ export async function POST(req: Request) {
   // Verificar que sea una DEMO y obtener el dueño.
   const { data: gym } = await admin.from("gyms").select("id, owner_id, is_demo").eq("id", gymId).maybeSingle<{ id: string; owner_id: string; is_demo: boolean }>();
   if (!gym) return NextResponse.json({ ok: false, error: "No existe ese gimnasio." }, { status: 404 });
-  if (!gym.is_demo) return NextResponse.json({ ok: false, error: "Solo se puede cambiar en demos." }, { status: 403 });
-  if (!gym.owner_id) return NextResponse.json({ ok: false, error: "La demo no tiene dueño." }, { status: 400 });
+  if (!gym.owner_id) return NextResponse.json({ ok: false, error: "El gimnasio no tiene dueño." }, { status: 400 });
 
   const email = `${nuevo}@socios.gymcore.app`;
   const { error } = await admin.auth.admin.updateUserById(gym.owner_id, {
