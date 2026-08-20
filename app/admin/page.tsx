@@ -143,8 +143,8 @@ export default function AdminDashboard() {
       body: JSON.stringify({ gymId: g.id, action: "desmarcar_prueba" }),
     }).then((x) => x.json()).catch(() => null);
     if (!r?.ok) { setBusyGym(null); alert(r?.error || "No se pudo completar la acción."); return; }
-    // Activar como cliente, con vencimiento a 30 días.
-    const vence = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    // Activar como cliente, con vencimiento a 30 días + 3 de regalo sin cargo (33).
+    const vence = new Date(Date.now() + 33 * 864e5).toISOString().slice(0, 10);
     await saveSub(g.id, { status: "active", payment_method: method, current_period_end: vence });
     setGyms((gs) => gs.map((x) => (x.id === g.id ? { ...x, is_test: false } : x)));
     setConvertId(null);
