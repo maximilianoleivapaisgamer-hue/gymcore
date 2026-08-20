@@ -17,6 +17,8 @@ interface NavItem {
   icon: string;
   /** Función que requiere: si el plan no la incluye, se muestra un candado. */
   feature?: PlanFeature;
+  /** Sección que se puede apagar desde "Secciones" (gyms.hidden_sections). */
+  section?: string;
   superAdmin?: boolean;
   external?: boolean;
 }
@@ -28,21 +30,21 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
       { href: "/dashboard/socios", label: "Socios", icon: "users" },
-      { href: "/dashboard/rutinas", label: "Rutinas", icon: "dumbbell" },
-      { href: "/dashboard/dietas", label: "Dietas", icon: "salad", feature: "dietas" },
-      { href: "/dashboard/finanzas", label: "Finanzas", icon: "chart" },
-      { href: "/dashboard/clases", label: "Clases", icon: "calendar" },
-      { href: "/dashboard/equipo", label: "Equipo", icon: "staff" },
-      { href: "/dashboard/sedes", label: "Sucursales", icon: "building" },
-      { href: "/dashboard/control-acceso", label: "Control de acceso", icon: "acceso", feature: "control_acceso" },
-      { href: "/dashboard/planes", label: "Planes", icon: "layers" },
+      { href: "/dashboard/rutinas", label: "Rutinas", icon: "dumbbell", section: "rutinas" },
+      { href: "/dashboard/dietas", label: "Dietas", icon: "salad", feature: "dietas", section: "dietas" },
+      { href: "/dashboard/finanzas", label: "Finanzas", icon: "chart", section: "finanzas" },
+      { href: "/dashboard/clases", label: "Clases", icon: "calendar", section: "clases" },
+      { href: "/dashboard/equipo", label: "Equipo", icon: "staff", section: "equipo" },
+      { href: "/dashboard/sedes", label: "Sucursales", icon: "building", section: "sedes" },
+      { href: "/dashboard/control-acceso", label: "Control de acceso", icon: "acceso", feature: "control_acceso", section: "control-acceso" },
+      { href: "/dashboard/planes", label: "Planes", icon: "layers", section: "planes" },
     ],
   },
   {
     label: "Experiencia socio",
     items: [
-      { href: "/dashboard/configuracion", label: "Página pública", icon: "globe" },
-      { href: "/dashboard/whatsapp", label: "Recordatorios WhatsApp", icon: "whatsapp" },
+      { href: "/dashboard/configuracion", label: "Página pública", icon: "globe", section: "pagina-publica" },
+      { href: "/dashboard/whatsapp", label: "Recordatorios WhatsApp", icon: "whatsapp", section: "whatsapp" },
     ],
   },
   {
@@ -50,6 +52,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/admin", label: "Super Admin", icon: "shield", superAdmin: true },
       { href: "/dashboard/mi-plan", label: "Mi plan", icon: "star" },
+      { href: "/dashboard/secciones", label: "Secciones", icon: "sliders" },
       { href: "/dashboard/cuenta", label: "Mi cuenta", icon: "account" },
     ],
   },
@@ -148,6 +151,14 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: string; classNa
         <path d="M9 21v-6h6v6M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
       </>
     ),
+    sliders: (
+      <>
+        <path d="M5 4v7M5 15v5M12 4v3M12 11v9M19 4v9M19 17v3" />
+        <circle cx="5" cy="13" r="2" />
+        <circle cx="12" cy="9" r="2" />
+        <circle cx="19" cy="15" r="2" />
+      </>
+    ),
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -170,6 +181,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
   const [role, setRole] = useState<string>("owner");
   const [perms, setPerms] = useState<string[]>([]);
+  const [hiddenSections, setHiddenSections] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -184,14 +196,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setPerms(profile?.permissions || []);
       if (profile?.gym_id) {
         setGymId(profile.gym_id);
-        const [{ data: g }, { data: sub }] = await Promise.all([
+        const [{ data: g }, { data: sub }, { data: gh }] = await Promise.all([
           supabase.from("gyms").select("name, logo_url, theme, bg_style, is_demo, slug").eq("id", profile.gym_id)
             .single<{ name: string; logo_url: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string }>(),
           supabase.from("subscriptions").select("plan").eq("gym_id", profile.gym_id)
             .maybeSingle<{ plan: string }>(),
+          // Best-effort: si la columna todavía no está migrada, no rompe (queda [] y se ven todas).
+          supabase.from("gyms").select("hidden_sections").eq("id", profile.gym_id)
+            .maybeSingle<{ hidden_sections: string[] | null }>(),
         ]);
         setGym(g ?? null);
         setPlan(sub?.plan ?? null);
+        setHiddenSections(gh?.hidden_sections || []);
         setPlans(await loadPlans(supabase));
       }
     })();
@@ -208,6 +224,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   function visibleItems(items: NavItem[]) {
     return items.filter((item) => {
       if (item.superAdmin && role !== "super_admin") return false;
+      // Sección apagada por el dueño desde "Secciones".
+      if (item.section && hiddenSections.includes(item.section)) return false;
       if (role === "empleado") return staffCanAccess(item.href, perms);
       return true;
     });

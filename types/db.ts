@@ -85,6 +85,8 @@ export interface Gym {
   is_demo?: boolean;
   /** Demo suspendida: la web pública no se muestra. */
   demo_suspended?: boolean;
+  /** Secciones del panel que el dueño apagó (claves de lib/sections.ts). */
+  hidden_sections?: string[];
 }
 
 /** Planes de abono mensual de GymCore (lo que Maxi le cobra a cada dueño).

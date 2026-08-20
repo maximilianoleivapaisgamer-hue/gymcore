@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="720" viewBox="0 0 1000 720" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="gVolt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#A3E635"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1000" height="720" fill="#0B0F16"/>
+
+  <!-- Título -->
+  <text x="50" y="62" fill="#E6EDF3" font-size="30" font-weight="700">Turno Gym · exploración de logo</text>
+  <text x="50" y="90" fill="#8B97A6" font-size="16">Conceptos + paleta · base para iterar</text>
+
+  <!-- ============ CONCEPTO 1: ICONO "T-mancuerna" ============ -->
+  <g transform="translate(50,140)">
+    <rect width="180" height="180" rx="40" fill="url(#g)"/>
+    <!-- barra (crossbar de la T) con discos -->
+    <rect x="42" y="52" width="96" height="18" rx="9" fill="#04121A"/>
+    <circle cx="42" cy="61" r="16" fill="#04121A"/>
+    <circle cx="138" cy="61" r="16" fill="#04121A"/>
+    <!-- vástago de la T -->
+    <rect x="81" y="61" width="18" height="78" rx="9" fill="#04121A"/>
+    <text x="90" y="215" fill="#8B97A6" font-size="14" text-anchor="middle">1 · "T" + mancuerna</text>
+  </g>
+
+  <!-- ============ CONCEPTO 2: ANILLO "turno" + play ============ -->
+  <g transform="translate(300,140)">
+    <rect width="180" height="180" rx="40" fill="#0E141C" stroke="#1b2430"/>
+    <!-- anillo tipo dial/turno con corte -->
+    <circle cx="90" cy="82" r="52" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="245 82" transform="rotate(-90 90 82)"/>
+    <!-- play = "es tu turno / arrancá" -->
+    <path d="M78 60 L110 82 L78 104 Z" fill="url(#g)"/>
+    <text x="90" y="215" fill="#8B97A6" font-size="14" text-anchor="middle">2 · Dial de turno + play</text>
+  </g>
+
+  <!-- ============ CONCEPTO 3: MONOGRAMA TG ============ -->
+  <g transform="translate(550,140)">
+    <rect width="180" height="180" rx="40" fill="#04121A" stroke="#1b2430"/>
+    <text x="90" y="126" fill="url(#g)" font-size="120" font-weight="800" text-anchor="middle" letter-spacing="-6">TG</text>
+    <text x="90" y="215" fill="#8B97A6" font-size="14" text-anchor="middle">3 · Monograma TG</text>
+  </g>
+
+  <!-- ============ CONCEPTO 4: sobre color (para redes) ============ -->
+  <g transform="translate(800,140)">
+    <rect width="180" height="180" rx="40" fill="url(#gVolt)"/>
+    <rect x="42" y="52" width="96" height="18" rx="9" fill="#04121A"/>
+    <circle cx="42" cy="61" r="16" fill="#04121A"/>
+    <circle cx="138" cy="61" r="16" fill="#04121A"/>
+    <rect x="81" y="61" width="18" height="78" rx="9" fill="#04121A"/>
+    <text x="90" y="215" fill="#8B97A6" font-size="14" text-anchor="middle">4 · Variante "energía" (volt)</text>
+  </g>
+
+  <!-- ============ WORDMARK ============ -->
+  <g transform="translate(50,410)">
+    <text y="40" font-size="58" font-weight="800" letter-spacing="-1">
+      <tspan fill="#E6EDF3">turno</tspan><tspan fill="#22D3EE"> gym</tspan>
+    </text>
+    <text y="78" fill="#8B97A6" font-size="17">Es tu turno.</text>
+  </g>
+
+  <!-- wordmark con ícono -->
+  <g transform="translate(560,388)">
+    <rect width="72" height="72" rx="18" fill="url(#g)"/>
+    <rect x="17" y="21" width="38" height="8" rx="4" fill="#04121A"/>
+    <circle cx="17" cy="25" r="7" fill="#04121A"/>
+    <circle cx="55" cy="25" r="7" fill="#04121A"/>
+    <rect x="32" y="25" width="8" height="31" rx="4" fill="#04121A"/>
+    <text x="90" y="38" font-size="34" font-weight="800" fill="#E6EDF3">turno<tspan fill="#22D3EE"> gym</tspan></text>
+    <text x="90" y="62" fill="#8B97A6" font-size="14">lockup horizontal (para la app y el header)</text>
+  </g>
+
+  <!-- ============ PALETA ============ -->
+  <g transform="translate(50,530)">
+    <text y="0" fill="#E6EDF3" font-size="18" font-weight="700">Paleta</text>
+    <g transform="translate(0,20)">
+      <rect width="150" height="70" rx="12" fill="#22D3EE"/>
+      <text x="12" y="92" fill="#8B97A6" font-size="13">Cian eléctrico</text>
+      <text x="12" y="110" fill="#5b6673" font-size="12">#22D3EE</text>
+    </g>
+    <g transform="translate(170,20)">
+      <rect width="150" height="70" rx="12" fill="#3B82F6"/>
+      <text x="12" y="92" fill="#8B97A6" font-size="13">Azul</text>
+      <text x="12" y="110" fill="#5b6673" font-size="12">#3B82F6</text>
+    </g>
+    <g transform="translate(340,20)">
+      <rect width="150" height="70" rx="12" fill="#A3E635"/>
+      <text x="12" y="92" fill="#8B97A6" font-size="13">Volt (acento)</text>
+      <text x="12" y="110" fill="#5b6673" font-size="12">#A3E635</text>
+    </g>
+    <g transform="translate(510,20)">
+      <rect width="150" height="70" rx="12" fill="#0B0F16" stroke="#1b2430"/>
+      <text x="12" y="92" fill="#8B97A6" font-size="13">Fondo oscuro</text>
+      <text x="12" y="110" fill="#5b6673" font-size="12">#0B0F16</text>
+    </g>
+    <g transform="translate(680,20)">
+      <rect width="150" height="70" rx="12" fill="#E6EDF3"/>
+      <text x="12" y="92" fill="#8B97A6" font-size="13">Texto claro</text>
+      <text x="12" y="110" fill="#5b6673" font-size="12">#E6EDF3</text>
+    </g>
+  </g>
+</svg>

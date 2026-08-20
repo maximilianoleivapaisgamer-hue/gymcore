@@ -150,6 +150,13 @@ export default function AdminDashboard() {
     setConvertId(null);
     setBusyGym(null);
   }
+  // Le da al gimnasio unos días sin cargo para que configure todo (prueba gratis).
+  // Lo deja en estado "trial" con vencimiento a N días y sin método de pago.
+  async function darGracia(g: Gym, dias = 3) {
+    if (!confirm(`¿Darle a "${g.name}" ${dias} días sin cargo para que configure? Queda como prueba gratis (no se le cobra) y vence en ${dias} días.`)) return;
+    const fin = new Date(Date.now() + dias * 864e5).toISOString().slice(0, 10);
+    await saveSub(g.id, { status: "trial", trial_ends_at: fin, current_period_end: null, payment_method: null });
+  }
   function archivar(g: Gym) {
     if (!confirm(`¿Archivar "${g.name}"? Sale de la lista de clientes y de las métricas, pero no se borra. Lo podés reactivar cuando quieras.`)) return;
     gestionGym(g.id, "archivar");
@@ -459,6 +466,7 @@ export default function AdminDashboard() {
                               Marcar prueba
                             </button>
                           )}
+                          <button onClick={() => darGracia(g, 3)} disabled={busyGym === g.id || savingId === g.id} className="font-semibold text-brand hover:underline disabled:opacity-50" title="Darle 3 días sin cargo para que configure (prueba gratis, no se le cobra)">3 días gratis</button>
                           <button onClick={() => archivar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-warn disabled:opacity-50" title="Sacar de clientes sin borrar (reversible)">Archivar</button>
                           <button onClick={() => eliminar(g)} disabled={busyGym === g.id} className="text-ink-2 hover:text-crit disabled:opacity-50" title="Borrar para siempre">Eliminar</button>
                         </div>
