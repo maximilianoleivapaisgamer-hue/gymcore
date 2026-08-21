@@ -203,6 +203,17 @@ con Google Maps, planes de socio, beneficios. Editable desde
 ### Demos (para vender) — `app/demo/*` y `app/api/admin/demo/*`
 - Generador de demos (`admin/demo/generar`): crea un gimnasio de ejemplo con 5
   socios, dirección real (Google/Apify), fotos, etc.
+  - **Lo ÚNICO obligatorio es el nombre.** Google Maps/Apify es opcional: si el
+    local no está cargado en Google (pasa seguido con los que recién abren), se
+    escribe la dirección a mano y la IA arma la web igual con el nombre, la
+    ciudad y el texto libre.
+  - **Requiere saldo en la cuenta de Anthropic.** Sin crédito, la IA devuelve
+    400 `credit balance is too low` y no se genera nada.
+  - Sin fotos de Google se usan fotos de ejemplo elegidas **según el rubro**
+    (`stockPara()` en `lib/stock-images.ts`): detecta pilates, yoga, danza,
+    crossfit, box, natación, spinning y artes marciales por el nombre y la
+    descripción. Antes eran siempre de sala de pesas, y una demo de pilates con
+    fotos de crossfit no se vende.
 - **Módulos de la demo**: en el formulario tildás qué secciones muestra
   (`body.secciones` = las claves VISIBLES de `lib/sections.ts`). El endpoint
   guarda lo inverso en `gyms.hidden_sections` y, para la app del socio, en

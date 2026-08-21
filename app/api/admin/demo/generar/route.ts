@@ -4,7 +4,7 @@ import { createClient as createServer } from "@/lib/supabase-server";
 import { generateDemoConfig } from "@/lib/ai/demo";
 import { DEFAULT_LANDING, type LandingConfig } from "@/lib/landing-config";
 import { seedDemoGym } from "@/lib/demo-seed";
-import { STOCK_GYM } from "@/lib/stock-images";
+import { stockPara } from "@/lib/stock-images";
 import { TOGGLEABLE_KEYS } from "@/lib/sections";
 
 /**
@@ -184,9 +184,11 @@ export async function POST(req: Request) {
 
   // 2) Bajar las fotos a la galería (máx 5 en las demos). Si no eligieron
   //    ninguna, usamos fotos de ejemplo para que la landing no quede vacía.
+  //    Las de ejemplo se eligen segun el rubro (pilates, danza, box...) para que
+  //    una demo de pilates no termine con fotos de sala de pesas.
   let urls = (Array.isArray(body.galleryUrls) && body.galleryUrls.length
     ? body.galleryUrls
-    : STOCK_GYM).slice(0, 5);
+    : stockPara({ nombre, infoLibre: body.infoLibre, tipo: body.tipo })).slice(0, 5);
   // Si eligieron una foto para el fondo, la ponemos primera (será el hero).
   if (body.heroPick && urls.includes(body.heroPick)) {
     urls = [body.heroPick, ...urls.filter((u) => u !== body.heroPick)].slice(0, 5);
