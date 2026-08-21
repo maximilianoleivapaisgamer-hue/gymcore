@@ -40,11 +40,19 @@ carnet QR; y cada gimnasio tiene su página pública white-label con su marca.
 > Regla de oro: si tocás la base, siempre dejás (a) el archivo `migration_XXX.sql`
 > y (b) un aviso claro de "corré este SQL en Supabase antes de subir".
 
-**Numeración de migraciones:** la serie salta de `026` a `030`. Los archivos
-`027`, `028` y `029` **nunca existieron** (verificado contra el historial de git:
-no fueron creados ni borrados). Es un **salto de numeración, sin migración** —
-no hay que rellenarlo. Lo mismo pasa con el `001`, que arranca en `002`.
-La numeración siguiente arranca en **034**.
+**Numeración de migraciones:** ya no hay huecos. Los archivos `027`, `028` y
+`029` faltaban en el repo pero los cambios **sí estaban aplicados** en la base
+(figuran en `supabase_migrations.schema_migrations` como `admin_team_helpers`,
+`gyms_is_test_flag` y `app_config_table`). Se reconstruyeron el 2026-08-21 con
+el SQL real leído de la base. La `035` recupera dos columnas más que estaban
+aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
+El `001` sí no existe: la serie arranca en `002`.
+La numeración siguiente arranca en **037**.
+
+> Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
+> son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
+> tiene un `update` comentado que **no hay que descomentar** (marcaría a todos
+> los clientes como prueba).
 
 ---
 
@@ -145,9 +153,13 @@ Mi plan, **Mi cuenta**.
 
 ### Portal del socio — `app/portal/*`
 La "app" del socio: rutina, dieta, clases/reservas, peso, progreso, carnet QR.
-Se **instala como PWA** (web a pantalla de inicio). El manifest es **por gimnasio**
-(`app/manifest/[slug]/route.ts`) y `components/PwaBranding.tsx` inyecta el ícono y
-el nombre del gym en el navegador del socio.
+Se **instala como PWA** (web a pantalla de inicio) con `components/InstallAppButton.tsx`.
+
+> ⚠️ Corregido el 2026-08-21: el manifest es **global** (`public/manifest.json`),
+> NO por gimnasio. `app/manifest/[slug]/route.ts` y `components/PwaBranding.tsx`
+> **no existen** (nunca estuvieron en el repo, verificado contra el historial de
+> git). La columna `gyms.app_icon_url` existe en la base pero no la lee ni la
+> escribe ninguna parte del código.
 
 ### Página pública / landing — `app/(public)/[slug]` y `/g/[slug]`
 Landing white-label por gimnasio: logo, portada, galería, colores/tema, dirección
@@ -285,7 +297,9 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
 
 - ✅ Gateo de WhatsApp a Pro (menú con candado + página + API). Requiere haber
   corrido `migration_032_whatsapp_pro.sql`.
-- ✅ Ícono de la app por gimnasio desde "Mi cuenta" (`app_icon_url`).
+- ⏳ **Ícono de la app por gimnasio**: NO está hecho, aunque este archivo decía
+  que sí. La columna `gyms.app_icon_url` existe pero está huérfana: falta la
+  subida en "Mi cuenta", el manifest por gimnasio y el componente que lo inyecte.
 - ✅ Secciones configurables (`hidden_sections`).
 - ✅ Botón **Accesos** en el admin para ver/reiniciar usuario y clave de cualquier
   gimnasio (demo o cliente real). Endpoints `admin/demo/acceso` y
@@ -339,6 +353,18 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
   y correr el SQL **antes** de deployar (si no, un candado puede mostrar el plan
   equivocado).
 - **Migraciones a mano:** ninguna migración se aplica sola. Ver §2.
+- **`revoke ... from anon, authenticated` NO alcanza para cerrar una función.**
+  En Postgres las funciones nacen con EXECUTE para el rol **PUBLIC**, y
+  anon/authenticated heredan de ahí. Hay que hacer
+  `revoke execute on function ... from public` y después `grant ... to service_role`.
+  Esto ya mordió una vez: las funciones `admin_list_super_admins` y
+  `admin_find_user_id_by_email` quedaron llamables por cualquiera desde
+  `/rest/v1/rpc/...` durante un mes (arreglado en `migration_036`). Un
+  `create or replace function` vuelve a darle EXECUTE a PUBLIC, así que si
+  recreás una función, revocá de nuevo.
+- **Correr `get_advisors` después de tocar la base.** El linter de Supabase
+  agarra RLS faltante, funciones abiertas y search_path mutable. Es la forma
+  rápida de no dejar un agujero.
 - **Columnas nuevas en consultas grandes:** si agregás una columna a un `select`
   que ya existe (ej: el que trae todos los gimnasios) y todavía no se corrió el
   SQL, ese `select` falla ENTERO y tira la pantalla abajo. Por eso las columnas
