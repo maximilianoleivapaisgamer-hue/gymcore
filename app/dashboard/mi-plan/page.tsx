@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { WA_TARGET, waHrefBase, abrirWhatsapp } from "@/lib/wa-link";
 import { SUB_STATUS_LABEL } from "@/types/db";
 import { loadPlans, loadGymExtras, isBonificada, featureLabel, DEFAULT_PLANS, type PlanConfig, type SubPlanKey, type PlanFeature } from "@/lib/plans";
 
@@ -151,11 +152,11 @@ export default function MiPlanPage() {
     setSending(false);
   }
 
-  function waAvisar(planLabel: string): string | null {
+  function waAvisar(planLabel: string): { href: string; phone: string; msg: string } | null {
     const phone = (transferData?.whatsapp || "").replace(/\D/g, "");
     if (!phone) return null;
     const msg = `¡Hola! Soy de ${sub ? "un gimnasio en turnogym" : "turnogym"}. Hice la transferencia del plan ${planLabel} y les paso el comprobante para adelantar el control. ¡Gracias!`;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    return { href: waHrefBase(phone, msg) as string, phone, msg };
   }
 
   const st = sub ? SUB_STATUS_LABEL[sub.status] : null;
@@ -428,9 +429,10 @@ export default function MiPlanPage() {
 
               {wa && (
                 <a
-                  href={wa}
-                  target="_blank"
+                  href={wa.href}
+                  target={WA_TARGET}
                   rel="noreferrer"
+                  onClick={(e) => abrirWhatsapp(e, wa.phone, wa.msg)}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[#25D366]/40 py-2.5 text-sm font-semibold text-[#25D366] hover:bg-[rgba(37,211,102,.12)]"
                 >
                   💬 Avisar por WhatsApp

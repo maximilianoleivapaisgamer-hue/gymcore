@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { loadPlans, ALL_FEATURES, type PlanConfig } from "@/lib/plans";
+import { WA_TARGET, waHrefBase, abrirWhatsapp } from "@/lib/wa-link";
 import {
   PLAN_LABEL, PLAN_PRICES, STATUS, METHOD_LABEL,
   money, fdate, venceOf, daysUntil, isProximoVence, isVencido,
@@ -19,8 +20,10 @@ interface Sub {
 }
 interface Profile { id: string; full_name: string | null; }
 
-/** Aviso por WhatsApp con un mensaje según el estado del gimnasio. */
-function waLink(gym: Gym, sub: Sub | undefined, ownerFirst: string): string | null {
+/** Aviso por WhatsApp con un mensaje según el estado del gimnasio.
+ *  Devuelve el teléfono y el texto por separado para que el click pueda abrir
+ *  WhatsApp Web reutilizando siempre la misma pestaña (ver lib/wa-link.ts). */
+function waLink(gym: Gym, sub: Sub | undefined, ownerFirst: string): { href: string; phone: string; msg: string } | null {
   const phone = (gym.whatsapp || "").replace(/\D/g, "");
   if (!phone) return null;
   const hola = ownerFirst ? `¡Hola ${ownerFirst}!` : "¡Hola!";
@@ -38,7 +41,7 @@ function waLink(gym: Gym, sub: Sub | undefined, ownerFirst: string): string | nu
   } else {
     msg = `${hola} Te escribo de turnogym para ver cómo venís con el sistema. ¿Necesitás una mano con algo?`;
   }
-  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  return { href: waHrefBase(phone, msg) as string, phone, msg };
 }
 
 export default function AdminDashboard() {
@@ -74,6 +77,16 @@ export default function AdminDashboard() {
   const [featSel, setFeatSel] = useState<string[]>([]);
   const [featBusy, setFeatBusy] = useState(false);
   const [featErr, setFeatErr] = useState("");
+  // Mensaje que deja /api/admin/entrar si no pudo entrar a una cuenta.
+  const [entrarErr, setEntrarErr] = useState("");
+
+  useEffect(() => {
+    const m = new URLSearchParams(window.location.search).get("entrar");
+    if (m) {
+      setEntrarErr(m);
+      window.history.replaceState({}, "", "/admin"); // limpia la URL
+    }
+  }, []);
 
   function abrirFunciones(g: Gym) {
     setFeatGym(g);
@@ -361,6 +374,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="w-full">
+      {entrarErr && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)] px-4 py-3 text-sm text-[#f5b13d]">
+          <span>{entrarErr}</span>
+          <button onClick={() => setEntrarErr("")} className="shrink-0 text-muted hover:text-ink" title="Cerrar">✕</button>
+        </div>
+      )}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="mt-1 text-ink-2">Todos los gimnasios clientes, su suscripción y cómo pagan.</p>
@@ -525,9 +544,10 @@ export default function AdminDashboard() {
                           {(() => {
                             const link = waLink(g, s, (ownerName(g.owner_id).split(" ")[0] || ""));
                             return link ? (
-                              <a href={link} target="_blank" rel="noreferrer"
+                              <a href={link.href} target={WA_TARGET} rel="noreferrer"
+                                onClick={(e) => abrirWhatsapp(e, link.phone, link.msg)}
                                 className="inline-flex items-center gap-1 rounded-lg border border-[#25D366]/40 px-2.5 py-1 text-xs font-semibold text-[#25D366] hover:bg-[rgba(37,211,102,.12)]"
-                                title="Enviar un aviso por WhatsApp al dueño">
+                                title="Abrir el chat de WhatsApp con el dueño (reutiliza la misma pestaña)">
                                 <span aria-hidden>💬</span> Avisar
                               </a>
                             ) : (
@@ -539,6 +559,21 @@ export default function AdminDashboard() {
                           <button onClick={() => abrirFunciones(g)} disabled={busyGym === g.id} className="text-brand hover:underline disabled:opacity-50" title="Habilitarle funciones que su plan no incluye">
                             Funciones{(extrasByGym[g.id]?.length || 0) > 0 ? ` (${extrasByGym[g.id].length})` : ""}
                           </button>
+                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2 py-1">
+                            <span className="text-[11px] text-muted">Entrar:</span>
+                            <a href={`/api/admin/entrar?gym=${g.id}&rol=owner`}
+                              onClick={(e) => { if (!confirm(`Vas a entrar al panel de "${g.name}" como el dueño.
+
+Esto cierra tu sesión de super admin; volvés con el botón "Volver al Super Admin" que te va a aparecer abajo.`)) e.preventDefault(); }}
+                              className="rounded bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand hover:bg-brand/25"
+                              title="Ver el panel tal cual lo ve el dueño">dueño</a>
+                            <a href={`/api/admin/entrar?gym=${g.id}&rol=socio`}
+                              onClick={(e) => { if (!confirm(`Vas a entrar a la app de un socio de "${g.name}".
+
+Esto cierra tu sesión de super admin; volvés con el botón "Volver al Super Admin" que te va a aparecer abajo.`)) e.preventDefault(); }}
+                              className="rounded bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-ink-2 hover:bg-white/10"
+                              title="Ver la app tal cual la ve un socio del gimnasio">socio</a>
+                          </span>
                           {convertId === g.id ? (
                             <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.06)] px-2 py-1">
                               <span className="text-[11px] text-ink-2">¿Cómo paga?</span>

@@ -182,6 +182,17 @@ El prospecto que probó la demo paga y su gimnasio se activa solo:
   vencimiento (editable a mano), socios, y acciones: Avisar (WhatsApp), Ver
   página, Marcar/quitar prueba, Pasar a cliente real (Transferencia/MP/Sin cobro),
   **Accesos** (ver/reiniciar usuario y clave del dueño), Archivar, Eliminar.
+- **Entrar como el cliente** (`api/admin/entrar?gym=<id>&rol=owner|socio`): desde
+  la fila del gimnasio, "Entrar: dueño / socio". Abre la sesión de esa cuenta sin
+  pedir la contraseña, generando un magic link con la API de admin de Supabase y
+  canjeándolo en el servidor (`verifyOtp`); si falla, cae al viejo truco de las
+  demos (clave == usuario). Nunca deja entrar a otro super admin.
+  - **Reemplaza tu sesión de super admin.** Por eso deja dos cookies: la de
+    `tg_viendo_como` (la lee `components/ViendoComo.tsx` para el cartel flotante)
+    y `tg_volver` (httpOnly, 8hs, tu user id) para que `api/admin/volver` te
+    restaure la sesión de un click. Al volver se re-chequea que ese id siga
+    siendo `super_admin`.
+  - El cartel se monta en `app/dashboard/layout.tsx` y `app/portal/layout.tsx`.
 - Los gimnasios marcados **prueba** (`is_test`) no cuentan para la plata/métricas.
 - Librería de ejercicios: botón para cargar/traducir 800+ ejercicios con IA.
 
@@ -234,6 +245,14 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
   - `createAdmin(URL, SERVICE_ROLE_KEY, {auth:{persistSession:false}})` →
     operaciones privilegiadas (saltea RLS). Nunca exponer el service-role al cliente.
 - **UI en español rioplatense**, tono cercano. Nada de inglés en la interfaz.
+- **Links de WhatsApp**: en los PANELES (super admin y panel del dueño) usar
+  `lib/wa-link.ts` — `target={WA_TARGET}` + `onClick={(e) => abrirWhatsapp(e, tel, msg)}`.
+  Eso hace dos cosas: en la compu va directo a `web.whatsapp.com` (saltea la
+  pantalla de "Abrir aplicación / Continuar en WhatsApp Web") y reutiliza SIEMPRE
+  la misma pestaña en vez de abrir una nueva por cada aviso. En celular sigue
+  usando `wa.me`, que abre la app.
+  ⚠️ En la **landing pública** y en el **portal del socio** NO se usa: ahí entra
+  gente desde el celular y `wa.me` es lo correcto.
 - **Design tokens de Tailwind** que ya existen (usarlos, no inventar colores):
   `card`, `btn btn-primary`, `btn btn-ghost`, `input`, `text-ink`, `text-ink-2`,
   `text-muted`, `text-brand`, `text-good`, `text-warn`, `text-crit`, `bg-brand`,

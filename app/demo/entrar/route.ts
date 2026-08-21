@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient(url, anon, {
     cookies: {
       getAll() { return req.cookies.getAll(); },
-      setAll(list) { list.forEach(({ name, value, options }) => res.cookies.set(name, value, options)); },
+      setAll(list: { name: string; value: string; options?: any }[]) { list.forEach(({ name, value, options }) => res.cookies.set(name, value, options)); },
     },
   });
   const { error } = await supabase.auth.signInWithPassword({ email, password });

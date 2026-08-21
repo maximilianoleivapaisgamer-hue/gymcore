@@ -8,6 +8,7 @@ import { allows, isBonificada, minPlanLabel, loadPlans, loadGymExtras, DEFAULT_P
 import { staffCanAccess } from "@/lib/staff";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
+import ViendoComo from "@/components/ViendoComo";
 import { BrandMark, BrandWordmark } from "@/components/BrandMark";
 import SedeSwitcher from "@/components/SedeSwitcher";
 
@@ -247,6 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       <ThemeApply theme={gym?.theme} />
+      <ViendoComo />
       {gym?.is_demo && gymId && <DemoVisitPing gymId={gymId} kind="panel" />}
       {/* Sidebar */}
       <aside

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { WA_TARGET, abrirWhatsapp } from "@/lib/wa-link";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 
 interface Member {
@@ -257,7 +258,7 @@ export default function DashboardHome() {
                       <i className="h-1.5 w-1.5 rounded-full bg-current" />{txt}
                     </span>
                     {waLink && (
-                      <a href={waLink} target="_blank" rel="noreferrer" title="Recordatorio por WhatsApp"
+                      <a href={waLink} target={WA_TARGET} rel="noreferrer" onClick={(e) => abrirWhatsapp(e, m.whatsapp, waMsg)} title="Recordatorio por WhatsApp (reutiliza la misma pestaña)"
                         className="grid h-8 w-8 place-items-center rounded-lg border border-white/[.08] bg-surface-2 transition hover:border-[#25d366]/40">
                         <WhatsAppLogo className="h-4 w-4" />
                       </a>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { WA_TARGET, abrirWhatsapp } from "@/lib/wa-link";
 import { type RealPlan } from "@/types/db";
 import DatePicker from "@/components/DatePicker";
 
@@ -288,7 +289,7 @@ export default function SociosPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {welcome.whatsapp && (
-                <a href={welcomeHref()} target="_blank" rel="noreferrer" className="btn btn-primary">💬 Enviar por WhatsApp</a>
+                <a href={welcomeHref()} target={WA_TARGET} rel="noreferrer" onClick={(e) => abrirWhatsapp(e, welcome?.whatsapp, welcomeText())} className="btn btn-primary">💬 Enviar por WhatsApp</a>
               )}
               <button className="btn btn-ghost" onClick={() => copiar(welcomeText(), "welcome")}>{copied === "welcome" ? "✓ ¡Copiado!" : "📋 Copiar mensaje"}</button>
               <button className="btn btn-ghost" onClick={() => setWelcome(null)}>Cerrar</button>
@@ -355,7 +356,8 @@ export default function SociosPage() {
                         <div className="flex justify-end gap-2">
                           <Link className={MINI} title="Ver detalle" href={`/dashboard/socios/${m.id}`}>👁️</Link>
                           {m.whatsapp && (
-                            <a className={MINI} title="WhatsApp" target="_blank" rel="noreferrer"
+                            <a className={MINI} title="WhatsApp" target={WA_TARGET} rel="noreferrer"
+                              onClick={(e) => abrirWhatsapp(e, m.whatsapp)}
                               href={"https://wa.me/" + (m.whatsapp || "").replace(/\D/g, "")}>
                               <WhatsAppLogo className="h-[17px] w-[17px]" />
                             </a>
