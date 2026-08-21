@@ -47,7 +47,7 @@ carnet QR; y cada gimnasio tiene su página pública white-label con su marca.
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **039**.
+La numeración siguiente arranca en **040**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -168,8 +168,22 @@ en `/dashboard/planes`, campo "Clases".
   avisa, pero los deja.
 - Los nombres de plan se comparan con `trim`+`lower`: los cargados a mano vienen
   con espacios de más ("PACK 1 ").
+- **Qué actividades incluye el plan** (`migration_039`): además del tope, cada
+  plan tiene `clases_modo` (`todas` | `excepto` | `solo`) y `clases_lista`
+  (nombres de actividades). Caso real de DanzArte: el "Pase Libre" es
+  `excepto ["Kangoo Jumps"]` y el plan "Kango Jumps" es `solo ["Kangoo Jumps"]`
+  (el Kangoo se hace con botas que pone el estudio, va aparte).
+  - **Se guarda el NOMBRE de la actividad, no el id de la clase.** El dueño carga
+    una fila por horario (DanzArte tiene 4 de "Zumba"), así que por nombre la
+    regla vale para todos los horarios, incluidos los que agregue después. La
+    contra es que si renombra una actividad el plan deja de matchear: por eso la
+    pantalla de Planes avisa cuando un plan apunta a algo que ya no existe.
+  - En el editor se listan las actividades **únicas** del gimnasio
+    (`actividadesUnicas()` agrupa los horarios repetidos). El dueño no escribe
+    nada: tilda de una lista de lo que él mismo ya cargó.
 - `lib/cupo-clases.ts` repite la misma cuenta en el front, **solo para mostrar**
-  ("te quedan 3 de 8"). ⚠️ Si tocás una, tocá la otra: tienen que coincidir.
+  ("te quedan 3 de 8", "No incluida"). ⚠️ Si tocás una, tocá la otra: tienen que
+  coincidir con el trigger.
 
 ### Portal del socio — `app/portal/*`
 La "app" del socio: rutina, dieta, clases/reservas, peso, progreso, carnet QR.

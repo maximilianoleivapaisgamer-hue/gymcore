@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
-import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
+import { cicloDe, topeDelPlan, claseIncluida, planDelSocio } from "@/lib/cupo-clases";
 import type { RealPlan } from "@/types/db";
 import InstallAppButton from "@/components/InstallAppButton";
 import ThemeApply from "@/components/ThemeApply";
@@ -68,6 +68,8 @@ export default function PortalPage() {
   const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null } | null>(null);
   /** Cupo de clases del plan del socio. null = plan sin tope. */
   const [cupo, setCupo] = useState<{ limite: number; usadas: number } | null>(null);
+  /** El plan del socio, para saber qué actividades tiene incluidas. */
+  const [miPlan, setMiPlan] = useState<RealPlan | null>(null);
   /** Motivo por el que no se pudo reservar (lo tira el trigger de la base). */
   const [reservaErr, setReservaErr] = useState("");
   const [routine, setRoutine] = useState<Routine | null>(null);
@@ -193,6 +195,7 @@ export default function PortalPage() {
   /** Cuántas clases del plan ya usó el socio en el ciclo de cuota actual.
    *  Es solo para mostrar: al que frena de verdad es el trigger de la base. */
   async function recalcularCupo(m: Member, planes: RealPlan[] | null) {
+    setMiPlan(planDelSocio(planes, m.plan_name));
     const limite = topeDelPlan(planes, m.plan_name);
     if (!limite) { setCupo(null); return; }
     const { ini, fin } = cicloDe(todayIso(), m.membership_expiry);
@@ -676,6 +679,8 @@ export default function PortalPage() {
                   const mine = allBookings.find((b) => b.class_id === c.id && b.class_date === date && b.member_id === member!.id);
                   const full = c.capacity != null && occupied >= c.capacity;
                   const key = c.id + date;
+                  // ¿Esta actividad entra en su plan? (ej: "Pase Libre" sin Kangoo)
+                  const incluida = claseIncluida(miPlan, c.name);
                   return (
                     <li key={key} className="flex items-center justify-between px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -688,6 +693,9 @@ export default function PortalPage() {
                             {c.instructor ? ` · ${c.instructor}` : ""}
                           </div>
                           <div className="text-xs text-muted">{occupied}{c.capacity != null ? ` / ${c.capacity}` : ""} anotados</div>
+                          {!incluida && (
+                            <div className="text-xs text-[#f5b13d]">No entra en tu plan · se contrata aparte</div>
+                          )}
                         </div>
                       </div>
                       {mine ? (
@@ -697,11 +705,17 @@ export default function PortalPage() {
                       ) : (
                         <button
                           className="btn btn-primary text-xs"
-                          disabled={full || sinCupo || busyClassKey === key}
-                          title={sinCupo ? "Ya usaste todas las clases que incluye tu plan este mes" : undefined}
+                          disabled={full || !incluida || sinCupo || busyClassKey === key}
+                          title={
+                            !incluida
+                              ? `${c.name.trim()} no está incluida en tu plan${member?.plan_name ? ` ${member.plan_name.trim()}` : ""}`
+                              : sinCupo
+                                ? "Ya usaste todas las clases que incluye tu plan este mes"
+                                : undefined
+                          }
                           onClick={() => reservar(c, date)}
                         >
-                          {full ? "Cupo lleno" : sinCupo ? "Sin clases" : "Reservar"}
+                          {full ? "Cupo lleno" : !incluida ? "No incluida" : sinCupo ? "Sin clases" : "Reservar"}
                         </button>
                       )}
                     </li>

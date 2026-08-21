@@ -53,3 +53,44 @@ export function topeDelPlan(
   const n = Number(p?.class_limit ?? 0);
   return n > 0 ? n : null;
 }
+
+/**
+ * ¿El plan incluye esta actividad?
+ *
+ * ⚠️ Igual que el cupo, esto es para MOSTRARLO nomás. Quien frena de verdad es
+ * el trigger (migration_039). Si tocás una, tocá la otra.
+ */
+export function claseIncluida(
+  plan: { clases_modo?: "todas" | "excepto" | "solo"; clases_lista?: string[] } | null | undefined,
+  nombreClase: string | null | undefined,
+): boolean {
+  const modo = plan?.clases_modo || "todas";
+  const lista = plan?.clases_lista || [];
+  if (modo === "todas" || lista.length === 0) return true;
+  const clase = String(nombreClase || "").trim().toLowerCase();
+  const esta = lista.some((x) => String(x || "").trim().toLowerCase() === clase);
+  return modo === "solo" ? esta : !esta;
+}
+
+/** El plan del socio dentro de los planes del gimnasio (match con trim+lower). */
+export function planDelSocio<T extends { name: string }>(
+  planes: T[] | null | undefined,
+  planName: string | null | undefined,
+): T | null {
+  const buscado = String(planName || "").trim().toLowerCase();
+  if (!buscado) return null;
+  return (planes || []).find((x) => String(x.name || "").trim().toLowerCase() === buscado) || null;
+}
+
+/** Actividades únicas del gimnasio (agrupa los horarios repetidos por nombre).
+ *  DanzArte tiene 4 filas de "Zumba": acá aparece una sola vez. */
+export function actividadesUnicas(clases: { name: string }[] | null | undefined): string[] {
+  const vistas = new Map<string, string>();
+  (clases || []).forEach((c) => {
+    const nombre = String(c.name || "").trim();
+    if (!nombre) return;
+    const clave = nombre.toLowerCase();
+    if (!vistas.has(clave)) vistas.set(clave, nombre);
+  });
+  return [...vistas.values()].sort((a, b) => a.localeCompare(b, "es"));
+}

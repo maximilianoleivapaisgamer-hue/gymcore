@@ -19,6 +19,11 @@ export interface RealPlan {
   /** Clases que incluye el plan por ciclo de cuota. null/0 = ilimitado.
    *  Lo aplica el trigger de la base (migration_038), no solo la pantalla. */
   class_limit?: number | null;
+  /** Qué actividades incluye: todas, todas menos las de la lista, o solo esas.
+   *  Lo aplica el mismo trigger (migration_039). */
+  clases_modo?: "todas" | "excepto" | "solo";
+  /** Nombres de actividades, tal cual los cargó el dueño en Clases. */
+  clases_lista?: string[];
 }
 
 /** Plantilla visual de la landing pública. Hoy hay una sola plantilla
