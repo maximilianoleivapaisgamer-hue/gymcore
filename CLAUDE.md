@@ -47,7 +47,7 @@ carnet QR; y cada gimnasio tiene su página pública white-label con su marca.
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **038**.
+La numeración siguiente arranca en **039**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -150,6 +150,26 @@ Mi plan, **Mi cuenta**.
   pueden apagar. Afecta el menú y lo que ve el socio en su app.
 - **Mi cuenta** (`app/dashboard/cuenta`): cambiar usuario/contraseña + subir el
   **ícono de la app** (`gyms.app_icon_url`) para la PWA del socio.
+
+### Tope de clases por plan
+Cada plan de socio (`gyms.real_plans`) puede tener `class_limit`: cuántas clases
+incluye por ciclo. Vacío/0 = **ilimitado** (ej: "Pase Libre"). Lo carga el dueño
+en `/dashboard/planes`, campo "Clases".
+
+- **Quién frena de verdad: el trigger `trg_enforce_class_limit` en `bookings`**
+  (`migration_038`). Va en la base y no en la pantalla porque el socio reserva
+  **directo desde el navegador** contra Supabase — no hay API en el medio, así
+  que un control solo en el front se esquiva.
+- **El ciclo** son los 30 días de la cuota de CADA socio, anclados a
+  `members.membership_expiry` (vence el 20/09 → ciclo del 20/08 al 20/09). Sin
+  vencimiento cargado, cae al mes calendario.
+- **Solo frena al socio.** El dueño y los profes pueden pasarse desde el panel de
+  Clases (para regalar una clase o cobrar una suelta); les sale un `confirm` que
+  avisa, pero los deja.
+- Los nombres de plan se comparan con `trim`+`lower`: los cargados a mano vienen
+  con espacios de más ("PACK 1 ").
+- `lib/cupo-clases.ts` repite la misma cuenta en el front, **solo para mostrar**
+  ("te quedan 3 de 8"). ⚠️ Si tocás una, tocá la otra: tienen que coincidir.
 
 ### Portal del socio — `app/portal/*`
 La "app" del socio: rutina, dieta, clases/reservas, peso, progreso, carnet QR.

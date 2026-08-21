@@ -16,6 +16,9 @@ export interface RealPlan {
   price: number;
   detail: string;
   sync_landing: boolean;
+  /** Clases que incluye el plan por ciclo de cuota. null/0 = ilimitado.
+   *  Lo aplica el trigger de la base (migration_038), no solo la pantalla. */
+  class_limit?: number | null;
 }
 
 /** Plantilla visual de la landing pública. Hoy hay una sola plantilla

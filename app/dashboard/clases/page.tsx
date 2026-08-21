@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
+import type { RealPlan } from "@/types/db";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 
 interface Klass {
@@ -16,7 +18,7 @@ interface Klass {
   capacity: number | null;
   color: string | null;
 }
-interface Member { id: string; full_name: string; }
+interface Member { id: string; full_name: string; plan_name: string | null; membership_expiry: string | null; }
 interface Booking { id: string; member_id: string; class_date: string; members?: { full_name: string } | null; }
 
 const DAYS = [
@@ -61,6 +63,8 @@ export default function ClasesPage() {
   const [sedeName, setSedeName] = useState<string>("");
   const [classes, setClasses] = useState<Klass[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  /** Planes del gimnasio, para saber el tope de clases de cada socio. */
+  const [realPlans, setRealPlans] = useState<RealPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(emptyForm());
@@ -88,13 +92,16 @@ export default function ClasesPage() {
       activeSede = resolveActiveSede(profile.gym_id, arr);
       setSedeId(activeSede);
       setSedeName(arr.find((s) => s.id === activeSede)?.name || "");
+      const { data: g } = await supabase.from("gyms").select("real_plans").eq("id", profile.gym_id)
+        .maybeSingle<{ real_plans: RealPlan[] | null }>();
+      setRealPlans(g?.real_plans || []);
     }
     let qClasses = supabase.from("classes").select("*").order("start_time");
     let qBookings = supabase.from("bookings").select("class_id, class_date").gte("class_date", iso(new Date()));
     if (activeSede) { qClasses = qClasses.eq("sede_id", activeSede); qBookings = qBookings.eq("sede_id", activeSede); }
     const [{ data: cl }, { data: mem }, { data: bk }] = await Promise.all([
       qClasses,
-      supabase.from("members").select("id, full_name").order("full_name"),
+      supabase.from("members").select("id, full_name, plan_name, membership_expiry").order("full_name"),
       qBookings,
     ]);
     setClasses((cl as Klass[]) || []);
@@ -162,6 +169,26 @@ export default function ClasesPage() {
   async function addBooking() {
     if (!gymId || !resFor || !resDate || !addMember) return;
     if (bookings.some((b) => b.member_id === addMember)) { setAddMember(""); return; }
+
+    // El tope del plan no te frena a vos (podés regalar o cobrar una suelta),
+    // pero te avisamos para que sepas que ese socio ya lo usó todo.
+    const socio = members.find((m) => m.id === addMember);
+    const limite = topeDelPlan(realPlans, socio?.plan_name);
+    if (socio && limite) {
+      const { ini, fin } = cicloDe(resDate, socio.membership_expiry);
+      const { count } = await supabase.from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("member_id", socio.id).gt("class_date", ini).lte("class_date", fin);
+      if ((count ?? 0) >= limite) {
+        const ok = confirm(
+          `${socio.full_name} ya usó las ${limite} clases que incluye su plan${socio.plan_name ? ` "${socio.plan_name.trim()}"` : ""} en este período.
+
+` +
+          `Si la anotás igual, queda como una clase extra. ¿La cargo?`
+        );
+        if (!ok) return;
+      }
+    }
     const { data } = await supabase.from("bookings")
       .insert({ gym_id: gymId, sede_id: sedeId, class_id: resFor.id, member_id: addMember, class_date: resDate })
       .select("id, member_id, class_date, members(full_name)").single();

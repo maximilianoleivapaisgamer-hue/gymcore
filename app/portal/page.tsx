@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
+import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
+import type { RealPlan } from "@/types/db";
 import InstallAppButton from "@/components/InstallAppButton";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
@@ -64,6 +66,10 @@ export default function PortalPage() {
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
   const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null } | null>(null);
+  /** Cupo de clases del plan del socio. null = plan sin tope. */
+  const [cupo, setCupo] = useState<{ limite: number; usadas: number } | null>(null);
+  /** Motivo por el que no se pudo reservar (lo tira el trigger de la base). */
+  const [reservaErr, setReservaErr] = useState("");
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [openDemo, setOpenDemo] = useState<Set<string>>(new Set());
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
@@ -90,7 +96,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null }>(),
+      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -103,6 +109,7 @@ export default function PortalPage() {
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Diet>(),
     ]);
     setGym(g ?? null);
+    await recalcularCupo(m, g?.real_plans ?? null);
     setRoutine((r as Routine) ?? null);
     setMyBookings((mb as MyBooking[]) || []);
     setClasses((cl as Klass[]) || []);
@@ -183,25 +190,49 @@ export default function PortalPage() {
     setBusyMeal(null);
   }
 
+  /** Cuántas clases del plan ya usó el socio en el ciclo de cuota actual.
+   *  Es solo para mostrar: al que frena de verdad es el trigger de la base. */
+  async function recalcularCupo(m: Member, planes: RealPlan[] | null) {
+    const limite = topeDelPlan(planes, m.plan_name);
+    if (!limite) { setCupo(null); return; }
+    const { ini, fin } = cicloDe(todayIso(), m.membership_expiry);
+    const { count } = await supabase.from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("member_id", m.id).gt("class_date", ini).lte("class_date", fin);
+    setCupo({ limite, usadas: count ?? 0 });
+  }
+
   async function reservar(c: Klass, date: string) {
     if (!member) return;
     setBusyClassKey(c.id + date);
+    setReservaErr("");
     const { data, error } = await supabase.from("bookings")
       .insert({ gym_id: member.gym_id, class_id: c.id, member_id: member.id, class_date: date })
       .select("id, class_id, member_id, class_date").single<BookingLite>();
-    if (!error && data) {
+    if (error) {
+      // El trigger del tope devuelve un mensaje ya escrito para el socio.
+      setReservaErr(error.message || "No se pudo reservar. Probá de nuevo.");
+    } else if (data) {
       setAllBookings((bs) => [...bs, data]);
       setMyBookings((mb) => [...mb, { id: data.id, class_id: c.id, class_date: date, classes: { name: c.name, start_time: c.start_time, instructor: c.instructor } }]);
+      if (cupo) setCupo({ ...cupo, usadas: cupo.usadas + 1 });
     }
     setBusyClassKey(null);
   }
   async function cancelar(bookingId: string) {
     setBusyClassKey(bookingId);
+    setReservaErr("");
     await supabase.from("bookings").delete().eq("id", bookingId);
     setAllBookings((bs) => bs.filter((b) => b.id !== bookingId));
     setMyBookings((mb) => mb.filter((b) => b.id !== bookingId));
+    // Cancelar le devuelve el lugar, pero solo si la clase caía en este ciclo.
+    if (member) await recalcularCupo(member, (gym as { real_plans?: RealPlan[] | null } | null)?.real_plans ?? null);
     setBusyClassKey(null);
   }
+
+  // Cuántas clases le quedan al socio en el ciclo (null = plan sin tope).
+  const restantes = cupo ? Math.max(0, cupo.limite - cupo.usadas) : Infinity;
+  const sinCupo = cupo ? restantes <= 0 : false;
 
   if (state === "loading") return <main className="grid min-h-screen place-items-center text-ink-2">Cargando…</main>;
 
@@ -610,6 +641,29 @@ export default function PortalPage() {
             <div className="border-b border-white/10 p-4">
               <h2 className="font-semibold">Todas las clases</h2>
               <p className="text-xs text-muted">Tocá "Reservar" para anotarte a la próxima fecha.</p>
+
+              {/* Cupo del plan. Solo aparece si el plan del socio tiene tope. */}
+              {cupo && (
+                <div className={`mt-3 rounded-lg border px-3 py-2 text-xs ${
+                  restantes <= 0
+                    ? "border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)] text-[#f5b13d]"
+                    : "border-white/10 bg-white/[.03] text-ink-2"
+                }`}>
+                  {restantes > 0 ? (
+                    <>Te {restantes === 1 ? "queda" : "quedan"} <b className="text-ink">{restantes}</b> de {cupo.limite} clases este mes
+                      {member?.plan_name ? <span className="text-muted"> · plan {member.plan_name.trim()}</span> : null}
+                    </>
+                  ) : (
+                    <>Ya usaste las {cupo.limite} clases que incluye tu plan este mes. Podés cancelar una reserva para liberar un lugar.</>
+                  )}
+                </div>
+              )}
+
+              {reservaErr && (
+                <div className="mt-3 rounded-lg border border-crit/30 bg-[rgba(240,82,82,.1)] px-3 py-2 text-xs text-crit">
+                  {reservaErr}
+                </div>
+              )}
             </div>
             {classes.length === 0 ? (
               <p className="p-6 text-center text-sm text-ink-2">Tu gimnasio todavía no cargó clases.</p>
@@ -641,8 +695,13 @@ export default function PortalPage() {
                           Cancelar
                         </button>
                       ) : (
-                        <button className="btn btn-primary text-xs" disabled={full || busyClassKey === key} onClick={() => reservar(c, date)}>
-                          {full ? "Cupo lleno" : "Reservar"}
+                        <button
+                          className="btn btn-primary text-xs"
+                          disabled={full || sinCupo || busyClassKey === key}
+                          title={sinCupo ? "Ya usaste todas las clases que incluye tu plan este mes" : undefined}
+                          onClick={() => reservar(c, date)}
+                        >
+                          {full ? "Cupo lleno" : sinCupo ? "Sin clases" : "Reservar"}
                         </button>
                       )}
                     </li>

@@ -37,7 +37,7 @@ export default function PlanesPage() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   function addPlan() {
-    setPlans((ps) => [...ps, { name: "", price: 0, detail: "", sync_landing: false }]);
+    setPlans((ps) => [...ps, { name: "", price: 0, detail: "", sync_landing: false, class_limit: null }]);
   }
   function setPlan(i: number, patch: Partial<RealPlan>) {
     setPlans((ps) => ps.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
@@ -108,6 +108,19 @@ export default function PlanesPage() {
                       value={p.price || ""}
                       onChange={(e) => setPlan(i, { price: Number(e.target.value) || 0 })}
                     />
+                  </div>
+                  <div className="flex items-center gap-1" title="Cuántas clases puede reservar el socio por mes con este plan. Vacío = sin tope.">
+                    <input
+                      type="number"
+                      min={0}
+                      className="input w-24"
+                      placeholder="Clases"
+                      value={p.class_limit ?? ""}
+                      onChange={(e) => setPlan(i, { class_limit: e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0) })}
+                    />
+                    <span className="whitespace-nowrap text-xs text-muted">
+                      {p.class_limit ? "clases/mes" : "sin tope"}
+                    </span>
                   </div>
                   <input
                     className="input min-w-[180px] flex-1"
