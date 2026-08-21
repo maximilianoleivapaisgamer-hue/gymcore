@@ -47,7 +47,7 @@ carnet QR; y cada gimnasio tiene su página pública white-label con su marca.
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **037**.
+La numeración siguiente arranca en **038**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -362,6 +362,12 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
   `/rest/v1/rpc/...` durante un mes (arreglado en `migration_036`). Un
   `create or replace function` vuelve a darle EXECUTE a PUBLIC, así que si
   recreás una función, revocá de nuevo.
+- **`is_super_admin()` y `current_gym_id()` NO se cierran**, aunque el linter
+  las marque (0028/0029). Postgres chequea el permiso EXECUTE al evaluar una
+  política RLS: si les revocás EXECUTE a `authenticated`, las 22 + 20 políticas
+  que las usan explotan con "permission denied" y todos los dueños y socios
+  pierden acceso a sus propios datos. Probado. Además no filtran nada: devuelven
+  info del que llama. Ver `migration_037`.
 - **Correr `get_advisors` después de tocar la base.** El linter de Supabase
   agarra RLS faltante, funciones abiertas y search_path mutable. Es la forma
   rápida de no dejar un agujero.
