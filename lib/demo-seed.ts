@@ -113,8 +113,69 @@ const CLASSES = [
 
 const COBRO = ["efectivo", "transferencia", "terminal"];
 
+const COLORES = ["#22d3ee", "#3b82f6", "#818cf8", "#f5b13d", "#22c55e", "#f472b6"];
+
+/** Saca acentos y pasa a minúsculas, para poder buscar días en el texto. */
+const sinAcentos = (s: string) =>
+  String(s || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+/** "Lunes, miércoles y viernes" → ["lun","mie","vie"]. */
+function diasDeTexto(texto: string): string[] {
+  const t = sinAcentos(texto);
+  // "lunes a viernes" es la forma más común de decir los 5 días.
+  if (/lun\w*\s+(a|al)\s+vie/.test(t)) return ["lun", "mar", "mie", "jue", "vie"];
+  const dias = [
+    ["lun", /lun/], ["mar", /mar/], ["mie", /mie/],
+    ["jue", /jue/], ["vie", /vie/], ["sab", /sab/], ["dom", /dom/],
+  ] as const;
+  return dias.filter(([, re]) => re.test(t)).map(([k]) => k);
+}
+
+/** "20.30hs", "20:30", "8 a 9" → "20:30" / "08:00". */
+function horaDeTexto(texto: string): string | null {
+  const m = sinAcentos(texto).match(/(\d{1,2})\s*[:.]?\s*(\d{2})?/);
+  if (!m) return null;
+  const h = Math.min(23, Number(m[1]));
+  const min = m[2] ? Math.min(59, Number(m[2])) : 0;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+/** Clase tal como la genera la IA para la landing (lib/ai/demo.ts). */
+export interface ClaseIA { nombre: string; dias: string; horario: string; cupo?: number }
+
+/**
+ * Convierte las clases que inventó la IA (que SÍ son del rubro: reformer, mat
+ * pilates, etc.) al formato de la tabla `classes`.
+ *
+ * Antes el panel de la demo se llenaba siempre con la lista fija de gimnasio
+ * (Funcional, Spinning, Crosstraining, Boxeo), así que un estudio de pilates
+ * veía "Boxeo" en su agenda mientras la web mostraba pilates. Ahora coinciden.
+ * Si la IA no devolvió nada usable, se cae a la lista de siempre.
+ */
+export function clasesDesdeIA(clases: ClaseIA[] | null | undefined, sedeId: string | null) {
+  const armadas = (clases || [])
+    .map((c, i) => {
+      const nombre = String(c.nombre || "").trim();
+      const dias = diasDeTexto(c.dias || "");
+      const hora = horaDeTexto(c.horario || "");
+      if (!nombre || !dias.length || !hora) return null;
+      return {
+        name: nombre.slice(0, 60),
+        weekdays: dias,
+        start_time: hora,
+        duration: 60,
+        capacity: Math.max(4, Math.min(60, Number(c.cupo) || 15)),
+        color: COLORES[i % COLORES.length],
+        sede_id: sedeId,
+      };
+    })
+    .filter(Boolean) as Record<string, unknown>[];
+  if (armadas.length) return armadas.slice(0, 8);
+  return CLASSES.map((c) => ({ ...c, sede_id: sedeId }));
+}
+
 /** Carga los datos de ejemplo en un gimnasio demo (best-effort). */
-export async function seedDemoGym(admin: SupabaseClient, gymId: string, sedeId: string | null): Promise<void> {
+export async function seedDemoGym(admin: SupabaseClient, gymId: string, sedeId: string | null, clasesIA?: ClaseIA[] | null): Promise<void> {
   try {
     // 1) Socios
     const rows = MEMBERS.map((m) => ({
@@ -136,7 +197,7 @@ export async function seedDemoGym(admin: SupabaseClient, gymId: string, sedeId: 
     }
 
     // 4) Clases
-    await admin.from("classes").insert(CLASSES.map((c) => ({ ...c, gym_id: gymId, sede_id: sedeId }))).then(() => {}, () => {});
+    await admin.from("classes").insert(clasesDesdeIA(clasesIA, sedeId).map((c) => ({ ...c, gym_id: gymId }))).then(() => {}, () => {});
 
     // 5) Caja: cuotas de los últimos 3 meses + algunos egresos → el gráfico muestra datos
     const cash: Record<string, unknown>[] = [];

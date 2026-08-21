@@ -209,6 +209,12 @@ con Google Maps, planes de socio, beneficios. Editable desde
     ciudad y el texto libre.
   - **Requiere saldo en la cuenta de Anthropic.** Sin crédito, la IA devuelve
     400 `credit balance is too low` y no se genera nada.
+  - Las **clases del panel** salen de las que inventó la IA para ese rubro
+    (`clasesDesdeIA()` en `lib/demo-seed.ts` convierte "Lunes y miércoles" +
+    "18.30hs" al formato de la tabla `classes`). Antes el panel se llenaba
+    siempre con una lista fija de gimnasio, así que un estudio de pilates veía
+    "Boxeo" y "Crosstraining" en su agenda mientras la web mostraba pilates.
+    Si la IA no devuelve nada usable, cae a la lista de siempre.
   - Sin fotos de Google se usan fotos de ejemplo elegidas **según el rubro**
     (`stockPara()` en `lib/stock-images.ts`): detecta pilates, yoga, danza,
     crossfit, box, natación, spinning y artes marciales por el nombre y la

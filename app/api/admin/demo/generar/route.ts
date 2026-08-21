@@ -310,7 +310,9 @@ export async function POST(req: Request) {
   const { data: sede } = await admin.from("sedes").insert({ gym_id: gym.id, name: "Sede principal" }).select("id").single<{ id: string }>();
 
   // 6) Datos de ejemplo (10 socios con rutinas, dietas, clases, caja).
-  await seedDemoGym(admin, gym.id, sede?.id ?? null);
+  //    Las clases salen de las que invento la IA para este rubro, asi el panel
+  //    coincide con la web (un estudio de pilates no tiene que ver "Boxeo").
+  await seedDemoGym(admin, gym.id, sede?.id ?? null, ai.clases);
 
   // 7) Login de socio demo (para ver la app del cliente).
   const socio = await createDemoSocio(admin, gym.id).catch(() => null);
