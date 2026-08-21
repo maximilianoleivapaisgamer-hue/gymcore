@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import AiChat from "@/components/AiChat";
-import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
+import { allows, loadPlans, loadGymExtras, DEFAULT_PLANS, type PlanConfig, type PlanFeature } from "@/lib/plans";
 import { capExercise } from "@/lib/exercise-i18n";
 
 interface Exercise {
@@ -63,6 +63,7 @@ export default function RutinasPage() {
   const [applyMsg, setApplyMsg] = useState("");
   const [plan, setPlan] = useState<string | null>(null);
   const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
+  const [extras, setExtras] = useState<PlanFeature[]>([]);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -75,6 +76,7 @@ export default function RutinasPage() {
       const { data: sub } = await supabase
         .from("subscriptions").select("plan").eq("gym_id", gid).maybeSingle<{ plan: string }>();
       setPlan(sub?.plan ?? null);
+      setExtras(await loadGymExtras(supabase, gid));
       setPlans(await loadPlans(supabase));
     }
     const [{ data: ex }, { data: mem }, { data: rout }] = await Promise.all([
@@ -292,7 +294,7 @@ export default function RutinasPage() {
           <p className="text-ink-2">{routines.length} rutinas · {ownExercises.length} propios · {libCount} de librería 🎞️</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AiChat kind="rutina" gymId={gymId} members={members} onDone={load} enabled={allows(plans, plan, "ia")} />
+          <AiChat kind="rutina" gymId={gymId} members={members} onDone={load} enabled={allows(plans, plan, "ia", extras)} />
           <button className="btn btn-ghost" onClick={() => setLibOpen(true)}>Biblioteca</button>
           <button className="btn btn-primary" onClick={startNew}>+ Nueva rutina</button>
         </div>

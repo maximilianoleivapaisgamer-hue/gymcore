@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient as createServer } from "@/lib/supabase-server";
 import { sendTemplate, waConfigured } from "@/lib/whatsapp";
-import { allows, loadPlans } from "@/lib/plans";
+import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
 
 /**
  * Configuración de recordatorios por WhatsApp del gimnasio (dueño logueado).
@@ -35,7 +35,8 @@ async function gymAllowsWhatsapp(admin: ReturnType<typeof createAdmin>, gymId: s
   const plans = await loadPlans(admin as never);
   const gated = plans.some((p) => (p.capabilities || []).includes("whatsapp"));
   if (!gated) return true;
-  return allows(plans, sub?.plan ?? null, "whatsapp");
+  const extras = await loadGymExtras(admin as never, gymId);
+  return allows(plans, sub?.plan ?? null, "whatsapp", extras);
 }
 
 export async function GET() {

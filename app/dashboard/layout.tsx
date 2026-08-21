@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { allows, minPlanLabel, loadPlans, DEFAULT_PLANS, type PlanFeature, type PlanConfig } from "@/lib/plans";
+import { allows, isBonificada, minPlanLabel, loadPlans, loadGymExtras, DEFAULT_PLANS, type PlanFeature, type PlanConfig } from "@/lib/plans";
 import { staffCanAccess } from "@/lib/staff";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
@@ -182,6 +182,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [role, setRole] = useState<string>("owner");
   const [perms, setPerms] = useState<string[]>([]);
   const [hiddenSections, setHiddenSections] = useState<string[]>([]);
+  /** Funciones bonificadas a mano para este gimnasio (gyms.extra_features). */
+  const [extras, setExtras] = useState<PlanFeature[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -208,6 +210,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setGym(g ?? null);
         setPlan(sub?.plan ?? null);
         setHiddenSections(gh?.hidden_sections || []);
+        setExtras(await loadGymExtras(supabase, profile.gym_id));
         setPlans(await loadPlans(supabase));
       }
     })();
@@ -289,9 +292,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <>
                       <span className={active ? "text-brand" : "opacity-85"}><Icon name={item.icon} /></span>
                       <span className="flex-1">{item.label}</span>
-                      {item.feature && !allows(plans, plan, item.feature) && (
+                      {item.feature && !allows(plans, plan, item.feature, extras) && (
                         <span className="rounded-full bg-[rgba(245,177,61,.14)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#f5b13d]">
                           {minPlanLabel(plans, item.feature)}
+                        </span>
+                      )}
+                      {/* Se la bonificaste: no va candado, va el cartelito de regalo. */}
+                      {item.feature && isBonificada(plans, plan, item.feature, extras) && (
+                        <span
+                          className="rounded-full bg-[rgba(34,197,94,.14)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-good"
+                          title="Función bonificada: te la habilitamos sin cargo"
+                        >
+                          Extra
                         </span>
                       )}
                     </>

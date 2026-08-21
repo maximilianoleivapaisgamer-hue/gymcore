@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
+import { allows, loadPlans, loadGymExtras, DEFAULT_PLANS, type PlanConfig, type PlanFeature } from "@/lib/plans";
 import AiChat from "@/components/AiChat";
 
 interface Member { id: string; full_name: string; }
@@ -43,6 +43,7 @@ export default function DietasPage() {
   const [gymId, setGymId] = useState<string | null>(null);
   const [plan, setPlan] = useState<string | null>(null);
   const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
+  const [extras, setExtras] = useState<PlanFeature[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [diets, setDiets] = useState<Diet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +63,7 @@ export default function DietasPage() {
       const { data: sub } = await supabase
         .from("subscriptions").select("plan").eq("gym_id", gid).maybeSingle<{ plan: string }>();
       setPlan(sub?.plan ?? null);
+      setExtras(await loadGymExtras(supabase, gid));
       setPlans(await loadPlans(supabase));
     }
     const [{ data: mem }, { data: di }] = await Promise.all([
@@ -177,7 +179,7 @@ export default function DietasPage() {
 
   const memberName = (id: string | null) => members.find((m) => m.id === id)?.full_name;
 
-  if (!loading && !allows(plans, plan, "dietas")) {
+  if (!loading && !allows(plans, plan, "dietas", extras)) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-16 text-center">
         <div className="mb-2 text-4xl">🥗</div>
@@ -202,7 +204,7 @@ export default function DietasPage() {
           <p className="text-ink-2">{diets.length} dietas cargadas</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AiChat kind="dieta" gymId={gymId} members={members} onDone={load} enabled={allows(plans, plan, "ia")} />
+          <AiChat kind="dieta" gymId={gymId} members={members} onDone={load} enabled={allows(plans, plan, "ia", extras)} />
           <button className="btn btn-primary" onClick={startNew}>+ Nueva dieta</button>
         </div>
       </div>

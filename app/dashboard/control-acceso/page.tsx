@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { allows, loadPlans, DEFAULT_PLANS, type PlanConfig } from "@/lib/plans";
+import { allows, loadPlans, loadGymExtras, DEFAULT_PLANS, type PlanConfig, type PlanFeature } from "@/lib/plans";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 
 interface Member {
@@ -33,6 +33,7 @@ export default function ControlAccesoPage() {
   const [today, setToday] = useState<{ name: string; time: string; ok: boolean }[]>([]);
   const [plan, setPlan] = useState<string | null>(null);
   const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
+  const [extras, setExtras] = useState<PlanFeature[]>([]);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [gymId, setGymId] = useState<string | null>(null);
   const [sedeId, setSedeId] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export default function ControlAccesoPage() {
         const { data: sub } = await supabase
           .from("subscriptions").select("plan").eq("gym_id", profile.gym_id).maybeSingle<{ plan: string }>();
         setPlan(sub?.plan ?? null);
+        setExtras(await loadGymExtras(supabase, profile.gym_id));
         setPlans(await loadPlans(supabase));
         // Sucursal activa: cada ingreso se registra en la sede desde la que se valida.
         const { data: sedeList } = await supabase.from("sedes")
@@ -106,7 +108,7 @@ export default function ControlAccesoPage() {
     setDni("");
   }
 
-  if (!loadingPlan && !allows(plans, plan, "control_acceso")) {
+  if (!loadingPlan && !allows(plans, plan, "control_acceso", extras)) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-16 text-center">
         <div className="mb-2 text-4xl">🚪</div>

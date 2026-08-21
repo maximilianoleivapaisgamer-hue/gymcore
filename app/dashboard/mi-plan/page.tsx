@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { SUB_STATUS_LABEL } from "@/types/db";
-import { loadPlans, DEFAULT_PLANS, type PlanConfig, type SubPlanKey } from "@/lib/plans";
+import { loadPlans, loadGymExtras, isBonificada, featureLabel, DEFAULT_PLANS, type PlanConfig, type SubPlanKey, type PlanFeature } from "@/lib/plans";
 
 interface Sub {
   plan: SubPlanKey;
@@ -45,6 +45,8 @@ export default function MiPlanPage() {
   const supabase = createClient();
   const [sub, setSub] = useState<Sub | null>(null);
   const [plans, setPlans] = useState<PlanConfig[]>(DEFAULT_PLANS);
+  /** Funciones que te habilitamos sin cargo, además de las del plan. */
+  const [extras, setExtras] = useState<PlanFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [changing, setChanging] = useState<string | null>(null);
   const [payMsg, setPayMsg] = useState("");
@@ -105,6 +107,7 @@ export default function MiPlanPage() {
           .from("subscriptions").select("plan, status, trial_ends_at, current_period_end")
           .eq("gym_id", profile.gym_id).single<Sub>();
         setSub(data ?? null);
+        setExtras(await loadGymExtras(supabase, profile.gym_id));
       }
       await loadTransfer();
       setLoading(false);
@@ -157,6 +160,9 @@ export default function MiPlanPage() {
 
   const st = sub ? SUB_STATUS_LABEL[sub.status] : null;
   const vence = sub ? (sub.status === "trial" ? sub.trial_ends_at : sub.current_period_end) : null;
+  // Funciones que le habilitamos a mano y que su plan NO trae. Las que ya vienen
+  // con el plan no se listan acá: no son un regalo, son parte de lo que paga.
+  const bonificadas = extras.filter((f) => isBonificada(plans, sub?.plan, f, extras));
 
   return (
     <main className="p-5 md:p-7">
@@ -214,6 +220,26 @@ export default function MiPlanPage() {
                 {sub.status === "past_due" && (
                   <div className="rounded-lg border border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)] px-4 py-3 text-sm text-[#f5b13d]">
                     Tenés un pago pendiente. Contactanos para regularizar tu cuenta.
+                  </div>
+                )}
+
+                {/* Funciones que le habilitamos sin cargo (gyms.extra_features). */}
+                {bonificadas.length > 0 && (
+                  <div className="w-full border-t border-white/10 pt-3">
+                    <div className="text-xs uppercase tracking-wide text-muted">Funciones bonificadas</div>
+                    <p className="mt-1 text-sm text-ink-2">
+                      Además de todo lo que trae tu plan, te dejamos habilitado sin cargo:
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {bonificadas.map((f) => (
+                        <span
+                          key={f}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-good/30 bg-[rgba(34,197,94,.08)] px-3 py-1 text-sm font-semibold text-good"
+                        >
+                          <span aria-hidden>🎁</span> {featureLabel(f)}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

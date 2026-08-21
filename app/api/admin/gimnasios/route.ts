@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient as createServer } from "@/lib/supabase-server";
+import { isFeature } from "@/lib/plans";
 
 /**
  * Gestión de gimnasios desde el Super Admin (solo super admin):
  *  - archivar / desarchivar: oculta o vuelve a mostrar el gimnasio en la lista
  *    de clientes (reversible, no borra nada).
+ *  - features: habilitarle a mano funciones que su plan no incluye
+ *    (bonificadas). Se guardan en gyms.extra_features y se suman a lo que ya
+ *    trae el plan; nunca le sacan nada.
  *  - eliminar: borra el gimnasio y sus cuentas de acceso (dueño + socios).
  *    Los datos (socios, rutinas, dietas, clases, caja, sedes) cascadean solos.
  *    Acción destructiva: el frontend pide confirmación.
@@ -29,7 +33,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Solo el super admin." }, { status: 403 });
   }
 
-  let body: { gymId?: string; action?: string };
+  let body: { gymId?: string; action?: string; extras?: string[] };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
   const gymId = String(body.gymId || "").trim();
   const action = String(body.action || "");
@@ -49,6 +53,14 @@ export async function POST(req: Request) {
     const { error } = await admin.from("gyms").update({ is_test: isTest }).eq("id", gymId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true, is_test: isTest });
+  }
+
+  if (action === "features") {
+    // Solo claves válidas de PlanFeature, sin repetidos.
+    const extras = [...new Set((Array.isArray(body.extras) ? body.extras : []).map(String).filter(isFeature))];
+    const { error } = await admin.from("gyms").update({ extra_features: extras }).eq("id", gymId);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true, extras });
   }
 
   if (action === "eliminar") {

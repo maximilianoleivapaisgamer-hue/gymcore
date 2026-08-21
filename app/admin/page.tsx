@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
-import { loadPlans, type PlanConfig } from "@/lib/plans";
+import { loadPlans, ALL_FEATURES, type PlanConfig } from "@/lib/plans";
 import {
   PLAN_LABEL, PLAN_PRICES, STATUS, METHOD_LABEL,
   money, fdate, venceOf, daysUntil, isProximoVence, isVencido,
@@ -67,6 +67,43 @@ export default function AdminDashboard() {
   const [accesoMsg, setAccesoMsg] = useState("");
   const [accesoErr, setAccesoErr] = useState("");
   const [accesoCopiado, setAccesoCopiado] = useState(false);
+
+  // Funciones bonificadas: habilitarle a UN gimnasio algo que su plan no trae.
+  const [extrasByGym, setExtrasByGym] = useState<Record<string, string[]>>({});
+  const [featGym, setFeatGym] = useState<Gym | null>(null);
+  const [featSel, setFeatSel] = useState<string[]>([]);
+  const [featBusy, setFeatBusy] = useState(false);
+  const [featErr, setFeatErr] = useState("");
+
+  function abrirFunciones(g: Gym) {
+    setFeatGym(g);
+    setFeatSel(extrasByGym[g.id] || []);
+    setFeatErr("");
+  }
+
+  async function guardarFunciones() {
+    if (!featGym) return;
+    setFeatBusy(true); setFeatErr("");
+    try {
+      const res = await fetch("/api/admin/gimnasios", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gymId: featGym.id, action: "features", extras: featSel }),
+      }).then((r) => r.json());
+      if (!res?.ok) {
+        setFeatErr(res?.error?.includes("extra_features")
+          ? "Falta correr migration_034 en Supabase para poder guardar las funciones bonificadas."
+          : (res?.error || "No se pudo guardar."));
+        setFeatBusy(false);
+        return;
+      }
+      setExtrasByGym((prev) => ({ ...prev, [featGym.id]: res.extras as string[] }));
+      setFeatGym(null);
+    } catch {
+      setFeatErr("Falló la conexión. Probá de nuevo.");
+    }
+    setFeatBusy(false);
+  }
 
   // Carga TODA la librería en tandas (traduce con IA). No se frena por una tanda:
   // si una falla la traducción, el servidor la degrada y sigue; y ante un corte
@@ -222,6 +259,14 @@ export default function AdminDashboard() {
       ((mem as { gym_id: string }[]) || []).forEach((m) => { c[m.gym_id] = (c[m.gym_id] || 0) + 1; });
       setCounts(c);
       setPlanCfgs(await loadPlans(supabase));
+      // Funciones bonificadas, en consulta aparte y best-effort: si todavía no
+      // se corrió migration_034 la columna no existe y el panel igual carga.
+      try {
+        const { data: ex } = await supabase.from("gyms").select("id, extra_features").eq("is_demo", false);
+        const map: Record<string, string[]> = {};
+        ((ex as { id: string; extra_features: string[] | null }[]) || []).forEach((r) => { map[r.id] = r.extra_features || []; });
+        setExtrasByGym(map);
+      } catch { /* sin bonificadas */ }
       setLoading(false);
     })();
     /* eslint-disable-next-line */
@@ -491,6 +536,9 @@ export default function AdminDashboard() {
                           })()}
                           <a href={`/${g.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver página</a>
                           <button onClick={() => abrirAccesos(g)} disabled={busyGym === g.id} className="text-brand hover:underline disabled:opacity-50" title="Ver o reiniciar el usuario y la contraseña del dueño">Accesos</button>
+                          <button onClick={() => abrirFunciones(g)} disabled={busyGym === g.id} className="text-brand hover:underline disabled:opacity-50" title="Habilitarle funciones que su plan no incluye">
+                            Funciones{(extrasByGym[g.id]?.length || 0) > 0 ? ` (${extrasByGym[g.id].length})` : ""}
+                          </button>
                           {convertId === g.id ? (
                             <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-[rgba(34,211,238,.06)] px-2 py-1">
                               <span className="text-[11px] text-ink-2">¿Cómo paga?</span>
@@ -638,6 +686,79 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Funciones bonificadas: habilitarle a este gimnasio algo que su plan no trae */}
+      {featGym && (() => {
+        const planKey = subByGym[featGym.id]?.plan;
+        const planCfg = planCfgs.find((p) => p.key === planKey);
+        const delPlan = planCfg?.capabilities || [];
+        const planName = planCfg?.label || PLAN_LABEL[planKey || ""] || "su plan";
+        return (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setFeatGym(null)}>
+            <div className="w-full max-w-md card" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="font-semibold">Funciones · {featGym.name}</h3>
+                <button onClick={() => setFeatGym(null)} className="text-muted hover:text-ink" title="Cerrar">✕</button>
+              </div>
+              <p className="mb-3 text-xs text-ink-2">
+                Está en el plan <b className="text-ink">{planName}</b>. Tildá lo que le quieras habilitar <b>sin cargo</b>,
+                sin subirle el plan. Al dueño le aparece como <b className="text-good">bonificada</b> en “Mi plan”.
+              </p>
+
+              <div className="space-y-1.5">
+                {ALL_FEATURES.map((f) => {
+                  const vieneConElPlan = delPlan.includes(f.key);
+                  const tildada = vieneConElPlan || featSel.includes(f.key);
+                  return (
+                    <label
+                      key={f.key}
+                      className={`flex items-start gap-2.5 rounded-lg border px-3 py-2 text-sm ${
+                        vieneConElPlan
+                          ? "border-white/10 bg-white/[.02] opacity-60"
+                          : featSel.includes(f.key)
+                            ? "cursor-pointer border-good/30 bg-[rgba(34,197,94,.08)]"
+                            : "cursor-pointer border-white/10 hover:border-white/20"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={tildada}
+                        disabled={vieneConElPlan}
+                        onChange={(e) =>
+                          setFeatSel((prev) => (e.target.checked ? [...prev, f.key] : prev.filter((k) => k !== f.key)))
+                        }
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium">{f.label}</span>
+                        <span className="block text-[11px] text-muted">
+                          {vieneConElPlan
+                            ? `Ya viene con el plan ${planName}`
+                            : featSel.includes(f.key)
+                              ? "🎁 Bonificada"
+                              : "No la incluye su plan"}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {featErr && <p className="mt-3 text-sm text-crit">{featErr}</p>}
+
+              <div className="mt-4 flex gap-2">
+                <button className="btn btn-primary flex-1" onClick={guardarFunciones} disabled={featBusy}>
+                  {featBusy ? "Guardando…" : "Guardar"}
+                </button>
+                <button className="btn btn-ghost shrink-0" onClick={() => setFeatGym(null)} disabled={featBusy}>Cancelar</button>
+              </div>
+              <p className="mt-2 text-[11px] text-muted">
+                Si después le subís el plan y esa función ya viene incluida, deja de figurar como bonificada sola.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
+import { TOGGLEABLE_SECTIONS, TOGGLEABLE_KEYS } from "@/lib/sections";
 import { removeWhiteBackground } from "@/lib/remove-white-bg";
 import { dominantColor } from "@/lib/dominant-color";
 import { STOCK_GYM } from "@/lib/stock-images";
@@ -144,6 +145,8 @@ export default function DemosPage() {
   const [gBusy, setGBusy] = useState(false);
   const [gallery, setGallery] = useState<string[]>([]);
   const [heroPick, setHeroPick] = useState<string>("");
+  // Módulos que va a mostrar la demo (por defecto, todos).
+  const [secciones, setSecciones] = useState<string[]>(TOGGLEABLE_KEYS);
   const [galBusy, setGalBusy] = useState(false);
   // Token de Apify (se puede cambiar desde acá cuando se acaban los créditos)
   const [cfgOpen, setCfgOpen] = useState(false);
@@ -537,6 +540,7 @@ export default function DemosPage() {
     setNombre(""); setInstagram(""); setCiudad(""); setDireccion(""); setWebsite(""); setInfoLibre("");
     setImages([]); setLogoUrl(null); setHeroUrl(null); setBrandColor(""); setLogoNoBg(true);
     setGUrl(""); setGallery([]); setHeroPick("");
+    setSecciones(TOGGLEABLE_KEYS);
     setErr(""); setResult(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -557,6 +561,7 @@ export default function DemosPage() {
           logoUrl, heroUrl,
           heroPick: heroPick || undefined,
           brandColor: brandColor || undefined,
+          secciones,
         }),
       });
       const data = await res.json();
@@ -748,6 +753,51 @@ export default function DemosPage() {
               <input type="color" value={brandColor || "#22d3ee"} onChange={(e) => setBrandColor(e.target.value)} className="h-9 w-14 rounded" />
               <span className="rounded-md px-2 py-1 text-xs font-semibold" style={{ background: brandColor || "#22d3ee", color: "#000" }}>{brandColor || "sin detectar"}</span>
             </div>
+          </Field>
+
+          {/* Qué módulos ve el prospecto. Un estudio de pilates no quiere ver
+              Rutinas ni Control de acceso: mostrale solo lo que le sirve. */}
+          <Field label={`Módulos que muestra la demo (${secciones.length} de ${TOGGLEABLE_KEYS.length})`}>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {([
+                ["Todo", TOGGLEABLE_KEYS],
+                ["🧘 Estudio de clases", ["clases", "planes", "finanzas", "pagina-publica"]],
+                ["🧑‍🏫 Personal trainer", ["rutinas", "planes", "finanzas", "pagina-publica"]],
+              ] as [string, string[]][]).map(([label, keys]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setSecciones(keys)}
+                  className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-semibold text-ink-2 hover:border-brand/40 hover:text-brand"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {TOGGLEABLE_SECTIONS.map((s) => {
+                const on = secciones.includes(s.key);
+                return (
+                  <label
+                    key={s.key}
+                    title={s.hint}
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition ${
+                      on ? "border-brand/40 bg-[rgba(34,211,238,.08)]" : "border-white/10 text-ink-2 hover:border-white/20"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={(e) => setSecciones((prev) => (e.target.checked ? [...prev, s.key] : prev.filter((k) => k !== s.key)))}
+                    />
+                    <span className="min-w-0 truncate">{s.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted">
+              Dashboard, Socios, Mi plan y Mi cuenta van siempre. El dueño después lo puede cambiar desde “Secciones”.
+            </p>
           </Field>
 
           {err && <p className="mt-3 text-sm text-crit">{err}</p>}

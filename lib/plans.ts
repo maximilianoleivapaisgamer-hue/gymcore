@@ -72,11 +72,65 @@ export async function loadPlans(sb: SupabaseClient): Promise<PlanConfig[]> {
   return DEFAULT_PLANS;
 }
 
-/** ¿El plan (por key) incluye esta función? */
-export function allows(plans: PlanConfig[], plan: string | null | undefined, feature: PlanFeature): boolean {
+/**
+ * ¿Este gimnasio puede usar esta función?
+ *
+ * Mira dos cosas: lo que trae el PLAN y las funciones BONIFICADAS a mano para
+ * ese gimnasio (gyms.extra_features, que carga el super admin). Las bonificadas
+ * solo suman: nunca sacan algo que el plan ya incluye.
+ *
+ * `extras` es opcional para no romper llamadas viejas; si no se pasa, se
+ * resuelve solo por el plan.
+ */
+export function allows(
+  plans: PlanConfig[],
+  plan: string | null | undefined,
+  feature: PlanFeature,
+  extras?: string[] | null,
+): boolean {
+  if (extras && extras.includes(feature)) return true;
   const list = plans.length ? plans : DEFAULT_PLANS;
   const p = list.find((x) => x.key === plan) || list.find((x) => x.key === "basico");
   return !!p && (p.capabilities || []).includes(feature);
+}
+
+/** ¿Esta función la tiene BONIFICADA (no viene con su plan, se la regalaste)? */
+export function isBonificada(
+  plans: PlanConfig[],
+  plan: string | null | undefined,
+  feature: PlanFeature,
+  extras?: string[] | null,
+): boolean {
+  if (!extras || !extras.includes(feature)) return false;
+  // Si el plan ya la incluye, no es una bonificación: es parte del plan.
+  return !allows(plans, plan, feature);
+}
+
+/** ¿La clave es una función válida? (filtra basura que venga de la base). */
+export function isFeature(key: string): key is PlanFeature {
+  return ALL_FEATURES.some((f) => f.key === key);
+}
+
+/** Nombre lindo de una función, para mostrarle al dueño. */
+export function featureLabel(feature: string): string {
+  return ALL_FEATURES.find((f) => f.key === feature)?.label || feature;
+}
+
+/**
+ * Funciones bonificadas de un gimnasio (gyms.extra_features).
+ *
+ * Best-effort a propósito: si todavía no se corrió migration_034 la columna no
+ * existe, y en ese caso devuelve [] en vez de romper el panel.
+ */
+export async function loadGymExtras(sb: SupabaseClient, gymId: string | null | undefined): Promise<PlanFeature[]> {
+  if (!gymId) return [];
+  try {
+    const { data } = await sb.from("gyms").select("extra_features").eq("id", gymId).maybeSingle();
+    const raw = (data as { extra_features?: string[] | null } | null)?.extra_features;
+    return Array.isArray(raw) ? raw.filter(isFeature) : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Etiqueta del plan más barato que incluye la función (para los candados del menú). */

@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { allows, loadPlans, type PlanFeature } from "@/lib/plans";
+import { allows, loadPlans, loadGymExtras, type PlanFeature } from "@/lib/plans";
 import { capExercise } from "@/lib/exercise-i18n";
 
-/** ¿El plan del gimnasio habilita esta función? (chequeo del lado del servidor). */
+/** ¿El gimnasio puede usar esta función? (chequeo del lado del servidor).
+ *  Contempla el plan Y las funciones bonificadas a mano (gyms.extra_features). */
 export async function gymHasFeature(
   admin: SupabaseClient,
   gymId: string,
@@ -12,7 +13,8 @@ export async function gymHasFeature(
     .from("subscriptions").select("plan").eq("gym_id", gymId)
     .maybeSingle<{ plan: string }>();
   const plans = await loadPlans(admin);
-  return allows(plans, data?.plan, feature);
+  const extras = await loadGymExtras(admin, gymId);
+  return allows(plans, data?.plan, feature, extras);
 }
 
 /**

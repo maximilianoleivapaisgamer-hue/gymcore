@@ -1,0 +1,349 @@
+# TurnoGym — Contexto del proyecto (para Claude Code)
+
+> Este archivo es la fuente de verdad para trabajar el desarrollo de TurnoGym.
+> Está pensado para que Claude Code entienda TODO el proyecto sin tener que
+> redescubrirlo. La parte de **negocio/marketing/decisiones** se trabaja en Claude
+> (Cowork); la parte de **código** se trabaja acá con Claude Code.
+
+---
+
+## 1. Qué es TurnoGym
+
+SaaS multi-gimnasio (multi-tenant) para dueños de gimnasios y personal trainers.
+En un solo lugar el dueño gestiona socios, cobros, clases, rutinas y dietas; cada
+socio tiene su propia "app" (web instalable) con rutina, dieta, clases, progreso y
+carnet QR; y cada gimnasio tiene su página pública white-label con su marca.
+
+- Producción: **turnogym.com**
+- Mercado: Argentina. Toda la interfaz en **español rioplatense** ("vos").
+- Precios en **pesos argentinos**, mensuales.
+
+---
+
+## 2. Stack y cómo se despliega (LEER SIEMPRE)
+
+- **Next.js 14 (App Router) + TypeScript + Tailwind CSS.**
+- **Supabase** (Postgres + Auth + Storage + RLS) como backend.
+- **Vercel** para el hosting (deploy automático del branch `main`).
+- **Mercado Pago** para cobros. **WhatsApp Cloud API (Meta)** para recordatorios.
+- IA de Anthropic para generar rutinas/dietas y traducir la librería de ejercicios.
+
+### Flujo de despliegue (IMPORTANTE)
+1. Claude Code edita los archivos **localmente** en la máquina del dueño.
+2. El dueño corre **`actualizar-github.bat`** (hace `git add` + `commit` + `push`).
+3. Vercel detecta el push a `main` y **deploya solo**.
+4. **Las migraciones de Supabase NO se aplican solas.** Cada archivo nuevo en
+   `supabase/migration_XXX.sql` hay que **correrlo a mano** en el SQL Editor de
+   Supabase. Si un cambio de código depende de una columna/tabla nueva, avisar de
+   correr el SQL **antes** de deployar.
+
+> Regla de oro: si tocás la base, siempre dejás (a) el archivo `migration_XXX.sql`
+> y (b) un aviso claro de "corré este SQL en Supabase antes de subir".
+
+**Numeración de migraciones:** la serie salta de `026` a `030`. Los archivos
+`027`, `028` y `029` **nunca existieron** (verificado contra el historial de git:
+no fueron creados ni borrados). Es un **salto de numeración, sin migración** —
+no hay que rellenarlo. Lo mismo pasa con el `001`, que arranca en `002`.
+La numeración siguiente arranca en **034**.
+
+---
+
+## 3. Arquitectura multi-tenant
+
+- Cada gimnasio es un **tenant** (`gyms`). Todo cuelga de `gym_id`.
+- **Auth / cuentas:**
+  - Los dueños y socios se crean como usuarios de Supabase Auth.
+  - Las cuentas generadas por la plataforma usan un **email sintético**:
+    `usuario@socios.gymcore.app`. El "usuario" es la parte antes de la `@`.
+    Al crearse, la **contraseña suele ser igual al usuario** (se avisa que la
+    cambien desde "Mi cuenta").
+  - `profiles.role`: `super_admin` (vos), dueño, staff. `is_super_admin()` es una
+    función SQL usada por RLS.
+- **RLS activo**: cada gimnasio ve solo lo suyo; el super admin ve todo. Las
+  operaciones sensibles del servidor usan el **service-role key** (ver §7).
+
+### Tablas clave
+- `profiles` — `id`, `gym_id`, `role`, `full_name`, `permissions text[]`.
+- `gyms` — tenant + config de la landing. Columnas relevantes:
+  `owner_id, name, slug, logo_url, hero_url, accent_color, theme, bg_style,
+  tagline, description, benefits[], member_plans jsonb, real_plans jsonb,
+  whatsapp, address, landing_config jsonb, is_demo, is_test, archived,
+  wa_phone_id, wa_reminders, wa_days_before, app_icon_url, hidden_sections text[],
+  hidden_member_sections text[], extra_features text[]`.
+- `subscriptions` — suscripción del dueño al SaaS: `gym_id, plan (basico|pro|elite),
+  status (trial|active|past_due|canceled), trial_ends_at, current_period_end,
+  payment_method (transferencia|mercadopago|null), mp_preapproval_id`.
+- `members` — socios del gimnasio: `gym_id, full_name, dni, email, whatsapp,
+  plan_name, plan_price, membership_expiry, height_cm, linked_user_id,
+  reminder_whatsapp, reminder_email, member_number, last_reminder_at,
+  last_reminder_for`. (El socio entra con **DNI** como usuario y clave.)
+- `routines` / `routine_blocks` / `exercises` — rutinas + librería de ejercicios
+  (con `primary_muscles[]`, `source`, demostración foto inicio/fin).
+- `diets` / `diet_meals` — dietas por día/tipo de comida, con fotos.
+- Clases y reservas (agenda + bookings).
+- `plan_configs` — planes editables por el super admin (ver §4).
+- `platform_settings` (id=1) — `transfer_alias, transfer_cbu, transfer_holder,
+  transfer_note, support_whatsapp` y tokens de integraciones.
+- `app_config` — key/value, **solo service-role** (tokens de Apify/Google, etc.).
+- `demo_visits` — tracking de visitas a demos.
+
+---
+
+## 4. Planes y gateo de funciones — `lib/plans.ts`
+
+- `PlanFeature = "clases" | "dietas" | "control_acceso" | "ia" | "whatsapp"`.
+- Cada plan tiene `capabilities: PlanFeature[]`. La app pregunta
+  `allows(plans, plan, feature, extras)` para habilitar/bloquear una función.
+- **Funciones bonificadas por gimnasio** (`gyms.extra_features text[]`): le
+  habilitás a UN cliente algo que su plan no trae, sin subirlo de plan ni tocar
+  `plan_configs`. Se cargan desde Super Admin → botón **Funciones** en la fila
+  del gimnasio (`action: "features"` en `api/admin/gimnasios`). Las bonificadas
+  solo SUMAN: nunca sacan algo que el plan ya incluye.
+  - `allows(plans, plan, feature, extras)` → el 4º parámetro es opcional; si no
+    se pasa, resuelve solo por plan (compatible con llamadas viejas).
+  - `isBonificada(plans, plan, feature, extras)` → true solo si se la regalaste
+    (el plan NO la trae). Sirve para los carteles.
+  - `loadGymExtras(sb, gymId)` → lee la columna. **Best-effort a propósito**: si
+    todavía no se corrió `migration_034` devuelve `[]` en vez de romper.
+  - Dónde se ve: en el menú del panel sale un chip verde **Extra** en vez del
+    candado, y en **Mi plan** un bloque "Funciones bonificadas" con 🎁.
+  - Requiere haber corrido `migration_034_funciones_bonificadas.sql`.
+- Los planes **reales** se leen de la tabla `plan_configs` con `loadPlans(sb)`;
+  si la base está vacía cae a `DEFAULT_PLANS` (respaldo hardcodeado).
+- El menú muestra un candado con `minPlanLabel(plans, feature)` (etiqueta del plan
+  más barato que incluye la función).
+
+**Estado actual de capabilities:**
+- `basico`: `clases`
+- `pro`: `clases, dietas, control_acceso, whatsapp`
+- `elite`: `clases, dietas, control_acceso, ia, whatsapp`
+
+Precios actuales: Básico **$49.000**, Pro **$79.000**, Elite **$119.000**
+(promo primer mes $90.000). Editables desde el panel Super Admin → Planes, que
+escribe en `plan_configs`.
+
+> ⚠️ Si agregás una feature nueva, hay que tocar **3 lugares**: el type
+> `PlanFeature` + `DEFAULT_PLANS` en `lib/plans.ts`, y un `UPDATE` a
+> `plan_configs` (SQL) porque los gimnasios reales usan la base, no los defaults.
+
+---
+
+## 5. Módulos / features implementados
+
+### Panel del dueño — `app/dashboard/*`
+Menú (con grupos): Dashboard, Socios, Rutinas, Dietas (Pro), Finanzas, Clases,
+Equipo, Sucursales, Control de acceso (Pro), Planes, Página pública,
+**Recordatorios automáticos** (WhatsApp, Pro), **Secciones**, Super Admin,
+Mi plan, **Mi cuenta**.
+- El menú y las páginas se gatean por plan con `allows()` (candado "Pro").
+- **Secciones** (`app/dashboard/secciones`): el dueño tilda qué secciones usar y
+  cuáles apagar. Se guardan las **claves ocultas** en `gyms.hidden_sections`
+  (`text[]`). Las secciones núcleo (Dashboard, Socios, Mi plan, Mi cuenta) no se
+  pueden apagar. Afecta el menú y lo que ve el socio en su app.
+- **Mi cuenta** (`app/dashboard/cuenta`): cambiar usuario/contraseña + subir el
+  **ícono de la app** (`gyms.app_icon_url`) para la PWA del socio.
+
+### Portal del socio — `app/portal/*`
+La "app" del socio: rutina, dieta, clases/reservas, peso, progreso, carnet QR.
+Se **instala como PWA** (web a pantalla de inicio). El manifest es **por gimnasio**
+(`app/manifest/[slug]/route.ts`) y `components/PwaBranding.tsx` inyecta el ícono y
+el nombre del gym en el navegador del socio.
+
+### Página pública / landing — `app/(public)/[slug]` y `/g/[slug]`
+Landing white-label por gimnasio: logo, portada, galería, colores/tema, dirección
+con Google Maps, planes de socio, beneficios. Editable desde
+`app/dashboard/configuracion`. Tiene modo **personal trainer** (copy adaptado).
+
+### Demos (para vender) — `app/demo/*` y `app/api/admin/demo/*`
+- Generador de demos (`admin/demo/generar`): crea un gimnasio de ejemplo con 5
+  socios, dirección real (Google/Apify), fotos, etc.
+- **Módulos de la demo**: en el formulario tildás qué secciones muestra
+  (`body.secciones` = las claves VISIBLES de `lib/sections.ts`). El endpoint
+  guarda lo inverso en `gyms.hidden_sections` y, para la app del socio, en
+  `gyms.hidden_member_sections` (mapeo `rutinas→rutina`, `dietas→dieta`,
+  `clases→clases`). Hay presets: **Todo**, **Estudio de clases** (pilates/yoga:
+  clases + planes + finanzas + página pública) y **Personal trainer**.
+  Si no se manda `secciones`, la demo muestra todo (comportamiento de antes).
+  El dueño después lo puede cambiar desde "Secciones".
+- Demo **sin login**: un link donde el prospecto entra "como dueño" o "como socio"
+  (`app/demo/[slug]`, `app/demo/entrar`).
+- Gestión de demos, credenciales, actividad, conversión a cliente.
+
+### Activación / checkout — `app/activar/[slug]` + `app/api/pagos/*`
+El prospecto que probó la demo paga y su gimnasio se activa solo:
+- **Suscripción** (débito automático) → MP `preapproval`.
+- **Un pago** (Checkout Pro) → MP `preference`.
+- **Transferencia** (alias/CBU) → la aprueba el super admin a mano.
+- El **webhook** (`app/api/pagos/webhook`) convierte la demo en cliente real y
+  activa la suscripción (1 mes). Tras pagar se muestran las credenciales.
+
+### Cobros / Super Admin — `app/admin/*`
+- Dashboard de gimnasios **reales** (`is_demo = false`): plan, estado, método,
+  vencimiento (editable a mano), socios, y acciones: Avisar (WhatsApp), Ver
+  página, Marcar/quitar prueba, Pasar a cliente real (Transferencia/MP/Sin cobro),
+  **Accesos** (ver/reiniciar usuario y clave del dueño), Archivar, Eliminar.
+- Los gimnasios marcados **prueba** (`is_test`) no cuentan para la plata/métricas.
+- Librería de ejercicios: botón para cargar/traducir 800+ ejercicios con IA.
+
+### Recordatorios por WhatsApp — `app/dashboard/whatsapp` + `app/api/whatsapp`
+- Función **Pro**. Avisa a los socios que deben, **desde el número del propio
+  gimnasio** (token central de Tech Provider + `phone_number_id` por gym en
+  `gyms.wa_phone_id`). Config: número, on/off, días antes, y "enviar prueba".
+- En Básico la pantalla ofrece el recordatorio **manual** desde Socios.
+- Falta la **etapa 2**: el cron diario que efectivamente manda los recordatorios
+  (`app/api/cron/whatsapp` + `vercel.json`). Ver §9.
+
+---
+
+## 6. Estructura del repo (orientativa)
+
+```
+app/
+  (public)/[slug]/      landing pública white-label
+  g/[slug]/             variante pública / demo pública
+  dashboard/            panel del dueño (layout.tsx define el menú y el gateo)
+    socios, rutinas, dietas, finanzas, clases, equipo, sedes,
+    control-acceso, planes, configuracion, whatsapp, secciones,
+    cuenta, mi-plan
+  portal/               app del socio (rutina, dieta, clases, peso, progreso)
+  admin/                super admin (page.tsx = dashboard de cobros)
+  activar/[slug]/       checkout público de activación
+  manifest/[slug]/      manifest PWA por gimnasio
+  acceso/               login
+  api/
+    whatsapp/           config de recordatorios del dueño
+    cron/whatsapp/      cron diario que manda los recordatorios (Vercel Cron)
+    cuenta/             cambiar usuario/clave del dueño logueado
+    pagos/{activar,webhook}/   Mercado Pago
+    admin/{gimnasios,cobros,transferencia,equipo,config,exercises}/
+    admin/demo/{generar,convertir,credenciales,acceso,publica,gestion,...}
+components/    PwaBranding, PasswordInput, AiChat, ThemeApply, AppBackground, ...
+lib/          plans.ts, admin.ts, mercadopago.ts, whatsapp.ts, google-places.ts,
+              supabase-browser.ts, supabase-server.ts
+supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
+```
+
+---
+
+## 7. Convenciones de código
+
+- **Route handlers** (`route.ts`): `export const runtime = "nodejs"`. Tres clientes
+  de Supabase según el caso:
+  - `supabase-browser` → componentes cliente (respeta RLS del usuario).
+  - `supabase-server` → SSR / leer el usuario logueado.
+  - `createAdmin(URL, SERVICE_ROLE_KEY, {auth:{persistSession:false}})` →
+    operaciones privilegiadas (saltea RLS). Nunca exponer el service-role al cliente.
+- **UI en español rioplatense**, tono cercano. Nada de inglés en la interfaz.
+- **Design tokens de Tailwind** que ya existen (usarlos, no inventar colores):
+  `card`, `btn btn-primary`, `btn btn-ghost`, `input`, `text-ink`, `text-ink-2`,
+  `text-muted`, `text-brand`, `text-good`, `text-warn`, `text-crit`, `bg-brand`,
+  `border-white/10`. Tema oscuro por defecto.
+- **Un archivo por responsabilidad**; los componentes cliente arrancan con
+  `"use client"`.
+- Al agregar un ítem al menú que sea de un plan, poné `feature: "<cap>"` para que
+  salga el candado.
+
+---
+
+## 8. Variables de entorno (Vercel)
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (privada, solo servidor)
+- `NEXT_PUBLIC_APP_URL` (ej: https://turnogym.com)
+- `MP_ACCESS_TOKEN` (Mercado Pago; el mismo sirve para suscripción y para un pago)
+- `ANTHROPIC_API_KEY` (IA de rutinas/dietas y traducción de la librería)
+- `WHATSAPP_TOKEN`, `WHATSAPP_TEMPLATE` (ej: `recordatorio_cuota`), `WHATSAPP_LANG`
+  (ej: `es` o `es_AR`)
+- `CRON_SECRET` (string largo al azar). Protege `/api/cron/whatsapp`: Vercel Cron
+  lo manda solo como `authorization: Bearer <secreto>`. **Si falta, el cron no
+  corre** (falla cerrado, no manda nada).
+- Tokens de Apify / Google Places: se cargan desde el panel (guardados en
+  `app_config` / `platform_settings`), no siempre por env.
+
+---
+
+## 9. Estado actual y pendientes
+
+- ✅ Gateo de WhatsApp a Pro (menú con candado + página + API). Requiere haber
+  corrido `migration_032_whatsapp_pro.sql`.
+- ✅ Ícono de la app por gimnasio desde "Mi cuenta" (`app_icon_url`).
+- ✅ Secciones configurables (`hidden_sections`).
+- ✅ Botón **Accesos** en el admin para ver/reiniciar usuario y clave de cualquier
+  gimnasio (demo o cliente real). Endpoints `admin/demo/acceso` y
+  `admin/demo/credenciales` ya no exigen `is_demo`.
+- ✅ Activación/conversión a cliente = **1 mes** (30 días), sin bono de +3 días.
+  El "regalo de días" se hace **a mano** editando la fecha de Vence en el admin.
+- ✅ **WhatsApp etapa 2**: cron diario que manda los recordatorios
+  (`app/api/cron/whatsapp/route.ts` + `vercel.json`, schedule `0 12 * * *` UTC =
+  9 AM de Argentina). No usa base nueva: se apoya en las columnas de
+  `migration_030_whatsapp.sql`. Requiere `CRON_SECRET` en Vercel.
+  - Recorre gimnasios con `wa_reminders=true` + `wa_phone_id`, **excluyendo**
+    demos (`is_demo`), archivados y suscripciones `canceled`.
+  - Gatea por plan con `allows(plans, plan, "whatsapp")`, con la misma
+    salvaguarda que `app/api/whatsapp` (si ningún plan tiene la capacidad, no
+    bloquea a nadie).
+  - Avisa al socio cuya cuota vence en `<= wa_days_before` días o ya venció;
+    respeta el opt-out `members.reminder_whatsapp`.
+  - Anti-duplicado: uno por vencimiento vía `members.last_reminder_for`; se marca
+    **después** de un envío exitoso (si falla, reintenta mañana).
+  - Topes: `MAX_ENVIOS=200` por corrida y `MAX_DIAS_VENCIDO=30` (no persigue
+    deudas más viejas que eso). Ambos son constantes arriba del archivo.
+  - Un envío que falla se loguea y sigue con el próximo; devuelve un JSON con el
+    resumen (útil para mirar en los logs de Vercel).
+- ✅ **Funciones bonificadas por gimnasio** (`gyms.extra_features`). Requiere
+  `migration_034_funciones_bonificadas.sql`.
+- ✅ **Demos con módulos a medida**: elegís en el generador qué secciones ve el
+  prospecto. No usa base nueva (se apoya en `hidden_sections` /
+  `hidden_member_sections`, migraciones 031 y 033).
+- ⏳ **Dashboard admin**: ya excluye demos (`is_demo=false`). A DEFINIR si además
+  se quiere ocultar del listado principal los gimnasios en estado "prueba"/trial y
+  mostrar solo los activos.
+- ⏳ **PWA**: el nombre/ícono por gimnasio ya está; falta pulir instalación en iOS.
+- ⏳ Cambiar el nombre del cobro en Mercado Pago (aparece el negocio de la cuenta
+  MP; se cambia en la config de Mercado Pago, no en el código).
+
+---
+
+## 10. Gotchas (cosas que ya rompieron — no repetir)
+
+- **Login roto al crear usuarios de Auth a mano:** GoTrue falla si quedan en NULL
+  los campos de token. Al insertar en `auth.users`, poné `coalesce(..., '')` en
+  `confirmation_token, recovery_token, email_change, email_change_token_new`.
+- **No cambiar el dominio del email sintético** (`@socios.gymcore.app`) al editar
+  un usuario: rompe el login. Solo cambiar la parte antes de la `@`.
+- **Mercado Pago:** el `reason`/`title` de la suscripción tiene límite de **60
+  caracteres** (truncar). El `payer_email` de un `preapproval` debe ser un email
+  **real y distinto** al de la cuenta vendedora (con email falso o la propia cuenta
+  tira 500).
+- **plan_configs manda:** los gimnasios reales leen los planes de la base. Cambios
+  de capabilities/precios hay que hacerlos por **SQL** además de en `DEFAULT_PLANS`,
+  y correr el SQL **antes** de deployar (si no, un candado puede mostrar el plan
+  equivocado).
+- **Migraciones a mano:** ninguna migración se aplica sola. Ver §2.
+- **Columnas nuevas en consultas grandes:** si agregás una columna a un `select`
+  que ya existe (ej: el que trae todos los gimnasios) y todavía no se corrió el
+  SQL, ese `select` falla ENTERO y tira la pantalla abajo. Por eso las columnas
+  nuevas se leen en una **consulta aparte y best-effort** (así se hace con
+  `hidden_sections` en el layout y con `extra_features` en el admin y el cron).
+- **El proyecto compila con errores de tipos:** `next.config.mjs` tiene
+  `typescript.ignoreBuildErrors: true`. Hay ~20 errores preexistentes por el
+  salto de versión de `@supabase/supabase-js` (el código está escrito contra la
+  2.45 y npm instala la 2.11x). No rompen en runtime, pero significa que **el
+  build no te avisa si rompés un tipo**: conviene correr `npx tsc --noEmit` y
+  comparar contra esa línea de base.
+- No usar `localStorage`/`sessionStorage` en artifacts/embeds; en la app normal está
+  ok, pero preferir estado en memoria o Supabase.
+
+---
+
+## 11. Cómo pedir cambios (para el dueño)
+
+Con Claude Code, pedile en criollo lo que querés (ej: "sumá un botón X en el panel
+de socios que haga Y"). Code va a:
+1. Leer este `CLAUDE.md` y los archivos que toque.
+2. Hacer el cambio + si toca la base, dejar el `migration_XXX.sql`.
+3. Avisarte si hay que correr SQL en Supabase.
+4. Vos corrés `actualizar-github.bat` para subir y Vercel deploya.
+
+Cuando algo sea de **negocio, precios, textos de venta, estrategia o contenido**,
+eso se trabaja en Claude (Cowork), no acá.

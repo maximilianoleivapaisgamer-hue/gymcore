@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { allows, loadPlans } from "@/lib/plans";
+import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
 import InstallAppButton from "@/components/InstallAppButton";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
@@ -109,7 +109,7 @@ export default function PortalPage() {
     setAllBookings((ab as BookingLite[]) || []);
     setLastWeight(((wl as WeightLog[]) || [])[0] ?? null);
     const loadedPlans = await loadPlans(supabase);
-    setIsElite(allows(loadedPlans, sub?.plan, "dietas"));
+    setIsElite(allows(loadedPlans, sub?.plan, "dietas", await loadGymExtras(supabase, m.gym_id)));
     setDiet((dt as Diet) ?? null);
     if (dt) {
       const { data: dp } = await supabase.from("diet_progress").select("meal_id, date")

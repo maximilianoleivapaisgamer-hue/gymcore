@@ -5,6 +5,7 @@ import { generateDemoConfig } from "@/lib/ai/demo";
 import { DEFAULT_LANDING, type LandingConfig } from "@/lib/landing-config";
 import { seedDemoGym } from "@/lib/demo-seed";
 import { STOCK_GYM } from "@/lib/stock-images";
+import { TOGGLEABLE_KEYS } from "@/lib/sections";
 
 /**
  * Genera un gimnasio DEMO con IA (solo super admin).
@@ -149,6 +150,9 @@ export async function POST(req: Request) {
     images?: { mediaType: string; data: string }[]; logoUrl?: string; heroUrl?: string;
     galleryUrls?: string[]; brandColor?: string; heroPick?: string;
     ownerEmail?: string; ownerPassword?: string;
+    /** Módulos que se muestran en la demo (claves de lib/sections.ts). Si no
+     *  viene, la demo muestra todo, como siempre. */
+    secciones?: string[];
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
 
@@ -233,6 +237,20 @@ export async function POST(req: Request) {
     cfg.ubicacion.mapsQuery = `${dirReal}${body.ciudad ? `, ${String(body.ciudad).trim()}` : ""}`;
   }
 
+  // 3.b) Módulos de la demo. Al prospecto le mostramos SOLO lo que le sirve:
+  //      un estudio de pilates no quiere ver Rutinas ni Control de acceso.
+  //      Guardamos las claves OCULTAS (lo inverso de lo que eligieron).
+  const pedidas = Array.isArray(body.secciones)
+    ? body.secciones.map(String).filter((k) => TOGGLEABLE_KEYS.includes(k))
+    : null;
+  const hiddenSections = pedidas ? TOGGLEABLE_KEYS.filter((k) => !pedidas.includes(k)) : [];
+  // La app del socio acompaña al panel: si el dueño no usa Rutinas, el socio
+  // tampoco ve la pestaña Rutina.
+  const PANEL_A_SOCIO: Record<string, string> = { rutinas: "rutina", dietas: "dieta", clases: "clases" };
+  const hiddenMemberSections = pedidas
+    ? Object.entries(PANEL_A_SOCIO).filter(([panel]) => !pedidas.includes(panel)).map(([, socio]) => socio)
+    : [];
+
   // 4) Usuario dueño (login del panel). Usuario = nombre del gym todo junto;
   //    la contraseña es la misma. Entra en /acceso escribiendo ese usuario.
   const slug = `demo-${slugify(nombre)}-${rand(4)}`;
@@ -274,6 +292,8 @@ export async function POST(req: Request) {
     address: cfg.ubicacion.direccion,
     instagram: cfg.instagram,
     landing_config: cfg,
+    // Solo si eligieron módulos; si no, se dejan los defaults (ve todo).
+    ...(pedidas ? { hidden_sections: hiddenSections, hidden_member_sections: hiddenMemberSections } : {}),
   }).select("id, slug").single<{ id: string; slug: string }>();
   if (gErr || !gym) {
     await admin.auth.admin.deleteUser(ownerId).catch(() => {});
