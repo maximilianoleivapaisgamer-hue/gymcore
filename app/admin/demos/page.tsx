@@ -900,6 +900,23 @@ export default function DemosPage() {
                       <button onClick={() => toggleActividad(d)} className="text-indigo hover:underline">{actId === d.id ? "Cerrar" : "📊 Actividad"}</button>
                       <button onClick={() => toggleAcc(d)} className="text-brand hover:underline">{openId === d.id ? "Ocultar" : "Accesos"}</button>
                       <a href={`/${d.slug}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Ver web</a>
+                      {/* Entrar a la demo con la cuenta del dueño o la de un socio,
+                          para verla tal cual la va a ver el prospecto. */}
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2 py-0.5">
+                        <span className="text-[11px] text-muted">Entrar:</span>
+                        <a href={`/api/admin/entrar?gym=${d.id}&rol=owner`}
+                          onClick={(e) => { if (!confirm(`Vas a entrar al panel de "${d.name}" como el dueño.
+
+Esto cierra tu sesión de super admin; volvés con el botón "Volver al Super Admin" que te va a aparecer abajo.`)) e.preventDefault(); }}
+                          className="rounded bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand hover:bg-brand/25"
+                          title="Ver el panel tal cual lo ve el dueño">dueño</a>
+                        <a href={`/api/admin/entrar?gym=${d.id}&rol=socio`}
+                          onClick={(e) => { if (!confirm(`Vas a entrar a la app de un socio de "${d.name}".
+
+Esto cierra tu sesión de super admin; volvés con el botón "Volver al Super Admin" que te va a aparecer abajo.`)) e.preventDefault(); }}
+                          className="rounded bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-ink-2 hover:bg-white/10"
+                          title="Ver la app tal cual la ve un socio">socio</a>
+                      </span>
                       <button onClick={() => startEdit(d)} className="text-ink-2 hover:text-ink">{editId === d.id ? "Cerrar" : "Editar"}</button>
                       <button onClick={() => startImg(d)} className="text-ink-2 hover:text-ink">{imgId === d.id ? "Cerrar" : "🖼️ Imágenes"}</button>
                       <button onClick={() => regenerar(d)} disabled={busyId === d.id} className="text-ink-2 hover:text-ink disabled:opacity-50">{busyId === d.id ? "…" : "Regenerar IA"}</button>
