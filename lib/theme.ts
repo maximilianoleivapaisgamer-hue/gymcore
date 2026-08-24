@@ -11,6 +11,11 @@
  * las superficies para un estudio de pilates, un violeta profundo para uno de
  * danza, un casi negro neutro para el verde neón, etc.).
  *
+ * ⚠️ LOS TEXTOS VAN NEUTROS EN LAS CINCO. Se probó tiñéndolos con el matiz de
+ * cada paleta (que es lo que suele recomendarse) y se ve como si las letras
+ * tuvieran una capa de color encima: en el rosa parecían rosadas. Lo que se
+ * tiñe es el FONDO y la MARCA, no las letras. No volver a teñirlas.
+ *
  * ── Cómo funciona por dentro ─────────────────────────────────────────────────
  * Cada token es una variable CSS que consume Tailwind (ver tailwind.config.ts).
  * Al cambiar de estilo se reescriben las variables y se repinta toda la app
@@ -61,28 +66,28 @@ export const THEMES: Theme[] = [
   {
     key: "rosa", label: "Rosa", desc: "Suave y cálido. Para pilates, yoga y estudios chicos.",
     bg: "#100b0f", surface: "#1a1218", surface2: "#211820", surface3: "#2a1f28",
-    ink: "#fbf4f8", ink2: "#c0a8b6", muted: "#98838f",
+    ink: "#f4f6f8", ink2: "#9aa3b2", muted: "#868c97",
     brandRgb: "244 165 195", brand2Rgb: "236 118 168", onBrand: "#0b0a10",
     hex: "#f4a5c3", hex2: "#ec76a8",
   },
   {
     key: "fucsia", label: "Fucsia", desc: "Eléctrico y con actitud. Para danza, zumba e indoor.",
     bg: "#0c0713", surface: "#16101f", surface2: "#1d1529", surface3: "#261c34",
-    ink: "#f7f2fb", ink2: "#b3a3c4", muted: "#8f82a1",
+    ink: "#f4f6f8", ink2: "#9aa3b2", muted: "#868c97",
     brandRgb: "232 62 168", brand2Rgb: "217 70 239", onBrand: "#0b0a10",
     hex: "#e83ea8", hex2: "#d946ef",
   },
   {
     key: "verde", label: "Verde neón", desc: "Tech y enérgico. Para funcional, crossfit y entrenadores.",
     bg: "#080b09", surface: "#101613", surface2: "#151d19", surface3: "#1c2721",
-    ink: "#f0f7f2", ink2: "#9db3a6", muted: "#7e9087",
+    ink: "#f4f6f8", ink2: "#9aa3b2", muted: "#868c97",
     brandRgb: "52 211 153", brand2Rgb: "16 185 129", onBrand: "#0b0a10",
     hex: "#34d399", hex2: "#10b981",
   },
   {
     key: "ambar", label: "Ámbar", desc: "Cálido y potente. Para musculación, box y fuerza.",
     bg: "#0d0a06", surface: "#17120b", surface2: "#1e1710", surface3: "#281f15",
-    ink: "#fbf6ec", ink2: "#bfae93", muted: "#958771",
+    ink: "#f4f6f8", ink2: "#9aa3b2", muted: "#868c97",
     brandRgb: "245 177 61", brand2Rgb: "234 88 12", onBrand: "#0b0a10",
     hex: "#f5b13d", hex2: "#ea580c",
   },

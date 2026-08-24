@@ -1,10 +1,14 @@
 /** @type {import('next').NextConfig} */
 
-// Landing de ventas (proyecto Next aparte). Si LANDING_URL está seteada en
-// Vercel, la home de turnogym.com (/) muestra esa landing; todo lo demás
-// (gimnasios, logins, demos, pagos) lo sigue sirviendo esta app.
-// Si LANDING_URL NO está seteada, no cambia nada: se ve la home actual.
+// Landing de ventas. La home de turnogym.com (/) la muestra a ella; todo lo
+// demás (gimnasios, logins, demos, pagos) lo sigue sirviendo esta app.
+//
+// Por defecto se sirve la que viaja con el proyecto en public/landing.html: un
+// solo deploy, un solo lugar donde editarla y sin salto a otro dominio.
+// Si algún día la landing se muda a un proyecto aparte, alcanza con setear
+// LANDING_URL en Vercel y esa gana, sin tocar código.
 const LANDING_URL = (process.env.LANDING_URL || '').replace(/\/$/, '');
+const LANDING_DESTINO = LANDING_URL || '/landing.html';
 
 const nextConfig = {
   images: { remotePatterns: [{ protocol: 'https', hostname: '**.supabase.co' }] },
@@ -13,10 +17,9 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
   async rewrites() {
-    if (!LANDING_URL) return [];
     return {
       beforeFiles: [
-        { source: '/', destination: LANDING_URL },
+        { source: '/', destination: LANDING_DESTINO },
       ],
     };
   },

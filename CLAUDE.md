@@ -40,6 +40,18 @@ carnet QR; y cada gimnasio tiene su página pública white-label con su marca.
 > Regla de oro: si tocás la base, siempre dejás (a) el archivo `migration_XXX.sql`
 > y (b) un aviso claro de "corré este SQL en Supabase antes de subir".
 
+### La landing de ventas
+Vive en `public/landing.html` (un solo HTML autocontenido, con su tipografía de
+Google Fonts y sus íconos SVG inline). `next.config.mjs` reescribe `/` hacia
+ella, así que **turnogym.com muestra la landing** y todo lo demás lo sigue
+sirviendo la app. Se deploya con el mismo push de siempre.
+- Los CTA no tienen `href` en el HTML: se los asigna el script al cargar
+  (`REGISTRO_URL` y el link de WhatsApp, arriba de todo en el `<script>`). Si
+  ves `href="#"` en el fuente, **no está roto**.
+- `app/page.tsx` sigue existiendo como respaldo, pero no se ve: la reescritura
+  gana. Si algún día la landing se muda a un proyecto aparte, se setea
+  `LANDING_URL` en Vercel y esa gana sin tocar código.
+
 ### Verificar el build ANTES de pushear
 El typecheck (`npx tsc --noEmit`) no agarra todo: hay errores que solo aparecen
 al compilar (imports rotos, mezclar servidor con cliente, exports de ruta mal).
@@ -162,13 +174,21 @@ escribe en `plan_configs`.
 ### Panel del dueño — `app/dashboard/*`
 Menú (con grupos): Dashboard, Socios, Rutinas, Dietas (Pro), Finanzas, Clases,
 Equipo, Sucursales, Control de acceso (Pro), Planes, Página pública,
-**Recordatorios automáticos** (WhatsApp, Pro), **Secciones**, Super Admin,
+**Recordatorios automáticos** (WhatsApp, Pro), **Configuración**, Super Admin,
 Mi plan, **Mi cuenta**.
 - El menú y las páginas se gatean por plan con `allows()` (candado "Pro").
-- **Secciones** (`app/dashboard/secciones`): el dueño tilda qué secciones usar y
-  cuáles apagar. Se guardan las **claves ocultas** en `gyms.hidden_sections`
-  (`text[]`). Las secciones núcleo (Dashboard, Socios, Mi plan, Mi cuenta) no se
-  pueden apagar. Afecta el menú y lo que ve el socio en su app.
+- **Configuración** (`app/dashboard/ajustes`): junta en una sola pantalla el
+  **estilo de la app** (los 5 presets + fondo del panel) y las **secciones**
+  (qué se prende y qué se apaga, para el dueño y para sus socios). Un solo
+  Guardar para todo. Se unificaron porque el dueño busca las dos cosas en el
+  mismo momento ("quiero acomodar mi panel").
+  - Las claves ocultas van en `gyms.hidden_sections` y `gyms.hidden_member_sections`.
+    Las secciones núcleo (Dashboard, Socios, Mi plan, Mi cuenta) no se apagan.
+  - `app/dashboard/secciones` quedó como **redirección** a `ajustes`.
+  - ⚠️ La pantalla de **Página pública** (`app/dashboard/configuracion`, mal
+    nombrada de antes) ya NO guarda `theme` ni `bg_style`: si los guardara,
+    pisaría lo que el dueño eligió en Configuración. Solo lee `theme` para
+    previsualizarse con sus colores.
 - **Mi cuenta** (`app/dashboard/cuenta`): cambiar usuario/contraseña + subir el
   **ícono de la app** (`gyms.app_icon_url`) para la PWA del socio.
 
@@ -355,6 +375,10 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
   - El color del texto del botón primario (`--on-brand`) es parte del preset:
     hay paletas donde el texto oscuro no llega al contraste mínimo contra los
     dos extremos del degradé (el fucsia con violeta daba 3.5 y hubo que abrirlo).
+  - ⚠️ **Los textos van NEUTROS en los cinco.** Se probó tiñéndolos con el matiz
+    de cada paleta (lo que suele recomendarse) y el dueño lo vio como "una capa
+    rosa encima de las letras". Lo que se tiñe es el fondo y la marca, no el
+    texto. No volver a teñirlos.
   - ⚠️ **Los contrastes están medidos, no elegidos a ojo.** Si tocás un color,
     volvé a medir: texto ≥4.5:1 sobre las tarjetas (incluida la superficie más
     clara) y el acento ≥3:1. De paso se corrigió `muted`, que en el tema viejo

@@ -53,7 +53,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/admin", label: "Super Admin", icon: "shield", superAdmin: true },
       { href: "/dashboard/mi-plan", label: "Mi plan", icon: "star" },
-      { href: "/dashboard/secciones", label: "Secciones", icon: "sliders" },
+      { href: "/dashboard/ajustes", label: "Configuración", icon: "sliders" },
       { href: "/dashboard/cuenta", label: "Mi cuenta", icon: "account" },
     ],
   },

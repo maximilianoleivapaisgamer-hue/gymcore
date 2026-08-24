@@ -1,0 +1,1636 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TurnoGym · Tu gimnasio, en orden</title>
+<meta name="description" content="TurnoGym es el sistema para gestionar tu gimnasio: socios, cobros, clases, rutinas y dietas en un solo panel, con tu marca y una app para cada socio. Probalo gratis 7 días.">
+<meta name="theme-color" content="#080B11">
+<meta property="og:title" content="TurnoGym · Tu gimnasio, en orden">
+<meta property="og:description" content="Socios, cobros, clases, rutinas y dietas en un solo panel. Con tu marca. Probalo gratis 7 días, sin tarjeta.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_AR">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2322D3EE'/%3E%3Cstop offset='1' stop-color='%233B82F6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='40' fill='url(%23g)'/%3E%3Crect x='42' y='52' width='96' height='18' rx='9' fill='%2304121A'/%3E%3Ccircle cx='42' cy='61' r='16' fill='%2304121A'/%3E%3Ccircle cx='138' cy='61' r='16' fill='%2304121A'/%3E%3Crect x='81' y='61' width='18' height='78' rx='9' fill='%2304121A'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TurnoGym · landing de venta · v1
+   Un solo archivo. HTML + CSS + JS vanilla. Sin dependencias.
+   ============================================================ */
+
+/* ---------- 1. Tokens ---------- */
+:root{
+  --bg:#080B11;
+  --bg-2:#0B0F16;
+  --surface:#111721;
+  --surface-2:#171F2C;
+  --line:rgba(230,237,243,.09);
+  --line-2:rgba(230,237,243,.17);
+  --text:#E6EDF3;
+  --muted:#93A1B5;
+  --dim:#6B7A90;
+  --cy:#22D3EE;
+  --bl:#3B82F6;
+  --volt:#A3E635;
+  --ink:#04121A;
+  --grad:linear-gradient(120deg,#22D3EE,#3B82F6);
+
+  --f-hud:"Bricolage Grotesque",system-ui,sans-serif;
+  --f-sans:"Hanken Grotesk",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,monospace;
+
+  --e:cubic-bezier(.16,1,.3,1);
+
+  /* radios: tarjetas 16 · botones y controles 12 · chips full · micro 8 */
+  --r-card:16px; --r-btn:12px; --r-mini:8px;
+
+  --wrap:1200px;
+  --sp:clamp(68px,7.6vw,112px);
+  --gut:clamp(20px,4vw,32px);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--f-sans);font-size:clamp(16px,.4vw + 15px,17px);
+  line-height:1.6;letter-spacing:.005em;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+img,svg{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+h1,h2,h3,h4{font-family:var(--f-hud);font-weight:800;letter-spacing:-.03em;line-height:1.04;margin:0}
+p{margin:0}
+::selection{background:var(--cy);color:var(--ink)}
+:focus-visible{outline:2px solid var(--cy);outline-offset:3px;border-radius:4px}
+
+/* grano sutil, fijo, sin coste de repintado */
+body::after{
+  content:"";position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.wrap{width:min(100% - var(--gut)*2,var(--wrap));margin-inline:auto}
+.sec{padding-block:var(--sp);position:relative}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+.eyebrow{
+  font-family:var(--f-mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--cy);margin:0 0 20px;font-weight:500;
+}
+.h2{font-size:clamp(2rem,1.2rem + 3.4vw,3.5rem)}
+.h3{font-size:clamp(1.35rem,1rem + 1.1vw,1.75rem);font-weight:700;letter-spacing:-.02em}
+.lead{color:var(--muted);font-size:clamp(1.02rem,.95rem + .35vw,1.15rem);max-width:62ch}
+
+/* ---------- 2. Botones ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  min-height:48px;padding:0 22px;border-radius:var(--r-btn);
+  font-weight:600;font-size:15.5px;white-space:nowrap;
+  border:1px solid transparent;
+  transition:background-color .18s var(--e),border-color .18s var(--e),
+             color .18s var(--e),transform .18s var(--e),box-shadow .18s var(--e);
+}
+.btn svg{width:17px;height:17px;flex:none}
+.btn--pri{background:var(--grad);color:var(--ink);box-shadow:0 1px 0 rgba(255,255,255,.28) inset}
+.btn--pri:hover{filter:brightness(1.07)}
+.btn--sec{background:var(--surface);border-color:var(--line-2);color:var(--text)}
+.btn--sec:hover{background:var(--surface-2);border-color:rgba(34,211,238,.45)}
+.btn--ghost{border-color:var(--line-2);color:var(--text)}
+.btn--ghost:hover{border-color:var(--cy);color:var(--cy)}
+.btn--volt{background:var(--volt);color:#15200a}
+.btn--volt:hover{filter:brightness(1.06)}
+.btn:active{transform:scale(.977)}
+.btn--sm{min-height:40px;padding:0 16px;font-size:14px}
+.btn--block{width:100%}
+
+/* ---------- 3. Revelado ---------- */
+.reveal{opacity:0;transform:translateY(24px)}
+.reveal.in{
+  opacity:1;transform:none;
+  transition:opacity .65s var(--e) var(--d,0ms),transform .65s var(--e) var(--d,0ms);
+}
+
+/* ---------- 4. Nav ---------- */
+.nav{
+  position:fixed;inset:0 0 auto;z-index:50;height:68px;
+  display:flex;align-items:center;
+  border-bottom:1px solid transparent;
+  transition:background-color .3s var(--e),border-color .3s var(--e),backdrop-filter .3s var(--e);
+}
+.nav[data-stuck="true"]{background:rgba(8,11,17,.82);backdrop-filter:blur(14px);border-bottom-color:var(--line)}
+.nav__in{display:flex;align-items:center;gap:28px;width:min(100% - var(--gut)*2,var(--wrap));margin-inline:auto}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-hud);font-weight:800;font-size:19px;letter-spacing:-.03em}
+.brand svg{width:30px;height:30px;border-radius:9px}
+.nav__links{display:flex;gap:26px;margin-left:auto;font-size:14.5px;color:var(--muted)}
+.nav__links a{position:relative;padding:6px 0;transition:color .18s var(--e)}
+.nav__links a:hover{color:var(--text)}
+.nav__links a::after{
+  content:"";position:absolute;left:0;right:100%;bottom:0;height:1px;background:var(--cy);
+  transition:right .28s var(--e);
+}
+.nav__links a:hover::after{right:0}
+.nav__cta{display:flex;gap:10px;align-items:center}
+.burger{display:none;width:44px;height:44px;align-items:center;justify-content:center;border:1px solid var(--line-2);border-radius:var(--r-btn)}
+.burger span{display:block;width:17px;height:1.5px;background:var(--text);position:relative;transition:transform .25s var(--e)}
+.burger span::before,.burger span::after{content:"";position:absolute;left:0;width:17px;height:1.5px;background:var(--text);transition:transform .25s var(--e),opacity .2s}
+.burger span::before{top:-5.5px}.burger span::after{top:5.5px}
+.nav[data-open="true"] .burger span{transform:rotate(45deg)}
+.nav[data-open="true"] .burger span::before{transform:translateY(5.5px) rotate(-90deg)}
+.nav[data-open="true"] .burger span::after{opacity:0}
+.sheet{
+  position:fixed;inset:68px 0 auto;z-index:49;background:rgba(8,11,17,.97);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);padding:8px var(--gut) 26px;
+  display:grid;gap:2px;transform:translateY(-12px);opacity:0;pointer-events:none;
+  transition:opacity .24s var(--e),transform .24s var(--e);
+}
+.sheet[data-open="true"]{opacity:1;transform:none;pointer-events:auto}
+.sheet a{padding:14px 4px;border-bottom:1px solid var(--line);font-size:17px;font-family:var(--f-hud);font-weight:600}
+.sheet .btn{margin-top:18px}
+
+/* CTA flotante en mobile */
+.dock{
+  position:fixed;left:var(--gut);right:var(--gut);bottom:calc(14px + env(safe-area-inset-bottom));z-index:48;
+  display:none;transform:translateY(120%);transition:transform .38s var(--e);
+}
+.dock[data-show="true"]{transform:none}
+
+/* ---------- 5. Hero ---------- */
+.hero{position:relative;padding-top:clamp(112px,14vh,164px);padding-bottom:clamp(60px,7vw,90px);overflow:hidden;isolation:isolate}
+
+/* capa ambiental: grilla de turnos + dos manchas que derivan */
+.hero__bg{position:absolute;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.hero__fx{
+  position:absolute;inset:0;width:100%;height:100%;
+  -webkit-mask-image:radial-gradient(74% 92% at 74% 40%,#000 0%,rgba(0,0,0,.5) 46%,transparent 80%),
+                     linear-gradient(to bottom,transparent 0,#000 15%,#000 84%,transparent 100%);
+  -webkit-mask-composite:source-in;
+  mask-image:radial-gradient(74% 92% at 74% 40%,#000 0%,rgba(0,0,0,.5) 46%,transparent 80%),
+             linear-gradient(to bottom,transparent 0,#000 15%,#000 84%,transparent 100%);
+  mask-composite:intersect;
+}
+.hero__glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55;will-change:transform}
+.hero__glow--a{
+  width:min(62vw,620px);aspect-ratio:1;top:-16%;right:-12%;
+  background:radial-gradient(circle,rgba(34,211,238,.24),transparent 66%);
+  animation:derivaA 46s var(--e) infinite alternate;
+}
+.hero__glow--b{
+  width:min(48vw,470px);aspect-ratio:1;top:34%;left:-18%;
+  background:radial-gradient(circle,rgba(59,130,246,.22),transparent 66%);
+  animation:derivaB 61s var(--e) infinite alternate;
+}
+@keyframes derivaA{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-7%,9%,0) scale(1.14)}}
+@keyframes derivaB{from{transform:translate3d(0,0,0) scale(1.08)}to{transform:translate3d(9%,-7%,0) scale(.94)}}
+.hero__grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);gap:clamp(32px,5vw,64px);align-items:center}
+h1{font-size:clamp(2.6rem,1.5rem + 5.1vw,4.9rem);margin:0;letter-spacing:-.04em}
+.h1line{display:block;overflow:hidden;padding-bottom:.06em}
+.h1line>span{display:block;transform:translateY(105%);transition:transform .8s var(--e) var(--d,0ms)}
+.ready .h1line>span{transform:none}
+.mark{
+  display:inline-block;background:var(--grad);color:var(--ink);
+  padding:.02em .22em .1em;border-radius:14px;
+}
+.hero__sub{margin-top:26px;max-width:44ch;color:var(--muted);font-size:clamp(1.05rem,.98rem + .4vw,1.2rem)}
+.hero__cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}
+
+/* ---------- 6. Mockup del panel ---------- */
+.panel{
+  position:relative;border-radius:var(--r-card);background:var(--bg-2);
+  border:1px solid var(--line-2);overflow:hidden;
+  box-shadow:0 40px 80px -40px rgba(2,8,20,.9),0 0 0 1px rgba(34,211,238,.12);
+}
+.panel::before{content:"";position:absolute;inset:0 0 auto;height:2px;background:var(--grad);z-index:2}
+.panel__bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:rgba(17,23,33,.7)}
+.panel__dot{width:9px;height:9px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-2)}
+.panel__url{margin-left:8px;font-family:var(--f-mono);font-size:11px;color:var(--dim)}
+.panel__body{display:grid;grid-template-columns:132px minmax(0,1fr)}
+.panel__side{border-right:1px solid var(--line);padding:14px 10px;display:grid;gap:2px;align-content:start}
+.panel__side i{display:block;height:1px;background:var(--line);margin:8px 6px}
+.pitem{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--r-mini);font-size:12.5px;color:var(--muted)}
+.pitem svg{width:14px;height:14px;color:var(--dim)}
+.pitem[data-on="true"]{background:rgba(34,211,238,.1);color:var(--text)}
+.pitem[data-on="true"] svg{color:var(--cy)}
+.pitem b{margin-left:auto;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.08em;color:var(--volt);font-weight:500}
+.panel__main{padding:16px}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.kpi{border:1px solid var(--line);border-radius:var(--r-mini);padding:11px 12px;background:var(--surface)}
+.kpi span{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:var(--f-mono)}
+.kpi strong{display:block;margin-top:5px;font-family:var(--f-mono);font-size:clamp(15px,1.4vw,19px);font-weight:700;letter-spacing:-.03em}
+.kpi em{font-style:normal;font-size:11px;color:var(--volt);font-family:var(--f-mono)}
+.chart{display:flex;align-items:flex-end;gap:5px;height:74px;margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:var(--r-mini);background:var(--surface)}
+.chart i{flex:1;background:linear-gradient(180deg,rgba(34,211,238,.85),rgba(59,130,246,.35));border-radius:3px 3px 0 0;transform-origin:bottom}
+.panel .chart i{transform:scaleY(0);transition:transform .7s var(--e) var(--d,0ms)}
+.panel.live .chart i{transform:scaleY(1)}
+.rows{margin-top:12px;border:1px solid var(--line);border-radius:var(--r-mini);overflow:hidden}
+.row{display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12.5px;background:var(--surface)}
+.row+.row{border-top:1px solid var(--line)}
+.row .av{width:24px;height:24px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--f-mono);font-size:9.5px;color:var(--muted)}
+.row .st{margin-left:auto;font-family:var(--f-mono);font-size:10.5px;padding:3px 8px;border-radius:999px}
+.st--ok{color:var(--volt);background:rgba(163,230,53,.12)}
+.st--due{color:#FCA5A5;background:rgba(248,113,113,.12)}
+.st--soon{color:var(--cy);background:rgba(34,211,238,.12)}
+
+/* ---------- 7. Datos del producto ---------- */
+.facts{border-block:1px solid var(--line);background:linear-gradient(180deg,rgba(17,23,33,.5),transparent)}
+.facts__grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
+.fact{background:var(--bg);padding:26px clamp(12px,2vw,26px)}
+.fact strong{display:block;font-family:var(--f-mono);font-size:clamp(1.7rem,1.2rem + 1.7vw,2.5rem);font-weight:700;letter-spacing:-.04em;color:var(--text)}
+.fact strong u{text-decoration:none;color:var(--cy)}
+.fact span{display:block;margin-top:7px;font-size:13.5px;color:var(--muted);line-height:1.45}
+
+/* ---------- 8. Riel de funciones ---------- */
+.rail__head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.rail__hint{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.rail{
+  display:flex;gap:16px;margin-top:44px;padding:4px calc((100vw - min(100% - var(--gut)*2,var(--wrap)))/2) 26px;
+  margin-inline:calc(50% - 50vw);width:100vw;
+  overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;
+}
+.rail::-webkit-scrollbar{display:none}
+.fcard{
+  flex:0 0 clamp(240px,72vw,300px);scroll-snap-align:start;
+  border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface);
+  padding:24px 22px 26px;display:flex;flex-direction:column;
+  transition:transform .3s var(--e),border-color .3s var(--e),background-color .3s var(--e);
+}
+.fcard:hover{transform:translateY(-4px);border-color:rgba(34,211,238,.4);background:var(--surface-2)}
+.fcard__ico{
+  width:40px;height:40px;border-radius:11px;display:grid;place-items:center;
+  background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.22);color:var(--cy);
+}
+.fcard__ico svg{width:19px;height:19px}
+.fcard h3{margin-top:20px;font-size:1.12rem;font-weight:700;letter-spacing:-.02em}
+.fcard p{margin-top:9px;color:var(--muted);font-size:14.5px;line-height:1.55}
+.tag{
+  align-self:flex-start;margin-top:18px;font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;padding:4px 9px;border-radius:999px;
+  color:var(--volt);border:1px solid rgba(163,230,53,.3);background:rgba(163,230,53,.08);
+}
+.tag--base{color:var(--muted);border-color:var(--line-2);background:transparent}
+
+/* ---------- 9. Marquesina de actividades ---------- */
+.marq{overflow:hidden;border-block:1px solid var(--line);padding:15px 0;background:var(--bg-2)}
+.marq__t{display:flex;width:max-content;gap:0;animation:slide 44s linear infinite}
+.marq span{
+  font-family:var(--f-hud);font-weight:700;font-size:clamp(15px,1.6vw,19px);letter-spacing:-.02em;
+  color:var(--dim);padding-inline:22px;white-space:nowrap;
+}
+.marq span:nth-child(3n){color:var(--muted)}
+.marq i{color:rgba(34,211,238,.4);font-style:normal;align-self:center;font-size:13px}
+@keyframes slide{to{transform:translate3d(-50%,0,0)}}
+
+/* ---------- 10. Cómo funciona ---------- */
+.pasos{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:clamp(30px,5vw,66px);margin-top:48px;align-items:start}
+.steps{display:grid;gap:6px}
+.step{
+  position:relative;text-align:left;padding:20px 20px 22px;border-radius:var(--r-card);
+  border:1px solid transparent;transition:background-color .3s var(--e),border-color .3s var(--e);
+}
+.step:hover{background:rgba(23,31,44,.5)}
+.step[aria-selected="true"]{background:var(--surface);border-color:var(--line-2)}
+.step__n{font-family:var(--f-mono);font-size:11.5px;color:var(--dim);letter-spacing:.1em}
+.step[aria-selected="true"] .step__n{color:var(--cy)}
+.step h3{margin-top:8px;font-size:1.25rem;font-weight:700;letter-spacing:-.025em;color:var(--muted);transition:color .3s var(--e)}
+.step[aria-selected="true"] h3{color:var(--text)}
+.step p{margin-top:8px;color:var(--dim);font-size:14.5px;max-width:44ch;transition:color .3s var(--e)}
+.step[aria-selected="true"] p{color:var(--muted)}
+.track{position:absolute;left:20px;right:20px;bottom:12px;height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+.prog{display:block;width:0;height:100%;background:var(--grad);border-radius:2px}
+.step[aria-selected="true"] .prog{animation:fillbar 5200ms linear forwards}
+.steps[data-paused="true"] .prog{animation-play-state:paused}
+@keyframes fillbar{to{width:100%}}
+.stage{
+  position:relative;display:grid;align-content:start;
+  border:1px solid var(--line-2);border-radius:var(--r-card);background:var(--bg-2);
+  padding:26px;overflow:hidden;
+  box-shadow:0 30px 70px -40px rgba(2,8,20,.9);
+}
+.stage__glow{position:absolute;inset:auto -20% -40% auto;width:70%;aspect-ratio:1;background:radial-gradient(circle,rgba(59,130,246,.16),transparent 65%);filter:blur(50px);pointer-events:none}
+.slide{grid-area:1/1;opacity:0;visibility:hidden;transform:translateY(14px);transition:opacity .45s var(--e),transform .45s var(--e),visibility .45s;pointer-events:none}
+.slide[data-on="true"]{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+.mini{border:1px solid var(--line);border-radius:var(--r-mini);background:var(--surface);padding:14px}
+.mini+.mini{margin-top:10px}
+.mini__lbl{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.field{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px;padding:10px 12px;border:1px solid var(--line-2);border-radius:var(--r-mini);background:var(--bg-2);font-size:14px}
+.field span{color:var(--muted)}
+.field b{font-family:var(--f-mono);font-weight:500;font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.chip{font-family:var(--f-mono);font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted)}
+.chip[data-on="true"]{border-color:rgba(34,211,238,.45);color:var(--cy);background:rgba(34,211,238,.08)}
+
+/* ---------- 11. IA ---------- */
+.ia{position:relative;overflow:hidden}
+.ia__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:clamp(32px,5vw,70px);align-items:center}
+.ia__list{margin:30px 0 0;padding:0;list-style:none;display:grid;gap:14px}
+.ia__list li{display:flex;gap:12px;align-items:flex-start;color:var(--muted);font-size:15px}
+.ia__list li span{flex:1}
+.ia__list svg{width:18px;height:18px;color:var(--volt);flex:none;margin-top:3px}
+.chat{border:1px solid var(--line-2);border-radius:var(--r-card);background:var(--bg-2);padding:18px;box-shadow:0 30px 70px -40px rgba(2,8,20,.9)}
+.chat__head{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.chat__av{width:30px;height:30px;border-radius:9px;background:var(--grad);display:grid;place-items:center;color:var(--ink)}
+.chat__av svg{width:16px;height:16px}
+.chat__head b{font-size:14.5px;font-weight:600}
+.chat__head span{font-family:var(--f-mono);font-size:10.5px;color:var(--dim);margin-left:auto;letter-spacing:.1em;text-transform:uppercase}
+.msg{margin-top:14px;max-width:88%;padding:12px 14px;border-radius:14px;font-size:14.5px;line-height:1.5}
+.msg--me{margin-left:auto;background:var(--surface-2);border:1px solid var(--line-2);border-bottom-right-radius:5px}
+.msg--ia{background:rgba(34,211,238,.07);border:1px solid rgba(34,211,238,.22);border-bottom-left-radius:5px}
+.msg--ia b{color:var(--cy);font-weight:600}
+.typing{display:inline-flex;gap:4px;align-items:center;height:14px}
+.typing i{width:5px;height:5px;border-radius:50%;background:var(--cy);opacity:.4;animation:blink 1.2s var(--e) infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-2px)}}
+.rut{margin-top:12px;border:1px solid var(--line);border-radius:var(--r-mini);overflow:hidden}
+.rut__r{display:flex;align-items:center;gap:12px;padding:9px 13px;font-size:13px;background:var(--surface)}
+.rut__r+.rut__r{border-top:1px solid var(--line)}
+.rut__r b{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--muted);font-weight:500}
+.rut__r i{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--dim);width:22px}
+
+/* ---------- 12. App del socio ---------- */
+.socio__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.92fr);gap:clamp(34px,6vw,80px);align-items:center}
+.phone{
+  width:min(300px,78vw);margin-inline:auto;border-radius:38px;padding:11px;
+  background:linear-gradient(150deg,#1E2836,#0D1420);border:1px solid var(--line-2);
+  box-shadow:0 50px 90px -46px rgba(2,8,20,.95);
+}
+.phone__scr{border-radius:28px;background:var(--bg-2);overflow:hidden;position:relative;border:1px solid rgba(0,0,0,.6)}
+.phone__notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:74px;height:19px;border-radius:999px;background:#05090F;z-index:3}
+.phone__top{padding:34px 16px 12px;display:flex;align-items:center;gap:9px}
+.phone__top b{font-family:var(--f-hud);font-size:15px;letter-spacing:-.02em}
+.phone__top span{margin-left:auto;font-family:var(--f-mono);font-size:10px;color:var(--dim)}
+.phone__logo{width:24px;height:24px;border-radius:8px;background:var(--grad)}
+.pv{padding:0 16px 14px;min-height:296px}
+.pv[hidden]{display:none}
+.pv__t{font-family:var(--f-hud);font-size:19px;font-weight:800;letter-spacing:-.03em}
+.pv__s{font-size:12.5px;color:var(--dim);margin-top:3px}
+.blk{margin-top:11px;border:1px solid var(--line);border-radius:var(--r-mini);background:var(--surface);padding:11px 12px}
+.blk__t{font-size:13px;font-weight:600;margin:0;display:flex;align-items:center;gap:8px}
+.blk__t em{margin-left:auto;font-style:normal;font-family:var(--f-mono);font-size:10.5px;color:var(--cy)}
+.blk ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.blk li{display:flex;gap:10px;font-size:12px;color:var(--muted)}
+.blk li b{margin-left:auto;font-family:var(--f-mono);font-weight:500;color:var(--dim)}
+.carnet{background:#E6EDF3;border-radius:12px;padding:14px;text-align:center;color:#04121A;margin-top:11px}
+.carnet img{width:118px;height:118px;margin:0 auto;image-rendering:pixelated}
+.carnet b{display:block;font-family:var(--f-hud);font-size:15px;margin-top:9px;letter-spacing:-.02em}
+.carnet span{display:block;font-family:var(--f-mono);font-size:10.5px;color:#4B5A6B;margin-top:2px}
+.tabs{display:flex;border-top:1px solid var(--line);background:rgba(17,23,33,.8)}
+.tab{flex:1;padding:11px 2px 13px;display:grid;justify-items:center;gap:4px;font-family:var(--f-mono);font-size:9px;letter-spacing:.06em;color:var(--dim);transition:color .2s var(--e)}
+.tab svg{width:16px;height:16px}
+.tab[aria-selected="true"]{color:var(--cy)}
+.socio__list{margin:28px 0 0;padding:0;list-style:none;display:grid;gap:18px}
+.socio__list li{border-left:2px solid var(--line);padding-left:18px}
+.socio__list b{display:block;font-family:var(--f-hud);font-size:1.05rem;font-weight:700;letter-spacing:-.02em}
+.socio__list p{margin-top:5px;color:var(--muted);font-size:14.5px}
+
+/* ---------- 13. White label ---------- */
+.wl{background:var(--bg-2);border-block:1px solid var(--line)}
+.wl__top{display:grid;gap:18px;max-width:62ch}
+.swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+.sw{
+  display:flex;align-items:center;gap:9px;height:42px;padding:0 15px;border-radius:999px;
+  border:1px solid var(--line-2);color:var(--muted);font-size:14px;
+  transition:border-color .2s var(--e),color .2s var(--e),background-color .2s var(--e);
+}
+.sw i{width:12px;height:12px;border-radius:50%;background:var(--c)}
+.sw[aria-pressed="true"]{color:var(--text);border-color:var(--c);background:color-mix(in oklab,var(--c) 12%,transparent)}
+.wl__prev{
+  margin-top:34px;border:1px solid var(--line-2);border-radius:var(--r-card);overflow:hidden;background:var(--bg);
+  box-shadow:0 40px 80px -46px rgba(2,8,20,.95);
+}
+.wl__bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+.wl__bar .panel__dot{width:8px;height:8px}
+.wl__addr{margin-left:6px;font-family:var(--f-mono);font-size:11px;color:var(--dim)}
+.wl__hero{position:relative;padding:clamp(28px,5vw,54px) clamp(20px,4vw,44px);display:grid;gap:20px;min-height:270px;align-content:center;transition:background .5s var(--e)}
+.wl__hero::before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,color-mix(in oklab,var(--gc) 26%,transparent),transparent 62%);transition:background .5s var(--e)}
+.wl__hero>*{position:relative}
+.wl__logo{display:flex;align-items:center;gap:11px}
+.wl__logo i{width:34px;height:34px;border-radius:11px;background:var(--gc);transition:background .5s var(--e)}
+.wl__logo b{font-family:var(--f-hud);font-size:19px;letter-spacing:-.03em}
+.wl__t{font-family:var(--f-hud);font-size:clamp(1.6rem,1.1rem + 2.2vw,2.6rem);font-weight:800;letter-spacing:-.035em;max-width:18ch;margin:0}
+.wl__hero p{color:var(--muted);max-width:46ch;font-size:15px}
+.wl__row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.wl__btn{height:42px;padding:0 18px;border-radius:var(--r-btn);background:var(--gc);color:#0A0F08;display:inline-flex;align-items:center;font-weight:600;font-size:14.5px;transition:background .5s var(--e)}
+.wl__btn--o{background:transparent;border:1px solid var(--line-2);color:var(--text)}
+.wl__plans{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-top:1px solid var(--line)}
+.wl__plan{background:var(--bg);padding:18px 16px}
+.wl__plan span{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.wl__plan strong{display:block;margin-top:7px;font-family:var(--f-mono);font-size:17px;letter-spacing:-.03em}
+.wl__plan em{display:block;margin-top:4px;font-style:normal;font-size:12.5px;color:var(--muted)}
+.wl__note{margin-top:20px;font-size:13.5px;color:var(--dim);display:flex;gap:9px;align-items:center}
+.wl__note svg{width:15px;height:15px;color:var(--cy);flex:none}
+
+/* ---------- 14. Precios ---------- */
+.planes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:52px;align-items:stretch}
+.plan{
+  position:relative;border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface);
+  padding:28px 24px 26px;display:flex;flex-direction:column;
+  transition:border-color .3s var(--e),transform .3s var(--e);
+}
+.plan:hover{border-color:var(--line-2);transform:translateY(-3px)}
+.plan--top{
+  background:var(--surface-2);border-color:rgba(163,230,53,.35);padding-top:34px;
+  box-shadow:0 30px 70px -46px rgba(163,230,53,.35);
+}
+.plan__flag{
+  position:absolute;top:-12px;left:24px;height:26px;padding:0 12px;border-radius:999px;
+  background:var(--volt);color:#15200a;display:inline-flex;align-items:center;
+  font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;
+}
+.plan h3{font-size:1.3rem;font-weight:700;letter-spacing:-.025em}
+.plan__who{margin-top:6px;color:var(--dim);font-size:13.5px}
+.plan__price{display:flex;align-items:baseline;gap:6px;margin-top:22px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.plan__price strong{font-family:var(--f-mono);font-size:clamp(1.9rem,1.4rem + 1.6vw,2.4rem);font-weight:700;letter-spacing:-.045em}
+.plan__price span{font-family:var(--f-mono);font-size:12.5px;color:var(--dim)}
+.plan ul{margin:22px 0 26px;padding:0;list-style:none;display:grid;gap:11px}
+.plan li{display:flex;gap:11px;font-size:14.5px;color:var(--muted);line-height:1.45}
+.plan li span{flex:1}
+.plan li svg{width:16px;height:16px;flex:none;margin-top:3px;color:var(--cy)}
+.plan--top li svg{color:var(--volt)}
+.plan li b{color:var(--text);font-weight:600}
+.plan .btn{margin-top:auto}
+.planes__foot{margin-top:26px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:14px}
+.planes__foot svg{width:17px;height:17px;color:var(--volt)}
+
+/* ---------- 15. Testimonios ---------- */
+.aviso{
+  display:inline-flex;align-items:center;gap:9px;margin-bottom:22px;padding:7px 13px;border-radius:var(--r-btn);
+  border:1px dashed rgba(163,230,53,.4);background:rgba(163,230,53,.05);
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--volt);
+}
+.quotes{display:grid;grid-template-columns:1.12fr 1fr;grid-template-rows:auto auto;gap:16px;margin-top:44px}
+.q{border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface);padding:26px 24px;display:flex;flex-direction:column}
+.q--big{grid-row:span 2;background:linear-gradient(165deg,var(--surface-2),var(--surface));border-color:var(--line-2)}
+.q p{font-family:var(--f-hud);font-weight:600;letter-spacing:-.02em;line-height:1.35;font-size:1.08rem}
+.q--big p{font-size:clamp(1.25rem,1rem + .9vw,1.6rem);font-weight:700}
+.q__by{margin-top:auto;padding-top:22px;display:flex;align-items:center;gap:11px}
+.q__av{width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--f-mono);font-size:12px;color:var(--cy)}
+.q__by b{display:block;font-size:14px;font-weight:600}
+.q__by span{display:block;font-size:12.5px;color:var(--dim)}
+
+/* ---------- 16. FAQ ---------- */
+.faq__grid{display:grid;grid-template-columns:minmax(0,.84fr) minmax(0,1.16fr);gap:clamp(30px,5vw,70px);align-items:start}
+.faq__aside{position:sticky;top:100px}
+.faq__aside p{margin-top:16px;color:var(--muted);font-size:15px;max-width:34ch}
+.faq__list{border-top:1px solid var(--line)}
+.acc{border-bottom:1px solid var(--line)}
+.acc__q{
+  width:100%;display:flex;align-items:center;gap:18px;padding:20px 2px;text-align:left;
+  font-family:var(--f-hud);font-weight:600;font-size:clamp(1rem,.95rem + .3vw,1.12rem);letter-spacing:-.02em;
+  transition:color .2s var(--e);
+}
+.acc__q:hover{color:var(--cy)}
+.acc__ico{margin-left:auto;width:22px;height:22px;position:relative;flex:none}
+.acc__ico::before,.acc__ico::after{content:"";position:absolute;top:50%;left:50%;width:13px;height:1.5px;background:var(--muted);transform:translate(-50%,-50%);transition:transform .28s var(--e),background-color .2s}
+.acc__ico::after{transform:translate(-50%,-50%) rotate(90deg)}
+.acc[data-open="true"] .acc__ico::after{transform:translate(-50%,-50%) rotate(0)}
+.acc[data-open="true"] .acc__ico::before,.acc[data-open="true"] .acc__ico::after{background:var(--cy)}
+.acc__a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .32s var(--e)}
+.acc[data-open="true"] .acc__a{grid-template-rows:1fr}
+.acc__a>div{overflow:hidden}
+.acc__a p{padding:0 42px 22px 2px;color:var(--muted);font-size:15px;max-width:64ch}
+
+/* ---------- 17. CTA final ---------- */
+.cierre{position:relative;overflow:hidden;border-top:1px solid var(--line)}
+.cierre__glow{position:absolute;inset:auto 50% -60% auto;transform:translateX(50%);width:min(90vw,900px);aspect-ratio:2/1;background:radial-gradient(ellipse at center,rgba(34,211,238,.18),transparent 62%);filter:blur(60px);pointer-events:none}
+.cierre__in{text-align:center;display:grid;justify-items:center;gap:24px}
+.cierre h2{font-size:clamp(2.4rem,1.4rem + 4.4vw,4.6rem);letter-spacing:-.045em}
+.cierre p{color:var(--muted);max-width:48ch;font-size:clamp(1.02rem,.96rem + .35vw,1.15rem)}
+.cierre__cta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.cierre__fine{font-family:var(--f-mono);font-size:12px;color:var(--dim);letter-spacing:.06em}
+
+/* ---------- 18. Footer ---------- */
+.foot{border-top:1px solid var(--line);padding:56px 0 40px;background:var(--bg-2)}
+.foot__grid{display:grid;grid-template-columns:1.6fr repeat(3,1fr);gap:34px}
+.foot__brand p{margin-top:14px;color:var(--dim);font-size:14px;max-width:34ch}
+.foot h3{font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:500}
+.foot ul{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:9px}
+.foot li a{color:var(--muted);font-size:14.5px;transition:color .18s var(--e)}
+.foot li a:hover{color:var(--cy)}
+.foot__end{margin-top:44px;padding-top:22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--dim);font-size:13px}
+.wa{display:inline-flex;align-items:center;gap:9px;color:var(--muted);transition:color .18s var(--e)}
+.wa:hover{color:var(--volt)}
+.wa svg{width:17px;height:17px}
+
+/* ---------- 19. Responsive ---------- */
+@media (max-width:1080px){
+  .hero__fx{
+    opacity:.7;
+    -webkit-mask-image:radial-gradient(62% 46% at 94% 22%,#000 0%,rgba(0,0,0,.42) 44%,transparent 78%),
+                       linear-gradient(to bottom,transparent 0,#000 12%,#000 70%,transparent 92%);
+    mask-image:radial-gradient(62% 46% at 94% 22%,#000 0%,rgba(0,0,0,.42) 44%,transparent 78%),
+               linear-gradient(to bottom,transparent 0,#000 12%,#000 70%,transparent 92%);
+  }
+  .hero__grid{grid-template-columns:1fr;gap:44px}
+  .hero__sub{max-width:52ch}
+  .panel{max-width:620px}
+  .ia__grid,.socio__grid,.pasos,.faq__grid{grid-template-columns:1fr}
+  .faq__aside{position:static}
+  .socio__grid .phone{grid-row:2}
+  .planes{grid-template-columns:1fr;max-width:520px}
+  .plan--top{order:-1}
+  .quotes{grid-template-columns:1fr}
+  .q--big{grid-row:auto}
+  .foot__grid{grid-template-columns:1fr 1fr;gap:30px}
+}
+@media (max-width:880px){
+  .nav__links,.nav__cta .btn--sec{display:none}
+  .burger{display:flex}
+  .facts__grid{grid-template-columns:repeat(2,1fr)}
+  .wl__plans{grid-template-columns:1fr}
+  .dock{display:block}
+  .panel__body{grid-template-columns:1fr}
+  .panel__side{display:flex;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);gap:4px;scrollbar-width:none}
+  .panel__side::-webkit-scrollbar{display:none}
+  .panel__side i{display:none}
+  .pitem{white-space:nowrap}
+  .pitem b{display:none}
+}
+@media (max-width:560px){
+  .nav__cta .btn--pri{display:none}
+  .foot__grid{grid-template-columns:1fr}
+  .kpis{grid-template-columns:1fr 1fr}
+  .cierre__cta .btn{width:100%}
+}
+@media (pointer:coarse){
+  .btn,.tab,.sw{min-height:44px}
+}
+
+/* ---------- 20. Movimiento reducido ---------- */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+  .reveal{opacity:1;transform:none}
+  .h1line>span{transform:none}
+  .chart i{transform:scaleY(1)}
+  .marq__t{animation:none;transform:none}
+  .hero__glow{animation:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== Sprite de iconos (Lucide, trazos inline) ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<defs>
+ <g id="s" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></g>
+</defs>
+<symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+<symbol id="i-money" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+<symbol id="i-dumbbell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></symbol>
+<symbol id="i-food" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></symbol>
+<symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01M12 3h.01M12 16v.01M16 12h1M21 12v.01M12 21v-1"/></symbol>
+<symbol id="i-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></symbol>
+<symbol id="i-ai" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/><path d="M5 3v4M19 17v4M3 5h4M17 19h4"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/></symbol>
+<symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+<symbol id="i-wa" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413"/></symbol>
+</svg>
+
+<!-- ===== Nav ===== -->
+<header class="nav" id="nav" data-stuck="false" data-open="false">
+  <div class="nav__in">
+    <a class="brand" href="#top" aria-label="TurnoGym, inicio">
+      <svg viewBox="0 0 180 180" aria-hidden="true"><defs><linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22D3EE"/><stop offset="1" stop-color="#3B82F6"/></linearGradient></defs><rect width="180" height="180" rx="40" fill="url(#bg1)"/><rect x="42" y="52" width="96" height="18" rx="9" fill="#04121A"/><circle cx="42" cy="61" r="16" fill="#04121A"/><circle cx="138" cy="61" r="16" fill="#04121A"/><rect x="81" y="61" width="18" height="78" rx="9" fill="#04121A"/></svg>
+      TurnoGym
+    </a>
+    <nav class="nav__links" aria-label="Secciones">
+      <a href="#funciones">Funciones</a>
+      <a href="#como">Cómo funciona</a>
+      <a href="#marca">Tu marca</a>
+      <a href="#precios">Precios</a>
+      <a href="#preguntas">Preguntas</a>
+    </nav>
+    <div class="nav__cta">
+      <a class="btn btn--sec btn--sm" id="waNav" href="#" rel="noopener"><svg aria-hidden="true"><use href="#i-wa"/></svg>WhatsApp</a>
+      <a class="btn btn--pri btn--sm" data-registro href="#">Probá gratis 7 días</a>
+      <button class="burger" id="burger" aria-label="Abrir menú" aria-expanded="false" aria-controls="sheet"><span></span></button>
+    </div>
+  </div>
+</header>
+<div class="sheet" id="sheet" data-open="false">
+  <a href="#funciones">Funciones</a>
+  <a href="#como">Cómo funciona</a>
+  <a href="#marca">Tu marca</a>
+  <a href="#precios">Precios</a>
+  <a href="#preguntas">Preguntas</a>
+  <a class="btn btn--pri btn--block" data-registro href="#">Probá gratis 7 días</a>
+</div>
+
+<div class="dock" id="dock" data-show="false">
+  <a class="btn btn--pri btn--block" data-registro href="#">Probá gratis 7 días<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+</div>
+
+<main id="top">
+
+<!-- ===== 1. Hero ===== -->
+<section class="hero">
+  <div class="hero__bg" aria-hidden="true">
+    <canvas class="hero__fx" id="fx"></canvas>
+    <div class="hero__glow hero__glow--a"></div>
+    <div class="hero__glow hero__glow--b"></div>
+  </div>
+  <div class="wrap hero__grid">
+    <div>
+      <h1 id="h1">
+        <span class="h1line"><span style="--d:60ms">Tu gimnasio,</span></span>
+        <span class="h1line"><span style="--d:150ms">en orden.</span></span>
+        <span class="h1line"><span style="--d:240ms"><em class="mark" style="font-style:normal">Es tu turno.</em></span></span>
+      </h1>
+      <p class="hero__sub">Socios, cobros, clases, rutinas y dietas en un solo panel. Con tu marca, y una app para cada socio.</p>
+      <div class="hero__cta">
+        <a class="btn btn--pri" data-registro href="#">Probá gratis 7 días<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        <a class="btn btn--sec" href="#como">Ver cómo funciona</a>
+      </div>
+    </div>
+
+    <!-- Mockup del panel del dueño. Datos de ejemplo. -->
+    <div class="panel" id="panel" role="img" aria-label="Vista del panel de TurnoGym con socios activos, cobros del mes, clases del día y el listado de socios">
+      <div class="panel__bar">
+        <i class="panel__dot"></i><i class="panel__dot"></i><i class="panel__dot"></i>
+        <span class="panel__url">turnogym.com/dashboard</span>
+      </div>
+      <div class="panel__body">
+        <div class="panel__side">
+          <span class="pitem" data-on="true"><svg><use href="#i-home"/></svg>Panel</span>
+          <span class="pitem"><svg><use href="#i-users"/></svg>Socios</span>
+          <span class="pitem"><svg><use href="#i-money"/></svg>Finanzas</span>
+          <span class="pitem"><svg><use href="#i-calendar"/></svg>Clases</span>
+          <span class="pitem"><svg><use href="#i-dumbbell"/></svg>Rutinas</span>
+          <span class="pitem"><svg><use href="#i-food"/></svg>Dietas<b>Pro</b></span>
+          <i></i>
+          <span class="pitem"><svg><use href="#i-qr"/></svg>Acceso<b>Pro</b></span>
+          <span class="pitem"><svg><use href="#i-sliders"/></svg>Secciones</span>
+        </div>
+        <div class="panel__main">
+          <div class="kpis">
+            <div class="kpi"><span>Socios activos</span><strong class="count" data-to="148">0</strong></div>
+            <div class="kpi"><span>Cobrado en agosto</span><strong class="count" data-to="1842000" data-money="1">$0</strong></div>
+            <div class="kpi"><span>Vencen esta semana</span><strong class="count" data-to="12">0</strong> <em>avisar</em></div>
+            <div class="kpi"><span>Clases de hoy</span><strong class="count" data-to="9">0</strong></div>
+          </div>
+          <div class="chart" aria-hidden="true">
+            <i style="height:38%;--d:120ms"></i><i style="height:56%;--d:170ms"></i><i style="height:44%;--d:220ms"></i>
+            <i style="height:71%;--d:270ms"></i><i style="height:63%;--d:320ms"></i><i style="height:88%;--d:370ms"></i>
+            <i style="height:74%;--d:420ms"></i><i style="height:96%;--d:470ms"></i>
+          </div>
+          <div class="rows">
+            <div class="row"><span class="av">NF</span>Nahuel Fioravanti<span class="st st--ok">al día</span></div>
+            <div class="row"><span class="av">MC</span>Micaela Roldán<span class="st st--soon">vence 27/8</span></div>
+            <div class="row"><span class="av">JP</span>Juan Pablo Vera<span class="st st--due">debe</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 2. Datos del producto ===== -->
+<section class="facts">
+  <div class="wrap">
+    <div class="facts__grid">
+      <div class="fact reveal"><strong><u>7</u> días</strong><span>de prueba gratis, sin cargar tarjeta</span></div>
+      <div class="fact reveal" style="--d:80ms"><strong>800+</strong><span>ejercicios en la librería, en español</span></div>
+      <div class="fact reveal" style="--d:160ms"><strong>1</strong><span>panel para todas tus sucursales</span></div>
+      <div class="fact reveal" style="--d:240ms"><strong>0</strong><span>instalaciones: entrás desde el navegador</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 3. Funciones (riel) ===== -->
+<section class="sec" id="funciones">
+  <div class="wrap rail__head">
+    <h2 class="h2 reveal" style="max-width:17ch">Lo que hoy tenés en cuadernos, planillas y chats.</h2>
+    <p class="rail__hint reveal" style="--d:100ms">Deslizá para ver todo</p>
+  </div>
+  <div class="rail" id="rail" tabindex="0" role="region" aria-label="Funciones de TurnoGym">
+    <article class="fcard"><div class="fcard__ico"><svg><use href="#i-users"/></svg></div>
+      <h3>Socios y cuotas</h3><p>Ficha, vencimiento y estado de pago de cada uno. El socio entra con su DNI, sin crear mails.</p><span class="tag tag--base">Todos los planes</span></article>
+    <article class="fcard"><div class="fcard__ico"><svg><use href="#i-money"/></svg></div>
+      <h3>Finanzas</h3><p>Ingresos y egresos del mes, quién debe y cuánto entró. Mercado Pago o transferencia.</p><span class="tag tag--base">Todos los planes</span></article>
+    <article class="fcard"><div class="fcard__ico"><svg><use href="#i-calendar"/></svg></div>
+      <h3>Clases y reservas</h3><p>Grilla por horario con cupo. Cada plan puede tener tope de clases y qué actividades incluye.</p><span class="tag tag--base">Todos los planes</span></article>
+    <article class="fcard"><div class="fcard__ico"><svg><use href="#i-dumbbell"/></svg></div>
+      <h3>Rutinas</h3><p>Bloques, series y repeticiones, con una librería de más de 800 ejercicios traducidos y con demostración.</p><span class="tag tag--base">Todos los planes</span></article>
+    <article class="fcard"><div class="fcard__ico"><svg><use href="#i-food"/></svg></div>
+      <h3>Dietas</h3><p>Por día y por comida, con fotos. El socio la abre desde el celular igual que la rutina.</p><span class="tag">Desde Pro</span></article>
+    <article class="fcard"><div class="fcard__ico"><svg><use href="#i-qr"/></svg></div>
+      <h3>Control de acceso</h3><p>Carnet con QR en el celular del socio. Escaneás en la puerta y sabés quién entró y si está al día.</p><span class="tag">Desde Pro</span></article>
+    <article class="fcard"><div class="fcard__ico"><svg><use href="#i-wa"/></svg></div>
+      <h3>Recordatorios</h3><p>Aviso automático de vencimiento por WhatsApp, desde el número del gimnasio y no desde el tuyo.</p><span class="tag">Desde Pro</span></article>
+    <article class="fcard"><div class="fcard__ico"><svg><use href="#i-branch"/></svg></div>
+      <h3>Sucursales y equipo</h3><p>Varias sedes en la misma cuenta y permisos por persona: quién ve la plata y quién solo carga rutinas.</p><span class="tag tag--base">Según el plan</span></article>
+  </div>
+</section>
+
+<!-- ===== Marquesina de actividades ===== -->
+<div class="marq" aria-hidden="true">
+  <div class="marq__t" id="marq">
+    <span>Musculación</span><i>/</i><span>Funcional</span><i>/</i><span>Spinning</span><i>/</i><span>Pilates</span><i>/</i><span>Zumba</span><i>/</i><span>Boxeo</span><i>/</i><span>Crossfit</span><i>/</i><span>Yoga</span><i>/</i><span>Kangoo Jumps</span><i>/</i><span>Natación</span><i>/</i><span>Personal trainer</span><i>/</i>
+    <span>Musculación</span><i>/</i><span>Funcional</span><i>/</i><span>Spinning</span><i>/</i><span>Pilates</span><i>/</i><span>Zumba</span><i>/</i><span>Boxeo</span><i>/</i><span>Crossfit</span><i>/</i><span>Yoga</span><i>/</i><span>Kangoo Jumps</span><i>/</i><span>Natación</span><i>/</i><span>Personal trainer</span><i>/</i>
+  </div>
+</div>
+
+<!-- ===== 4. Cómo funciona ===== -->
+<section class="sec" id="como">
+  <div class="wrap">
+    <h2 class="h2 reveal" style="max-width:15ch">De la primera carga al primer cobro.</h2>
+    <div class="pasos">
+      <div class="steps" id="steps" role="tablist" aria-label="Pasos para empezar">
+        <button class="step" role="tab" aria-selected="true" aria-controls="sl-1" id="tb-1">
+          <span class="step__n">01</span><h3>Cargá tu gimnasio</h3>
+          <p>Nombre, planes, precios y horarios de clase. El panel queda andando el mismo día.</p>
+          <span class="track"><span class="prog"></span></span>
+        </button>
+        <button class="step" role="tab" aria-selected="false" aria-controls="sl-2" id="tb-2" tabindex="-1">
+          <span class="step__n">02</span><h3>Sumá a tus socios</h3>
+          <p>Cada socio entra con su DNI y se instala la app en el celular. Ahí ve su rutina, sus clases y su carnet.</p>
+          <span class="track"><span class="prog"></span></span>
+        </button>
+        <button class="step" role="tab" aria-selected="false" aria-controls="sl-3" id="tb-3" tabindex="-1">
+          <span class="step__n">03</span><h3>Cobrá y seguí de cerca</h3>
+          <p>Vencimientos a la vista, aviso automático al que está por vencer y la caja del mes al día.</p>
+          <span class="track"><span class="prog"></span></span>
+        </button>
+      </div>
+
+      <div class="stage">
+        <div class="stage__glow" aria-hidden="true"></div>
+        <!-- Paso 1 -->
+        <div class="slide" id="sl-1" role="tabpanel" aria-labelledby="tb-1" data-on="true">
+          <div class="mini">
+            <span class="mini__lbl">Datos del gimnasio</span>
+            <div class="field"><span>Nombre</span><b>Iron House</b></div>
+            <div class="field"><span>Sucursales</span><b>2</b></div>
+            <div class="field"><span>Color de marca</span><b style="color:#F97316">#F97316</b></div>
+          </div>
+          <div class="mini">
+            <span class="mini__lbl">Planes de socio</span>
+            <div class="field"><span>Pase Libre</span><b>$28.000</b></div>
+            <div class="field"><span>3 veces por semana</span><b>$22.000</b></div>
+            <div class="field"><span>Clase suelta</span><b>$6.500</b></div>
+          </div>
+        </div>
+        <!-- Paso 2 -->
+        <div class="slide" id="sl-2" role="tabpanel" aria-labelledby="tb-2">
+          <div class="mini">
+            <span class="mini__lbl">Alta de socio</span>
+            <div class="field"><span>Nombre</span><b>Micaela Roldán</b></div>
+            <div class="field"><span>DNI (usuario y clave)</span><b>38 942 116</b></div>
+            <div class="field"><span>Plan</span><b>Pase Libre</b></div>
+            <div class="field"><span>Vence</span><b>27/09</b></div>
+          </div>
+          <div class="mini">
+            <span class="mini__lbl">Qué ve en el celular</span>
+            <div class="chips">
+              <span class="chip" data-on="true">Rutina</span><span class="chip" data-on="true">Clases</span>
+              <span class="chip" data-on="true">Carnet QR</span><span class="chip" data-on="true">Progreso</span>
+              <span class="chip">Dieta</span>
+            </div>
+          </div>
+        </div>
+        <!-- Paso 3 -->
+        <div class="slide" id="sl-3" role="tabpanel" aria-labelledby="tb-3">
+          <div class="mini">
+            <span class="mini__lbl">Cobros de la semana</span>
+            <div class="field"><span>Mercado Pago</span><b>$412.000</b></div>
+            <div class="field"><span>Transferencia</span><b>$186.500</b></div>
+            <div class="field"><span>Efectivo</span><b>$95.000</b></div>
+          </div>
+          <div class="mini">
+            <span class="mini__lbl">Avisos que salen solos</span>
+            <div class="field"><span>3 días antes del vencimiento</span><b style="color:var(--volt)">activo</b></div>
+            <div class="field"><span>Socios en la cola de hoy</span><b>12</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 5. IA ===== -->
+<section class="sec ia">
+  <div class="wrap ia__grid">
+    <div>
+      <p class="eyebrow reveal">Incluido en Elite</p>
+      <h2 class="h2 reveal" style="--d:60ms;max-width:14ch">La rutina, escrita en 20 segundos.</h2>
+      <p class="lead reveal" style="--d:120ms;margin-top:22px">Le decís para quién es, qué busca y cuántos días entrena. La IA arma la rutina con los ejercicios de tu librería y la deja cargada en la ficha del socio. Vos la corregís y listo.</p>
+      <ul class="ia__list reveal" style="--d:180ms">
+        <li><svg><use href="#i-check"/></svg><span>Usa los ejercicios que ya tenés cargados, no inventa aparatos que no están.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Dietas por día y por comida con el mismo criterio.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Queda editable: cambiás series, repeticiones o el ejercicio entero.</span></li>
+      </ul>
+    </div>
+    <!-- Conversación de ejemplo -->
+    <div class="chat reveal" style="--d:120ms" id="chat">
+      <div class="chat__head">
+        <span class="chat__av"><svg><use href="#i-ai"/></svg></span>
+        <b>Asistente de rutinas</b><span>Elite</span>
+      </div>
+      <div class="msg msg--me">Rutina de 4 días para Nahuel. Quiere ganar masa, entrena a la tarde y tiene la rodilla derecha sensible.</div>
+      <div class="msg msg--ia" id="iaMsg"><span class="typing" id="typing"><i></i><i></i><i></i></span></div>
+      <div class="rut" id="rut" hidden>
+        <div class="rut__r"><i>A1</i>Sentadilla en máquina Smith<b>4 x 10</b></div>
+        <div class="rut__r"><i>A2</i>Prensa 45, recorrido corto<b>3 x 12</b></div>
+        <div class="rut__r"><i>B1</i>Peso muerto rumano<b>4 x 8</b></div>
+        <div class="rut__r"><i>B2</i>Remo con barra<b>4 x 10</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 6. App del socio ===== -->
+<section class="sec">
+  <div class="wrap socio__grid">
+    <div>
+      <h2 class="h2 reveal" style="max-width:16ch">Tu socio abre el celular y sabe qué hacer hoy.</h2>
+      <ul class="socio__list reveal" style="--d:80ms">
+        <li><b>Se instala como una app</b><p>Entra por la web y la agrega a la pantalla de inicio. No hay que pasar por ninguna tienda.</p></li>
+        <li><b>Rutina y dieta del día</b><p>Con la demostración de cada ejercicio, para que no te pregunten cómo se hace.</p></li>
+        <li><b>Reserva de clases</b><p>Ve el cupo y reserva. Si su plan tiene tope, el sistema lo frena antes de anotarse.</p></li>
+        <li><b>Carnet con QR y progreso</b><p>Entra al gimnasio con el celular y sigue su peso y sus marcas sin planillas.</p></li>
+      </ul>
+      <a class="btn btn--sec reveal" style="--d:140ms;margin-top:30px" href="#precios">Ver qué incluye cada plan</a>
+    </div>
+
+    <!-- Mockup de la app del socio. Datos de ejemplo. -->
+    <div class="phone reveal" style="--d:100ms">
+      <div class="phone__scr">
+        <div class="phone__notch" aria-hidden="true"></div>
+        <div class="phone__top"><i class="phone__logo"></i><b>Iron House</b><span>Micaela</span></div>
+
+        <div class="pv" id="pv-rutina">
+          <p class="pv__t">Hoy: Tren inferior</p>
+          <p class="pv__s">Día 2 de 4 · 52 minutos</p>
+          <div class="blk"><p class="blk__t">Bloque A <em>3 vueltas</em></p>
+            <ul><li>Sentadilla búlgara<b>12</b></li><li>Prensa 45<b>15</b></li><li>Curl femoral<b>12</b></li></ul></div>
+          <div class="blk"><p class="blk__t">Bloque B <em>3 vueltas</em></p>
+            <ul><li>Hip thrust<b>10</b></li><li>Gemelos de pie<b>20</b></li></ul></div>
+        </div>
+
+        <div class="pv" id="pv-clases" hidden>
+          <p class="pv__t">Clases de hoy</p>
+          <p class="pv__s">Te quedan 6 de 8 este ciclo</p>
+          <div class="blk"><p class="blk__t">Funcional <em>18:30</em></p>
+<ul><li>Quedan 4 lugares<b>reservar</b></li></ul></div>
+          <div class="blk"><p class="blk__t">Spinning <em>19:30</em></p>
+<ul><li>Completo<b>lista de espera</b></li></ul></div>
+          <div class="blk"><p class="blk__t">Zumba <em>20:30</em></p>
+<ul><li>Quedan 11 lugares<b>reservar</b></li></ul></div>
+        </div>
+
+        <div class="pv" id="pv-carnet" hidden>
+          <p class="pv__t">Tu carnet</p>
+          <p class="pv__s">Mostralo en la puerta</p>
+          <div class="carnet">
+            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKIAAACiAQAAAADqiSu2AAABOklEQVR42s2XMW4lMQxDn74G+KUM5AB7FM/V/s3sG2nKD9jgFpPdJmljh5WhxgRNULSJr+gPvsOPTaeZmUGfhVm6mVlhMQdCUpsFz/5MJA2Wc6BbwbPOwrswzdjAAWCacZ2ea277fupZXW2WXRyqklmwwjNxaQOHy8xO4jXgXTCzYzUHdCNx/UfbkA+lW6mA2Xlc53odBpUQ0QZ1hG5zrn+LEc3VlBBtANHW6+BZXboPtybLdWiuNmBE82SXDoQISRqhm9JqDqERTfcrUD3X6/CA/swKeHYl88/6vckIAYPPlGaDHx6eSCL0NiN0O3NPj7pOTwYdmJt6lCezVKi3Lbf0qFkgXsdlx2Xv1Toc/3z48mQcjI+02NOjuE4rEHpmH5t61J0Px3VCZcPu/kwJlzwZ0Zbng/2Cf9ZfP7nBHqUZzfIAAAAASUVORK5CYII=" alt="Código QR del carnet del socio" width="118" height="118">
+            <b>Micaela Roldán</b><span>SOCIA 0148 · AL DÍA HASTA 27/09</span>
+          </div>
+        </div>
+
+        <div class="pv" id="pv-progreso" hidden>
+          <p class="pv__t">Tu progreso</p>
+          <p class="pv__s">Últimas 6 semanas</p>
+          <div class="blk"><p class="blk__t">Peso corporal <em>-2,4 kg</em></p>
+            <div class="chart" style="height:64px;margin-top:10px;padding:8px;border:0;background:transparent" aria-hidden="true">
+              <i style="height:92%"></i><i style="height:88%"></i><i style="height:84%"></i><i style="height:79%"></i><i style="height:76%"></i><i style="height:71%"></i>
+            </div></div>
+          <div class="blk"><p class="blk__t">Sentadilla <em>+15 kg</em></p>
+<ul><li>Última marca<b>70 kg x 5</b></li></ul></div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Secciones de la app del socio">
+          <button class="tab" role="tab" aria-selected="true" data-pv="pv-rutina"><svg><use href="#i-dumbbell"/></svg>Rutina</button>
+          <button class="tab" role="tab" aria-selected="false" data-pv="pv-clases" tabindex="-1"><svg><use href="#i-calendar"/></svg>Clases</button>
+          <button class="tab" role="tab" aria-selected="false" data-pv="pv-carnet" tabindex="-1"><svg><use href="#i-qr"/></svg>Carnet</button>
+          <button class="tab" role="tab" aria-selected="false" data-pv="pv-progreso" tabindex="-1"><svg><use href="#i-trend"/></svg>Progreso</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 7. White label ===== -->
+<section class="sec wl" id="marca">
+  <div class="wrap">
+    <div class="wl__top">
+      <p class="eyebrow reveal">Página pública incluida</p>
+      <h2 class="h2 reveal" style="--d:60ms">Sale con tu marca, no con la nuestra.</h2>
+      <p class="lead reveal" style="--d:120ms">Cada gimnasio tiene su propia web con su logo, su color, sus fotos, sus planes y el mapa del local. Elegí un color y mirá cómo cambia.</p>
+    </div>
+
+    <div class="swatches reveal" style="--d:160ms" role="group" aria-label="Elegí una marca de ejemplo">
+      <button class="sw" style="--c:#F97316" aria-pressed="true" data-gym="0"><i></i>Iron House</button>
+      <button class="sw" style="--c:#E879F9" aria-pressed="false" data-gym="1"><i></i>Estudio DanzArte</button>
+      <button class="sw" style="--c:#A3E635" aria-pressed="false" data-gym="2"><i></i>Box 47</button>
+      <button class="sw" style="--c:#38BDF8" aria-pressed="false" data-gym="3"><i></i>Club Norte</button>
+    </div>
+
+    <!-- Preview de la página pública del gimnasio. Contenido de ejemplo. -->
+    <div class="wl__prev reveal" id="wlPrev" style="--d:200ms;--gc:#F97316">
+      <div class="wl__bar">
+        <i class="panel__dot"></i><i class="panel__dot"></i><i class="panel__dot"></i>
+        <span class="wl__addr">turnogym.com/<b id="wlSlug">iron-house</b></span>
+      </div>
+      <div class="wl__hero">
+        <div class="wl__logo"><i></i><b id="wlName">Iron House</b></div>
+        <p class="wl__t" id="wlTag">Fierros, funcional y una sala que abre a las 6 de la mañana.</p>
+        <p id="wlDesc">Dos sedes en Morón. Musculación, funcional y clases con cupo, con profe en sala todo el día.</p>
+        <div class="wl__row">
+          <span class="wl__btn">Sumate</span>
+          <span class="wl__btn wl__btn--o">Ver clases</span>
+          <span class="wl__addr" id="wlAddr">Av. Rivadavia 18400, Morón</span>
+        </div>
+      </div>
+      <div class="wl__plans">
+        <div class="wl__plan"><span>Pase libre</span><strong id="wlP1">$28.000</strong><em>Todas las actividades</em></div>
+        <div class="wl__plan"><span>3 por semana</span><strong id="wlP2">$22.000</strong><em>12 clases por mes</em></div>
+        <div class="wl__plan"><span>Clase suelta</span><strong id="wlP3">$6.500</strong><em>Sin membresía</em></div>
+      </div>
+    </div>
+    <p class="wl__note reveal" style="--d:240ms"><svg><use href="#i-check"/></svg>El socio nunca ve la palabra TurnoGym. Ve tu gimnasio.</p>
+  </div>
+</section>
+
+<!-- ===== 8. Precios ===== -->
+<section class="sec" id="precios">
+  <div class="wrap">
+    <h2 class="h2 reveal" style="max-width:16ch">Un precio por mes. Sin comisión por socio.</h2>
+    <div class="planes">
+      <article class="plan reveal">
+        <h3>Básico</h3>
+        <p class="plan__who">Para el gimnasio que arranca</p>
+        <p class="plan__price"><strong>$49.000</strong><span>por mes</span></p>
+        <ul>
+          <li><svg><use href="#i-check"/></svg><span>1 sucursal, <b>socios ilimitados</b></span></li>
+          <li><svg><use href="#i-check"/></svg><span>Cobros y finanzas</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Rutinas con librería de ejercicios</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Clases y reservas</span></li>
+          <li><svg><use href="#i-check"/></svg><span>App del socio y página pública</span></li>
+        </ul>
+        <a class="btn btn--sec btn--block" data-registro href="#">Probá gratis 7 días</a>
+      </article>
+
+      <article class="plan plan--top reveal" style="--d:80ms">
+        <span class="plan__flag">El más elegido</span>
+        <h3>Pro</h3>
+        <p class="plan__who">Para el que ya está lleno y quiere ordenarse</p>
+        <p class="plan__price"><strong>$79.000</strong><span>por mes</span></p>
+        <ul>
+          <li><svg><use href="#i-check"/></svg><span>Hasta <b>3 sucursales</b></span></li>
+          <li><svg><use href="#i-check"/></svg><span>Todo lo del Básico</span></li>
+          <li><svg><use href="#i-check"/></svg><span><b>Dietas</b> por día y por comida</span></li>
+          <li><svg><use href="#i-check"/></svg><span><b>Recordatorios por WhatsApp</b> automáticos</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Control de acceso con QR</span></li>
+        </ul>
+        <a class="btn btn--volt btn--block" data-registro href="#">Probá gratis 7 días</a>
+      </article>
+
+      <article class="plan reveal" style="--d:160ms">
+        <h3>Elite</h3>
+        <p class="plan__who">Para cadenas y multi sede</p>
+        <p class="plan__price"><strong>$119.000</strong><span>por mes</span></p>
+        <ul>
+          <li><svg><use href="#i-check"/></svg><span><b>Sucursales ilimitadas</b></span></li>
+          <li><svg><use href="#i-check"/></svg><span>Todo lo del Pro</span></li>
+          <li><svg><use href="#i-check"/></svg><span><b>IA</b> para rutinas y dietas</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Soporte prioritario</span></li>
+        </ul>
+        <a class="btn btn--sec btn--block" data-registro href="#">Probá gratis 7 días</a>
+      </article>
+    </div>
+    <p class="planes__foot reveal"><svg><use href="#i-shield"/></svg>7 días gratis, sin tarjeta. Después pagás por mes y lo dás de baja cuando quieras.</p>
+  </div>
+</section>
+
+<!-- ===== 9. Testimonios (CONTENIDO DE EJEMPLO: reemplazar por reseñas reales antes de publicar) ===== -->
+<section class="sec">
+  <div class="wrap">
+    <p class="aviso reveal">Ejemplos · reemplazar por clientes reales</p>
+    <h2 class="h2 reveal" style="--d:60ms;max-width:15ch">Lo que cambia cuando dejás el cuaderno.</h2>
+    <div class="quotes">
+      <article class="q q--big reveal" style="--d:80ms">
+        <p>“Antes tenía tres cuadernos y un Excel que solo entendía yo. Ahora entro al panel, veo quién debe y le mando el aviso desde ahí. La primera semana cobré cuotas que tenía perdidas.”</p>
+        <div class="q__by"><span class="q__av">AR</span><div><b>Nombre del cliente</b><span>Gimnasio · Ciudad</span></div></div>
+      </article>
+      <article class="q reveal" style="--d:140ms">
+        <p>“Los socios se bajan la app y dejan de preguntar por WhatsApp a qué hora es la clase.”</p>
+        <div class="q__by"><span class="q__av">MP</span><div><b>Nombre del cliente</b><span>Estudio · Ciudad</span></div></div>
+      </article>
+      <article class="q reveal" style="--d:200ms">
+        <p>“Lo que más uso es el tope de clases por plan. Se acabó el que pagaba tres veces por semana y venía todos los días.”</p>
+        <div class="q__by"><span class="q__av">LG</span><div><b>Nombre del cliente</b><span>Box · Ciudad</span></div></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 10. Preguntas ===== -->
+<section class="sec" id="preguntas">
+  <div class="wrap faq__grid">
+    <div class="faq__aside reveal">
+      <h2 class="h2">Preguntas que nos hacen siempre.</h2>
+      <p>Si te queda alguna, escribinos y te la respondemos hoy.</p>
+      <a class="btn btn--ghost" id="waFaq" style="margin-top:24px" href="#" rel="noopener"><svg aria-hidden="true"><use href="#i-wa"/></svg>WhatsApp</a>
+    </div>
+    <div class="faq__list reveal" style="--d:80ms">
+      <div class="acc" data-open="false">
+        <button class="acc__q" aria-expanded="false">¿Tengo que instalar algo?<span class="acc__ico"></span></button>
+        <div class="acc__a"><div><p>No. Vos entrás desde el navegador de la computadora o del celular. El socio abre su link y lo agrega a la pantalla de inicio, y le queda como una app.</p></div></div>
+      </div>
+      <div class="acc" data-open="false">
+        <button class="acc__q" aria-expanded="false">¿Puedo probarlo con mis socios reales?<span class="acc__ico"></span></button>
+        <div class="acc__a"><div><p>Sí. Los 7 días de prueba son con el sistema completo y sin cargar tarjeta. Si después seguís, todo lo que cargaste queda como está.</p></div></div>
+      </div>
+      <div class="acc" data-open="false">
+        <button class="acc__q" aria-expanded="false">¿Cómo cobro las cuotas?<span class="acc__ico"></span></button>
+        <div class="acc__a"><div><p>Con Mercado Pago, por suscripción o pago único, o por transferencia. El efectivo lo registrás a mano y queda en Finanzas igual que el resto.</p></div></div>
+      </div>
+      <div class="acc" data-open="false">
+        <button class="acc__q" aria-expanded="false">¿Sirve para un estudio de pilates o para personal trainer?<span class="acc__ico"></span></button>
+        <div class="acc__a"><div><p>Sí. Apagás las secciones que no usás y el panel queda solo con lo tuyo. Un estudio de clases suele dejar clases, planes y finanzas; un personal trainer, rutinas y socios.</p></div></div>
+      </div>
+      <div class="acc" data-open="false">
+        <button class="acc__q" aria-expanded="false">¿Los socios necesitan tener mail?<span class="acc__ico"></span></button>
+        <div class="acc__a"><div><p>No. Entran con el DNI como usuario y como clave, y después la cambian si quieren. Es lo que menos fricción genera con la gente que no usa mail.</p></div></div>
+      </div>
+      <div class="acc" data-open="false">
+        <button class="acc__q" aria-expanded="false">¿Puedo usar mi logo y mis colores?<span class="acc__ico"></span></button>
+        <div class="acc__a"><div><p>Sí, en los tres planes. La página pública y la app del socio salen con tu logo, tu color y tus fotos.</p></div></div>
+      </div>
+      <div class="acc" data-open="false">
+        <button class="acc__q" aria-expanded="false">Tengo más de una sede, ¿cómo funciona?<span class="acc__ico"></span></button>
+        <div class="acc__a"><div><p>Cada sede tiene sus socios, sus clases y su caja, y vos ves todo junto o filtrado. Básico incluye 1 sede, Pro hasta 3 y Elite todas las que tengas.</p></div></div>
+      </div>
+      <div class="acc" data-open="false">
+        <button class="acc__q" aria-expanded="false">¿Me ayudan a cargar los datos?<span class="acc__ico"></span></button>
+        <div class="acc__a"><div><p>Sí. Escribinos por WhatsApp y te ayudamos a pasar la lista de socios y los planes para que arranques con todo cargado.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 11. Cierre ===== -->
+<section class="sec cierre">
+  <div class="cierre__glow" aria-hidden="true"></div>
+  <div class="wrap cierre__in">
+    <h2 class="reveal">Es tu turno.</h2>
+    <p class="reveal" style="--d:80ms">Probá TurnoGym siete días con tus socios de verdad. Si no te ordena el gimnasio, no pagás nada.</p>
+    <div class="cierre__cta reveal" style="--d:140ms">
+      <a class="btn btn--pri" data-registro href="#">Probá gratis 7 días<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      <a class="btn btn--sec" id="waCta" href="#" rel="noopener"><svg aria-hidden="true"><use href="#i-wa"/></svg>WhatsApp</a>
+    </div>
+    <p class="cierre__fine reveal" style="--d:200ms">SIN TARJETA · SIN PERMANENCIA</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== Footer ===== -->
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div class="foot__brand">
+        <a class="brand" href="#top">
+          <svg viewBox="0 0 180 180" aria-hidden="true"><defs><linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22D3EE"/><stop offset="1" stop-color="#3B82F6"/></linearGradient></defs><rect width="180" height="180" rx="40" fill="url(#bg2)"/><rect x="42" y="52" width="96" height="18" rx="9" fill="#04121A"/><circle cx="42" cy="61" r="16" fill="#04121A"/><circle cx="138" cy="61" r="16" fill="#04121A"/><rect x="81" y="61" width="18" height="78" rx="9" fill="#04121A"/></svg>
+          TurnoGym
+        </a>
+        <p>El sistema para gestionar tu gimnasio: socios, cobros, clases, rutinas y dietas en un solo lugar.</p>
+      </div>
+      <div>
+        <p class="blk__t">Producto</p>
+        <ul>
+          <li><a href="#funciones">Funciones</a></li>
+          <li><a href="#como">Cómo funciona</a></li>
+          <li><a href="#marca">Página con tu marca</a></li>
+          <li><a href="#precios">Precios</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="blk__t">Empezar</p>
+        <ul>
+          <li><a data-registro href="#">Probá gratis 7 días</a></li>
+          <li><a href="#preguntas">Preguntas</a></li>
+          <li><a class="wa" id="waFoot" href="#" rel="noopener"><svg aria-hidden="true"><use href="#i-wa"/></svg>11 5057 3199</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="blk__t">Legales</p>
+        <ul>
+          <li><a href="#">Términos</a></li>
+          <li><a href="#">Privacidad</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot__end">
+      <span>© <span id="yr">2026</span> TurnoGym. Hecho en Argentina.</span>
+      <span class="mono">turnogym.com</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   Configuración editable
+   ============================================================ */
+var REGISTRO_URL = "https://turnogym.com/registro";   // destino de todos los CTA
+var WHATSAPP     = "5491150573199";
+var WA_TEXTO     = "Hola! Vi la web de TurnoGym y quiero probarlo en mi gimnasio.";
+var WA_URL       = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(WA_TEXTO);
+
+var i, el, els;
+els = document.querySelectorAll("[data-registro]");
+for(i=0;i<els.length;i++){ els[i].setAttribute("href", REGISTRO_URL); }
+els = document.querySelectorAll("#waNav,#waFaq,#waCta,#waFoot");
+for(i=0;i<els.length;i++){ els[i].setAttribute("href", WA_URL); els[i].setAttribute("target","_blank"); }
+document.getElementById("yr").textContent = new Date().getFullYear();
+
+var reduce = window.matchMedia("(prefers-reduced-motion:reduce)");
+
+/* ============================================================
+   1. Revelado escalonado (con las tres salvaguardas)
+   ============================================================ */
+var revs = document.querySelectorAll(".reveal");
+function showAll(){ for(var k=0;k<revs.length;k++){ revs[k].classList.add("in"); } }
+
+if(reduce.matches || !("IntersectionObserver" in window)){
+  showAll();
+}else{
+  var io = new IntersectionObserver(function(en){
+    en.forEach(function(x){
+      if(x.isIntersecting){ x.target.classList.add("in"); io.unobserve(x.target); }
+    });
+  }, { threshold:0.12, rootMargin:"0px 0px -6% 0px" });
+  for(i=0;i<revs.length;i++){ io.observe(revs[i]); }
+  setTimeout(showAll, 5000);
+}
+window.addEventListener("beforeprint", showAll);
+
+/* ============================================================
+   2. Titular que se arma (una sola vez, solo en el hero)
+   ============================================================ */
+requestAnimationFrame(function(){ document.body.classList.add("ready"); });
+
+/* ============================================================
+   3. Nav sólido + CTA flotante
+   ============================================================ */
+var nav = document.getElementById("nav");
+var dock = document.getElementById("dock");
+var hero = document.querySelector(".hero");
+if(hero && "IntersectionObserver" in window){
+  new IntersectionObserver(function(e){
+    var out = !e[0].isIntersecting;
+    nav.setAttribute("data-stuck", String(out));
+    dock.setAttribute("data-show", String(out));
+  }, { threshold:0, rootMargin:"-70% 0px 0px 0px" }).observe(hero);
+}
+
+/* menú mobile */
+var burger = document.getElementById("burger");
+var sheet  = document.getElementById("sheet");
+function setMenu(open){
+  nav.setAttribute("data-open", String(open));
+  sheet.setAttribute("data-open", String(open));
+  burger.setAttribute("aria-expanded", String(open));
+  burger.setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
+}
+burger.addEventListener("click", function(){ setMenu(nav.getAttribute("data-open") !== "true"); });
+sheet.addEventListener("click", function(e){ if(e.target.tagName === "A"){ setMenu(false); } });
+document.addEventListener("keydown", function(e){ if(e.key === "Escape"){ setMenu(false); } });
+
+/* ============================================================
+   4. Números que suben + barras del panel
+   ============================================================ */
+var arsFmt = new Intl.NumberFormat("es-AR", { style:"currency", currency:"ARS", maximumFractionDigits:0 });
+function runCount(node){
+  var to = parseInt(node.getAttribute("data-to"), 10) || 0;
+  var money = node.getAttribute("data-money") === "1";
+  var fmt = function(v){ return money ? arsFmt.format(v) : String(v); };
+  if(reduce.matches){ node.textContent = fmt(to); return; }
+  var dur = 1100, t0 = null;
+  function frame(ts){
+    if(t0 === null){ t0 = ts; }
+    var p = Math.min((ts - t0) / dur, 1);
+    var eased = 1 - Math.pow(1 - p, 3);
+    node.textContent = fmt(Math.round(to * eased));
+    if(p < 1){ requestAnimationFrame(frame); }
+  }
+  requestAnimationFrame(frame);
+}
+var panel = document.getElementById("panel");
+if(panel){
+  if(!("IntersectionObserver" in window) || reduce.matches){
+    panel.classList.add("live");
+    var cs = panel.querySelectorAll(".count");
+    for(i=0;i<cs.length;i++){ runCount(cs[i]); }
+  }else{
+    var pio = new IntersectionObserver(function(en){
+      if(en[0].isIntersecting){
+        panel.classList.add("live");
+        var c = panel.querySelectorAll(".count");
+        for(var k=0;k<c.length;k++){ runCount(c[k]); }
+        pio.disconnect();
+      }
+    }, { threshold:0.3 });
+    pio.observe(panel);
+  }
+}
+
+/* ============================================================
+   5. Riel de funciones con deriva
+   ============================================================ */
+(function(){
+  var rail = document.getElementById("rail");
+  if(!rail) return;
+  var cards = Array.prototype.slice.call(rail.children);
+  var original = cards.length;
+  cards.forEach(function(c){
+    var clone = c.cloneNode(true);
+    clone.setAttribute("aria-hidden", "true");
+    rail.appendChild(clone);
+  });
+  var all = rail.children;
+  var cycle = 0;
+  function measure(){ cycle = all[original].offsetLeft - all[0].offsetLeft; }
+  measure();
+  if(window.ResizeObserver){ new ResizeObserver(measure).observe(rail); }
+  else { window.addEventListener("resize", measure); }
+
+  function wrapScroll(){
+    if(cycle <= 0) return;
+    if(rail.scrollLeft >= cycle){ rail.scrollLeft -= cycle; }
+    else if(rail.scrollLeft < 0){ rail.scrollLeft += cycle; }
+  }
+
+  var drift = true, down = false, inView = false, pauseUntil = 0, last = 0;
+  if("IntersectionObserver" in window){
+    new IntersectionObserver(function(e){ inView = e[0].isIntersecting; }, { threshold:0.05 }).observe(rail);
+  }else{ inView = true; }
+
+  rail.addEventListener("pointerenter", function(){ drift = false; });
+  rail.addEventListener("pointerleave", function(){ drift = true; });
+  rail.addEventListener("focusin", function(){ drift = false; });
+  rail.addEventListener("focusout", function(){ drift = true; });
+  rail.addEventListener("pointerdown", function(){ down = true; });
+  window.addEventListener("pointerup", function(){ down = false; pauseUntil = performance.now() + 2500; });
+  rail.addEventListener("touchstart", function(){ pauseUntil = performance.now() + 4000; }, { passive:true });
+  rail.addEventListener("scroll", wrapScroll, { passive:true });
+  rail.addEventListener("keydown", function(e){
+    if(e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    var step = all[1].offsetLeft - all[0].offsetLeft;
+    rail.scrollLeft += (e.key === "ArrowRight" ? step : -step);
+    pauseUntil = performance.now() + 2500;
+  });
+
+  function tick(ts){
+    var dt = last ? Math.min(ts - last, 60) : 16;
+    last = ts;
+    if(drift && !down && inView && ts > pauseUntil && !reduce.matches){
+      rail.scrollLeft += dt * 0.032;
+      wrapScroll();
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+
+/* ============================================================
+   6. Marquesina: se apaga fuera de pantalla
+   ============================================================ */
+(function(){
+  var m = document.getElementById("marq");
+  if(!m || !("IntersectionObserver" in window)) return;
+  new IntersectionObserver(function(e){
+    m.style.animationPlayState = e[0].isIntersecting ? "running" : "paused";
+  }, { threshold:0 }).observe(m);
+})();
+
+/* ============================================================
+   7. Pasos que se auto-avanzan con barra de progreso
+   ============================================================ */
+(function(){
+  var box = document.getElementById("steps");
+  if(!box) return;
+  var tabs = Array.prototype.slice.call(box.querySelectorAll(".step"));
+  var slides = tabs.map(function(t){ return document.getElementById(t.getAttribute("aria-controls")); });
+  var cur = 0, timer = null, paused = false;
+  var DUR = 5200;
+
+  function paint(n){
+    tabs.forEach(function(t, k){
+      t.setAttribute("aria-selected", String(k === n));
+      t.tabIndex = k === n ? 0 : -1;
+      if(slides[k]){ slides[k].setAttribute("data-on", String(k === n)); }
+    });
+    var bar = tabs[n].querySelector(".prog");
+    if(bar){ bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = ""; }
+    cur = n;
+  }
+  function schedule(){
+    clearTimeout(timer);
+    if(reduce.matches || paused) return;
+    timer = setTimeout(function(){ paint((cur + 1) % tabs.length); schedule(); }, DUR);
+  }
+  function pause(v){
+    paused = v;
+    box.setAttribute("data-paused", String(v));
+    if(v){ clearTimeout(timer); } else { schedule(); }
+  }
+  var section = box.closest(".sec");
+  section.addEventListener("pointerenter", function(){ pause(true); });
+  section.addEventListener("pointerleave", function(){ pause(false); });
+  section.addEventListener("focusin", function(){ pause(true); });
+  section.addEventListener("focusout", function(){ pause(false); });
+
+  tabs.forEach(function(t, k){
+    t.addEventListener("click", function(){ paint(k); schedule(); });
+    t.addEventListener("keydown", function(e){
+      var n = null;
+      if(e.key === "ArrowDown" || e.key === "ArrowRight"){ n = (k + 1) % tabs.length; }
+      if(e.key === "ArrowUp" || e.key === "ArrowLeft"){ n = (k - 1 + tabs.length) % tabs.length; }
+      if(n === null) return;
+      e.preventDefault(); paint(n); tabs[n].focus(); schedule();
+    });
+  });
+
+  paint(0);
+  if("IntersectionObserver" in window){
+    new IntersectionObserver(function(e){
+      if(e[0].isIntersecting){ schedule(); } else { clearTimeout(timer); }
+    }, { threshold:0.2 }).observe(box);
+  }else{ schedule(); }
+})();
+
+/* ============================================================
+   8. La IA "escribe" la respuesta al entrar en pantalla
+   ============================================================ */
+(function(){
+  var chat = document.getElementById("chat");
+  if(!chat) return;
+  var msg = document.getElementById("iaMsg");
+  var rut = document.getElementById("rut");
+  var texto = "Listo. Cuatro días, empuje y tracción alternados, y en pierna cambié la sentadilla libre por Smith para cuidarle la rodilla.";
+  var done = false;
+
+  function write(){
+    if(done) return; done = true;
+    if(reduce.matches){ msg.textContent = texto; rut.hidden = false; return; }
+    setTimeout(function(){
+      msg.textContent = "";
+      var n = 0;
+      (function type(){
+        msg.textContent = texto.slice(0, n);
+        n += 2;
+        if(n <= texto.length + 2){ setTimeout(type, 18); }
+        else { rut.hidden = false; }
+      })();
+    }, 900);
+  }
+  if("IntersectionObserver" in window){
+    new IntersectionObserver(function(e){ if(e[0].isIntersecting){ write(); } }, { threshold:0.4 }).observe(chat);
+  }else{ write(); }
+})();
+
+/* ============================================================
+   9. Pestañas de la app del socio
+   ============================================================ */
+(function(){
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  if(!tabs.length) return;
+  function select(k){
+    tabs.forEach(function(t, j){
+      var on = j === k;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("data-pv")).hidden = !on;
+    });
+  }
+  tabs.forEach(function(t, k){
+    t.addEventListener("click", function(){ select(k); });
+    t.addEventListener("keydown", function(e){
+      var n = null;
+      if(e.key === "ArrowRight"){ n = (k + 1) % tabs.length; }
+      if(e.key === "ArrowLeft"){ n = (k - 1 + tabs.length) % tabs.length; }
+      if(n === null) return;
+      e.preventDefault(); select(n); tabs[n].focus();
+    });
+  });
+})();
+
+/* ============================================================
+   10. Selector de marca (white label)
+   ============================================================ */
+(function(){
+  var prev = document.getElementById("wlPrev");
+  if(!prev) return;
+  var gyms = [
+    { c:"#F97316", slug:"iron-house", name:"Iron House",
+      tag:"Fierros, funcional y una sala que abre a las 6 de la mañana.",
+      desc:"Dos sedes en Morón. Musculación, funcional y clases con cupo, con profe en sala todo el día.",
+      addr:"Av. Rivadavia 18400, Morón",
+      p:["$28.000","$22.000","$6.500"], pl:["Pase libre","3 por semana","Clase suelta"],
+      pd:["Todas las actividades","12 clases por mes","Sin membresía"] },
+    { c:"#E879F9", slug:"estudio-danzarte", name:"Estudio DanzArte",
+      tag:"Danza, ritmos y Kangoo Jumps en grupos de diez.",
+      desc:"Clases con cupo chico y profe atenta a cada una. Kangoo con botas del estudio incluidas.",
+      addr:"San Martín 1250, Ramos Mejía",
+      p:["$24.000","$19.500","$8.000"], pl:["Pase libre","2 por semana","Kangoo Jumps"],
+      pd:["Todos los ritmos","8 clases por mes","Botas incluidas"] },
+    { c:"#A3E635", slug:"box-47", name:"Box 47",
+      tag:"Crossfit de verdad, con horarios cada hora.",
+      desc:"Wod diario, olímpico los martes y jueves, y open box los sábados a la mañana.",
+      addr:"Belgrano 780, Quilmes",
+      p:["$32.000","$26.000","$7.000"], pl:["Ilimitado","3 wods","Drop in"],
+      pd:["Todos los horarios","12 wods por mes","Clase suelta"] },
+    { c:"#38BDF8", slug:"club-norte", name:"Club Norte",
+      tag:"Pileta, musculación y clases para toda la familia.",
+      desc:"Tres sedes en zona norte. Natación con carriles por nivel y sala de máquinas nueva.",
+      addr:"Av. Maipú 2900, Olivos",
+      p:["$35.000","$27.000","$18.000"], pl:["Full club","Solo pileta","Solo sala"],
+      pd:["Todo incluido","3 turnos por semana","Sin clases"] }
+  ];
+  var f = {
+    slug:document.getElementById("wlSlug"), name:document.getElementById("wlName"),
+    tag:document.getElementById("wlTag"), desc:document.getElementById("wlDesc"),
+    addr:document.getElementById("wlAddr"),
+    p:[document.getElementById("wlP1"),document.getElementById("wlP2"),document.getElementById("wlP3")]
+  };
+  var plans = prev.querySelectorAll(".wl__plan");
+  var btns = Array.prototype.slice.call(document.querySelectorAll(".sw"));
+
+  function apply(k){
+    var g = gyms[k];
+    prev.style.setProperty("--gc", g.c);
+    f.slug.textContent = g.slug; f.name.textContent = g.name;
+    f.tag.textContent = g.tag; f.desc.textContent = g.desc; f.addr.textContent = g.addr;
+    for(var j=0;j<3;j++){
+      f.p[j].textContent = g.p[j];
+      plans[j].querySelector("span").textContent = g.pl[j];
+      plans[j].querySelector("em").textContent = g.pd[j];
+    }
+    btns.forEach(function(b, j){ b.setAttribute("aria-pressed", String(j === k)); });
+  }
+  btns.forEach(function(b, k){ b.addEventListener("click", function(){ apply(k); }); });
+})();
+
+/* ============================================================
+   11. Acordeón de preguntas
+   ============================================================ */
+(function(){
+  var accs = Array.prototype.slice.call(document.querySelectorAll(".acc"));
+  accs.forEach(function(a){
+    var q = a.querySelector(".acc__q");
+    q.addEventListener("click", function(){
+      var open = a.getAttribute("data-open") === "true";
+      accs.forEach(function(o){ o.setAttribute("data-open","false"); o.querySelector(".acc__q").setAttribute("aria-expanded","false"); });
+      if(!open){ a.setAttribute("data-open","true"); q.setAttribute("aria-expanded","true"); }
+    });
+  });
+})();
+
+
+/* ============================================================
+   12. Fondo del hero: grilla de turnos que se va ocupando
+   ============================================================ */
+(function(){
+  var cv = document.getElementById("fx");
+  var heroEl = document.querySelector(".hero");
+  if(!cv || !heroEl || !cv.getContext) return;
+
+  var ctx = cv.getContext("2d");
+  var base = document.createElement("canvas");
+  var bctx = base.getContext("2d");
+
+  var PITCH = 38, CELL = 27, RAD = 5;
+  var W = 0, H = 0, cols = 0, rows = 0;
+  var books = [], lastSpawn = 0, lastDraw = 0, t0 = 0, raf = 0, visible = true;
+
+  function box(c, x, y, s, r){
+    if(c.roundRect){ c.beginPath(); c.roundRect(x, y, s, s, r); c.fill(); }
+    else { c.fillRect(x, y, s, s); }
+  }
+
+  function resize(){
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    W = heroEl.clientWidth; H = heroEl.clientHeight;
+    if(!W || !H) return;
+    cv.width = base.width = Math.round(W * dpr);
+    cv.height = base.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cols = Math.ceil(W / PITCH) + 1;
+    rows = Math.ceil(H / PITCH) + 1;
+    bctx.clearRect(0, 0, W, H);
+    bctx.fillStyle = "rgba(230,237,243,.034)";
+    for(var r = 0; r < rows; r++){
+      for(var c = 0; c < cols; c++){ box(bctx, c * PITCH, r * PITCH, CELL, RAD); }
+    }
+    books = [];
+  }
+
+  function paint(t){
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(base, 0, 0, W, H);
+    var r, c, d, v, w, a;
+    /* dos olas cruzadas: la de adelante en cian, la de atrás en azul */
+    for(r = 0; r < rows; r++){
+      for(c = 0; c < cols; c++){
+        d = c * 0.92 + r * 1.34;
+        v = Math.sin(t * 0.52 - d * 0.15);
+        w = Math.sin(t * 0.23 + (c * 1.25 - r * 0.8) * 0.11);
+        a = 0;
+        if(w > 0.82){ a = ((w - 0.82) / 0.18) * 0.2; ctx.fillStyle = "rgba(59,130,246," + a.toFixed(3) + ")"; box(ctx, c * PITCH, r * PITCH, CELL, RAD); }
+        if(v > 0.79){
+          a = Math.pow((v - 0.79) / 0.21, 1.4) * 0.55;
+          ctx.fillStyle = "rgba(34,211,238," + a.toFixed(3) + ")";
+          box(ctx, c * PITCH, r * PITCH, CELL, RAD);
+        }
+      }
+    }
+    /* turnos que se reservan solos */
+    for(var i = books.length - 1; i >= 0; i--){
+      var b = books[i];
+      var p = (t - b.t) / b.life;
+      if(p >= 1){ books.splice(i, 1); continue; }
+      a = p < 0.14 ? p / 0.14 : 1 - (p - 0.14) / 0.86;
+      a = a * a * (b.volt ? 0.62 : 0.78);
+      ctx.fillStyle = (b.volt ? "rgba(163,230,53," : "rgba(34,211,238,") + a.toFixed(3) + ")";
+      box(ctx, b.c * PITCH, b.r * PITCH, CELL, RAD);
+    }
+  }
+
+  function frame(ts){
+    raf = requestAnimationFrame(frame);
+    if(ts - lastDraw < 32) return;
+    lastDraw = ts;
+    var t = (ts - t0) / 1000;
+    if(ts - lastSpawn > 620 && books.length < 10){
+      lastSpawn = ts;
+      books.push({
+        c: (Math.random() * cols) | 0,
+        r: (Math.random() * rows) | 0,
+        t: t,
+        life: 2.6 + Math.random() * 1.6,
+        volt: Math.random() < 0.22
+      });
+    }
+    paint(t);
+  }
+
+  function stop(){ if(raf){ cancelAnimationFrame(raf); raf = 0; } }
+  function start(){
+    if(raf || reduce.matches || !visible) return;
+    t0 = performance.now() - 2000;
+    lastDraw = 0;
+    raf = requestAnimationFrame(frame);
+  }
+
+  function still(){
+    /* con movimiento reducido: una sola pasada, sin loop */
+    stop();
+    paint(3.2);
+  }
+
+  resize();
+  if(reduce.matches){ still(); } else { start(); }
+
+  var rt;
+  function onResize(){ clearTimeout(rt); rt = setTimeout(function(){ resize(); if(reduce.matches){ still(); } }, 160); }
+  if(window.ResizeObserver){ new ResizeObserver(onResize).observe(heroEl); }
+  else { window.addEventListener("resize", onResize); }
+
+  if("IntersectionObserver" in window){
+    new IntersectionObserver(function(e){
+      visible = e[0].isIntersecting;
+      if(visible){ start(); } else { stop(); }
+    }, { threshold:0 }).observe(heroEl);
+  }
+  if(reduce.addEventListener){
+    reduce.addEventListener("change", function(){ if(reduce.matches){ still(); } else { start(); } });
+  }
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden){ stop(); } else { start(); }
+  });
+})();
+
+})();
+</script>
+</body>
+</html>

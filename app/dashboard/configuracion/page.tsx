@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import type { Gym } from "@/types/db";
-import { THEMES, BG_STYLES, themeOf } from "@/lib/theme";
-import ThemePicker from "@/components/ThemePicker";
+import { THEMES } from "@/lib/theme";
 import ThemeApply from "@/components/ThemeApply";
 import ShareGym from "@/components/ShareGym";
 import {
@@ -33,8 +32,9 @@ export default function ConfiguracionPage() {
   const supabase = createClient();
   const [gymId, setGymId] = useState<string | null>(null);
   const [slug, setSlug] = useState("");
+  // Solo para previsualizar la pantalla con los colores que ya eligió el dueño
+  // en Configuración. Esta pantalla NO los guarda (ver abajo).
   const [theme, setTheme] = useState("celeste");
-  const [bgStyle, setBgStyle] = useState("aurora");
   const [cfg, setCfg] = useState<LandingConfig>(DEFAULT_LANDING);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,7 +55,6 @@ export default function ConfiguracionPage() {
           setGymId(data.id);
           setSlug(data.slug || "");
           setTheme(data.theme || "celeste");
-          setBgStyle(data.bg_style || "aurora");
           setCfg(resolveLandingConfig(data));
         }
       }
@@ -130,8 +129,7 @@ export default function ConfiguracionPage() {
       name: clean.nombre,
       slug,
       accent_color: clean.marca.primary,
-      theme,
-      bg_style: bgStyle,
+      // theme y bg_style NO se tocan acá: los maneja Configuración.
       tagline: clean.tagline,
       description: clean.descripcion,
       whatsapp: clean.whatsapp,
@@ -155,26 +153,6 @@ export default function ConfiguracionPage() {
       <div className="max-h-screen overflow-y-auto border-r border-white/10 bg-[#0b0f16] p-5">
         <h1 className="mb-1 text-lg font-bold">Configurá tu página</h1>
         <p className="mb-5 text-xs text-muted">Editá el contenido y mirá el resultado en vivo a la derecha.</p>
-
-        <Section title="Estilo de la app">
-          <p className="mb-2 text-xs text-muted">
-            Cambia los colores de tu panel y de la app que ven tus socios. Elegí el que vaya con tu lugar.
-          </p>
-          <ThemePicker
-            value={theme}
-            onChange={(k) => { setTheme(k); patchMarca({ primary: themeOf(k).hex, secondary: themeOf(k).hex2 }); }}
-          />
-
-          <label className="mb-1 mt-4 block text-xs font-semibold text-ink-2">Fondo del panel</label>
-          <div className="grid grid-cols-3 gap-2">
-            {BG_STYLES.map((b) => (
-              <button key={b.key} type="button" onClick={() => setBgStyle(b.key)}
-                className={`rounded-lg border p-2 text-left transition ${bgStyle === b.key ? "border-brand bg-white/5" : "border-white/10 hover:bg-white/5"}`}>
-                <div className="text-xs font-semibold">{b.label}</div>
-              </button>
-            ))}
-          </div>
-        </Section>
 
         <Section title="Colores de tu página pública">
           <p className="mb-2 text-xs text-muted">
