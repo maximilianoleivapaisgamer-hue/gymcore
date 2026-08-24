@@ -70,8 +70,10 @@ export default function ActivarPage() {
           ) : (
             <BrandMark size={52} className="mx-auto mb-3 rounded-2xl" />
           )}
-          <h1 className="text-2xl font-bold">Activá {data?.gym.name || "tu gimnasio"}</h1>
-          <p className="mt-1 text-sm text-ink-2">Al pagar, tu gimnasio queda activo y <b>tu web y tu app quedan online con tu marca</b>. No perdés nada de lo que ya viste.</p>
+          <h1 className="text-2xl font-bold">Activá {data?.gym.name || "tu cuenta"}</h1>
+          <p className="mt-1 text-sm text-ink-2">
+            Al pagar, {data?.gym.name ? <b>{data.gym.name}</b> : "tu cuenta"} queda activo y <b>tu web y tu app quedan online con tu marca</b>. No perdés nada de lo que ya viste.
+          </p>
         </div>
 
         {loading ? (
@@ -79,7 +81,7 @@ export default function ActivarPage() {
         ) : data?.yaActivo ? (
           <div className="card text-center">
             <div className="mb-2 text-3xl">✅</div>
-            <p className="text-sm">Este gimnasio ya está activo. Entrá con tu usuario y contraseña:</p>
+            <p className="text-sm">{data?.gym.name ? <b>{data.gym.name}</b> : "Esta cuenta"} ya está activo. Entrá con tu usuario y contraseña:</p>
             {data.ownerUser && <p className="mt-2 text-lg font-bold">{data.ownerUser}</p>}
             <a href="/acceso" className="btn btn-primary mt-4 inline-block">Ir a iniciar sesión</a>
           </div>
@@ -140,8 +142,8 @@ export default function ActivarPage() {
                 </button>
                 <p className="text-center text-[11px] text-muted">
                   {metodo === "pago"
-                    ? "Un pago con Mercado Pago (tarjeta o dinero en cuenta). Tu gimnasio queda activo al acreditarse."
-                    : "Autorizás el débito automático en Mercado Pago. Apenas se acredita, tu gimnasio queda activo solo."}
+                    ? "Un pago con Mercado Pago (tarjeta o dinero en cuenta). Tu cuenta queda activa al acreditarse."
+                    : "Autorizás el débito automático en Mercado Pago. Apenas se acredita, tu cuenta queda activa sola."}
                 </p>
               </div>
             ) : (
@@ -153,7 +155,7 @@ export default function ActivarPage() {
                     {data.transfer.cbu && <div>CBU: <b className="text-ink">{data.transfer.cbu}</b></div>}
                     {data.transfer.titular && <div className="text-ink-2">Titular: {data.transfer.titular}</div>}
                     {data.transfer.nota && <div className="mt-1 text-xs text-muted">{data.transfer.nota}</div>}
-                    <p className="mt-2 text-xs text-ink-2">Después mandanos el comprobante y activamos tu gimnasio (hasta 48hs hábiles).</p>
+                    <p className="mt-2 text-xs text-ink-2">Después mandanos el comprobante y te activamos la cuenta (hasta 48hs hábiles).</p>
                     {waTransfer && <a href={waTransfer} target="_blank" rel="noreferrer" className="btn btn-primary mt-2 inline-block w-full text-center">Enviar comprobante por WhatsApp</a>}
                   </>
                 ) : (

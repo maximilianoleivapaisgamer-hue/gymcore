@@ -190,7 +190,7 @@ export default function ConfiguracionPage() {
         </Section>
 
         <Section title="Logo y fondo">
-          <label className="mb-1 block text-xs font-semibold text-ink-2">Logo del gimnasio</label>
+          <label className="mb-1 block text-xs font-semibold text-ink-2">Logo del negocio</label>
           <label className="mb-1 flex items-center gap-1.5 text-[11px] text-ink-2">
             <input type="checkbox" checked={logoNoBg} onChange={(e) => setLogoNoBg(e.target.checked)} />
             Quitar fondo blanco (para logos de Instagram)
@@ -216,7 +216,7 @@ export default function ConfiguracionPage() {
         </Section>
 
         <Section title="Encabezado">
-          <Field label="Nombre del gimnasio"><input className="input" value={cfg.nombre} onChange={(e) => patch({ nombre: e.target.value })} /></Field>
+          <Field label="Nombre del negocio"><input className="input" value={cfg.nombre} onChange={(e) => patch({ nombre: e.target.value })} /></Field>
           <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-2">
             <input type="checkbox" checked={cfg.heroLogo} onChange={(e) => patch({ heroLogo: e.target.checked })} />
             Mostrar el logo grande arriba del nombre

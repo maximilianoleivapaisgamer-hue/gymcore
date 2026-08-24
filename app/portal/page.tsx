@@ -244,8 +244,8 @@ export default function PortalPage() {
       <div className="max-w-sm">
         <h1 className="text-2xl font-bold">No encontramos tu ficha</h1>
         <p className="mt-2 text-ink-2">
-          Tu cuenta no está vinculada a ningún gimnasio todavía. Pedile a tu gimnasio que te cargue como socio
-          con este mismo email, y volvé a entrar.
+          Tu cuenta todavía no está vinculada. Pedí que te carguen como socio con este mismo email,
+          y volvé a entrar.
         </p>
         <button className="btn btn-ghost mt-4" onClick={logout}>Cerrar sesión</button>
       </div>

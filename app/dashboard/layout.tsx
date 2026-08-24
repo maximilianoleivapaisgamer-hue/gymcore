@@ -273,7 +273,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
             <div className="min-w-0">
               <div className="truncate text-[13px] font-semibold leading-tight">{gym?.name || "Tu gimnasio"}</div>
-              <div className="text-[10px] font-medium text-muted">Panel del gimnasio</div>
+              <div className="text-[10px] font-medium text-muted">Panel del negocio</div>
             </div>
           </div>
         </div>

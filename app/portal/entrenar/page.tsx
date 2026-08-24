@@ -139,9 +139,9 @@ export default function EntrenarPage() {
   );
   if (state === "noroutine") return (
     <main className="mx-auto max-w-lg px-6 py-16 text-center">
-      <div className="mb-2 text-4xl">🏋️</div>
+      <div className="mb-2 text-4xl">📋</div>
       <h1 className="text-xl font-bold">Todavía no tenés una rutina asignada</h1>
-      <p className="mt-2 text-ink-2">Cuando tu gimnasio te cargue una rutina, vas a poder iniciarla acá.</p>
+      <p className="mt-2 text-ink-2">Cuando te carguen una rutina, vas a poder iniciarla acá.</p>
       <Link href="/portal" className="btn btn-primary mt-5 inline-block">← Volver a mi perfil</Link>
     </main>
   );

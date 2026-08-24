@@ -493,7 +493,7 @@ export default function RutinasPage() {
       {libOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setLibOpen(false)}>
           <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 text-lg font-bold">Ejercicios propios del gimnasio</h3>
+            <h3 className="mb-1 text-lg font-bold">Tus propios ejercicios</h3>
             <p className="mb-4 text-sm text-ink-2">
               Acá cargás y borrás los tuyos. Los <b>{libCount} de la librería</b> (con demostración) ya aparecen solos al armar rutinas y no se editan desde acá.
             </p>
@@ -537,7 +537,7 @@ export default function RutinasPage() {
                 <button className="shrink-0 px-2 text-muted hover:text-ink" onClick={() => setPicking(null)}>✕</button>
               </div>
               <div className="mt-2 flex gap-1.5 text-xs">
-                {([["todos", "Todos"], ["demo", "🎞️ Con demo"], ["mios", "Del gimnasio"]] as const).map(([k, label]) => (
+                {([["todos", "Todos"], ["demo", "🎞️ Con demo"], ["mios", "Míoso"]] as const).map(([k, label]) => (
                   <button key={k} onClick={() => setPickFilter(k)}
                     className={`rounded-full border px-3 py-1 font-semibold transition ${pickFilter === k ? "border-brand/40 bg-[rgba(34,211,238,.12)] text-brand" : "border-white/10 text-ink-2 hover:text-ink"}`}>
                     {label}

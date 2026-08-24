@@ -155,7 +155,7 @@ export default function MiPlanPage() {
   function waAvisar(planLabel: string): { href: string; phone: string; msg: string } | null {
     const phone = (transferData?.whatsapp || "").replace(/\D/g, "");
     if (!phone) return null;
-    const msg = `¡Hola! Soy de ${sub ? "un gimnasio en turnogym" : "turnogym"}. Hice la transferencia del plan ${planLabel} y les paso el comprobante para adelantar el control. ¡Gracias!`;
+    const msg = `¡Hola! Soy de ${sub ? "un negocio con turnogym" : "turnogym"}. Hice la transferencia del plan ${planLabel} y les paso el comprobante para adelantar el control. ¡Gracias!`;
     return { href: waHrefBase(phone, msg) as string, phone, msg };
   }
 
@@ -357,7 +357,7 @@ export default function MiPlanPage() {
 
           {/* Frase de valor, centrada debajo de los 3 planes */}
           <div className="mx-auto mt-6 max-w-2xl rounded-xl border border-good/30 bg-[rgba(34,197,94,.08)] px-4 py-3 text-center text-sm font-semibold leading-snug text-good">
-            💡 Por lo que te sale el abono de <b>un solo socio</b> en el gimnasio, tenés todo este sistema profesional para sumar clientes y fidelizarlos.
+            💡 Por lo que te sale el abono de <b>un solo socio</b>, tenés todo este sistema profesional para sumar clientes y fidelizarlos.
           </div>
         </>
       )}

@@ -210,7 +210,7 @@ export default function FinanzasPage() {
       <main className="mx-auto max-w-2xl px-6 py-16 text-center">
         <div className="mb-2 text-4xl">🔒</div>
         <h1 className="text-2xl font-bold">Sin acceso a Finanzas</h1>
-        <p className="mt-2 text-ink-2">El dueño del gimnasio no habilitó a los empleados para ver este módulo.</p>
+        <p className="mt-2 text-ink-2">El dueño no habilitó a los empleados para ver este módulo.</p>
         <Link href="/dashboard" className="btn btn-primary mt-5 inline-block">Volver al panel</Link>
       </main>
     );

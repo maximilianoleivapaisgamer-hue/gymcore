@@ -36,20 +36,20 @@ export interface PlanConfig {
 /** Valores por defecto (respaldo si la base no está disponible). */
 export const DEFAULT_PLANS: PlanConfig[] = [
   {
-    key: "basico", sort: 1, label: "Básico", tagline: "Para gimnasios que arrancan.",
+    key: "basico", sort: 1, label: "Básico", tagline: "Para los que están arrancando.",
     price: 49000, promo_price: null, promo_note: null, featured: false,
     features: ["Una sola sucursal", "Socios ilimitados", "Gestión de socios y cobros", "Rutinas y finanzas", "Clases y reservas", "Portal del socio", "Página pública white-label"],
     capabilities: ["clases"],
   },
   {
-    key: "pro", sort: 2, label: "Pro", tagline: "Para gimnasios en crecimiento.",
+    key: "pro", sort: 2, label: "Pro", tagline: "Para los que están creciendo.",
     price: 79000, promo_price: null, promo_note: null, featured: true,
-    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Recordatorios de cuota por WhatsApp", "Configurá tu dominio propio (ej: tugim.com.ar)"],
+    features: ["Hasta 3 sucursales", "Todo lo del Básico", "Dietas y planes de comida", "Recordatorios de cuota por WhatsApp", "Configurá tu dominio propio (ej: tumarca.com.ar)"],
     capabilities: ["clases", "dietas", "control_acceso", "whatsapp"],
   },
   {
     key: "elite", sort: 3, label: "Elite", tagline: "Para cadenas y multi-sede.",
-    price: 119000, promo_price: 90000, promo_note: "Primer mes a $90.000 para gimnasios que contraten ahora.", featured: false,
+    price: 119000, promo_price: 90000, promo_note: "Primer mes a $90.000 para los que contraten ahora.", featured: false,
     features: ["Sucursales ilimitadas", "Todo lo del Pro", "Control de acceso por QR", "Cobros online (Mercado Pago)", "Soporte prioritario"],
     capabilities: ["clases", "dietas", "control_acceso", "ia", "whatsapp"],
   },

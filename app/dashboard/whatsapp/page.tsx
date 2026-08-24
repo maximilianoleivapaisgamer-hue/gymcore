@@ -89,7 +89,7 @@ export default function WhatsAppPage() {
       )}
 
       <div className="card mb-4">
-        <label className="mb-1 block text-sm font-semibold">Número de WhatsApp del gimnasio</label>
+        <label className="mb-1 block text-sm font-semibold">Número de WhatsApp del negocio</label>
         <p className="mb-2 text-xs text-ink-2">Es el identificador del número (phone number ID) que te da turnogym al conectar el WhatsApp de <b>{gymName || "tu gimnasio"}</b>. Si no lo tenés, te lo pasamos nosotros.</p>
         <input className="input" value={phoneId} onChange={(e) => setPhoneId(e.target.value)} placeholder="phone number ID (ej: 123456789012345)" />
       </div>
