@@ -40,6 +40,27 @@ carnet QR; y cada gimnasio tiene su página pública white-label con su marca.
 > Regla de oro: si tocás la base, siempre dejás (a) el archivo `migration_XXX.sql`
 > y (b) un aviso claro de "corré este SQL en Supabase antes de subir".
 
+### Verificar el build ANTES de pushear
+El typecheck (`npx tsc --noEmit`) no agarra todo: hay errores que solo aparecen
+al compilar (imports rotos, mezclar servidor con cliente, exports de ruta mal).
+Para correr el build hace falta que existan las variables públicas de Supabase;
+el `.env.local` que deja `vercel link` viene **sin valores** (Vercel no los
+devuelve descifrados). Con valores de mentira alcanza para verificar que
+compile, porque las páginas piden los datos recién en el navegador:
+
+```
+NEXT_PUBLIC_SUPABASE_URL="https://ejemplo.supabase.co" NEXT_PUBLIC_SUPABASE_ANON_KEY="clave-de-mentira" npm run build
+```
+
+Ojo: eso sirve para **compilar**, no para `npm run dev`. Para levantar la app
+localmente de verdad hay que poner los valores reales en `.env.local`
+(Supabase → Settings → API; las dos son públicas, viajan al navegador igual).
+
+> Antes esto no se podía: la carpeta se llamaba `TURNOGYM #` y el `#` rompía el
+> rastreador de archivos de Next (`path must be a string without null bytes`).
+> Se renombró a `TURNOGYM` el 2026-08-24. No uses `#`, `&` ni `%` en nombres de
+> carpetas de proyectos.
+
 **Numeración de migraciones:** ya no hay huecos. Los archivos `027`, `028` y
 `029` faltaban en el repo pero los cambios **sí estaban aplicados** en la base
 (figuran en `supabase_migrations.schema_migrations` como `admin_team_helpers`,
