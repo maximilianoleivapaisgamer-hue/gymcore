@@ -16,13 +16,13 @@ export interface PanelSection {
 export const TOGGLEABLE_SECTIONS: PanelSection[] = [
   { key: "rutinas", label: "Rutinas", hint: "Armar y asignar rutinas de entrenamiento." },
   { key: "dietas", label: "Dietas", hint: "Planes de comida y nutrición." },
-  { key: "finanzas", label: "Finanzas", hint: "Ingresos, egresos y caja del gimnasio." },
+  { key: "finanzas", label: "Finanzas", hint: "Ingresos, egresos y caja del negocio." },
   { key: "clases", label: "Clases y reservas", hint: "Agenda de clases y cupos para los socios." },
   { key: "equipo", label: "Equipo", hint: "Sumar profes o staff con permisos." },
   { key: "sedes", label: "Sucursales", hint: "Manejar más de una sede." },
   { key: "control-acceso", label: "Control de acceso", hint: "Ingreso de socios por QR / DNI." },
   { key: "planes", label: "Planes de socio", hint: "Los planes que les cobrás a tus socios." },
-  { key: "pagina-publica", label: "Página pública", hint: "Tu web con la marca del gimnasio." },
+  { key: "pagina-publica", label: "Página pública", hint: "Tu web con tu marca." },
   { key: "whatsapp", label: "Recordatorios WhatsApp", hint: "Avisos de cuota por WhatsApp." },
 ];
 

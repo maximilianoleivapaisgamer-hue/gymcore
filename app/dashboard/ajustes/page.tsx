@@ -6,6 +6,7 @@ import { TOGGLEABLE_SECTIONS, TOGGLEABLE_KEYS, MEMBER_SECTIONS, MEMBER_KEYS } fr
 import { BG_STYLES, themeOf } from "@/lib/theme";
 import ThemePicker from "@/components/ThemePicker";
 import ThemeApply from "@/components/ThemeApply";
+import PreviewSocio from "@/components/PreviewSocio";
 
 /**
  * Configuración del panel: cómo se ve la app y qué secciones se usan.
@@ -23,6 +24,7 @@ export default function AjustesPage() {
   const [hidden, setHidden] = useState<string[]>([]);
   const [hiddenMember, setHiddenMember] = useState<string[]>([]);
   const [theme, setTheme] = useState<string>("celeste");
+  const [gym, setGym] = useState<{ name: string | null; logo_url: string | null }>({ name: null, logo_url: null });
   const [bgStyle, setBgStyle] = useState<string>("aurora");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -38,9 +40,10 @@ export default function AjustesPage() {
       if (profile?.gym_id) {
         // select("*") para que no rompa si alguna columna no está migrada.
         const { data } = await supabase.from("gyms").select("*").eq("id", profile.gym_id)
-          .single<{ id: string; hidden_sections?: string[] | null; hidden_member_sections?: string[] | null; theme?: string | null; bg_style?: string | null }>();
+          .single<{ id: string; name: string | null; logo_url: string | null; hidden_sections?: string[] | null; hidden_member_sections?: string[] | null; theme?: string | null; bg_style?: string | null }>();
         if (data) {
           setGymId(data.id);
+          setGym({ name: data.name, logo_url: data.logo_url });
           setHidden(data.hidden_sections || []);
           setHiddenMember(data.hidden_member_sections || []);
           setTheme(themeOf(data.theme).key);
@@ -82,7 +85,7 @@ export default function AjustesPage() {
   if (loading) return <div className="grid min-h-[40vh] place-items-center text-ink-2">Cargando…</div>;
 
   return (
-    <div className="mx-auto w-full max-w-2xl p-5 md:p-7">
+    <div className="mx-auto w-full max-w-5xl p-5 md:p-7">
       {/* Previsualización en vivo: lo que tocás se ve al instante. */}
       <ThemeApply theme={theme} />
 
@@ -91,10 +94,18 @@ export default function AjustesPage() {
         <p className="mt-1 text-ink-2">Cómo se ve tu app y qué secciones usás. No se borra nada: lo volvés a cambiar cuando quieras.</p>
       </div>
 
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_268px] lg:gap-8">
+        <div className="min-w-0">
+
       {/* ── Estilo ─────────────────────────────────────────────────────────── */}
       <h2 className="mb-1 text-sm font-semibold text-ink">Estilo de la app</h2>
       <p className="mb-3 text-xs text-ink-2">Los colores de tu panel y de la app que ven tus socios. Elegí el que vaya con tu lugar.</p>
       <ThemePicker value={theme} onChange={(k) => { limpiar(); setTheme(k); }} />
+
+      {/* En celular la vista previa va acá, pegada a lo que previsualiza. */}
+      <div className="mt-5 lg:hidden">
+        <PreviewSocio theme={theme} nombre={gym.name} logoUrl={gym.logo_url} ocultas={hiddenMember} />
+      </div>
 
       <div className="mt-4">
         <div className="mb-2 text-xs font-semibold text-ink-2">Fondo del panel</div>
@@ -153,6 +164,17 @@ export default function AjustesPage() {
         {err && <span className="text-sm text-crit">{err}</span>}
       </div>
       <p className="mt-3 text-[11px] text-muted">Inicio, Socios, Mi plan y Mi cuenta están siempre disponibles y no se pueden apagar.</p>
+
+        </div>
+
+        {/* En pantalla grande queda fija al costado: al tocar un estilo o apagar
+            una sección se ve el efecto sin perder de vista los controles. */}
+        <aside className="hidden lg:block">
+          <div className="sticky top-6">
+            <PreviewSocio theme={theme} nombre={gym.name} logoUrl={gym.logo_url} ocultas={hiddenMember} />
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

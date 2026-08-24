@@ -305,8 +305,7 @@ El prospecto que probó la demo paga y su gimnasio se activa solo:
   gimnasio** (token central de Tech Provider + `phone_number_id` por gym en
   `gyms.wa_phone_id`). Config: número, on/off, días antes, y "enviar prueba".
 - En Básico la pantalla ofrece el recordatorio **manual** desde Socios.
-- Falta la **etapa 2**: el cron diario que efectivamente manda los recordatorios
-  (`app/api/cron/whatsapp` + `vercel.json`). Ver §9.
+- La **etapa 2** (cron diario que los manda) ya está hecha: ver §9.
 
 ---
 
@@ -318,12 +317,11 @@ app/
   g/[slug]/             variante pública / demo pública
   dashboard/            panel del dueño (layout.tsx define el menú y el gateo)
     socios, rutinas, dietas, finanzas, clases, equipo, sedes,
-    control-acceso, planes, configuracion, whatsapp, secciones,
-    cuenta, mi-plan
+    control-acceso, planes, configuracion (= Página pública), whatsapp,
+    ajustes (= Configuración), cuenta, mi-plan
   portal/               app del socio (rutina, dieta, clases, peso, progreso)
   admin/                super admin (page.tsx = dashboard de cobros)
   activar/[slug]/       checkout público de activación
-  manifest/[slug]/      manifest PWA por gimnasio
   acceso/               login
   api/
     whatsapp/           config de recordatorios del dueño
@@ -332,7 +330,8 @@ app/
     pagos/{activar,webhook}/   Mercado Pago
     admin/{gimnasios,cobros,transferencia,equipo,config,exercises}/
     admin/demo/{generar,convertir,credenciales,acceso,publica,gestion,...}
-components/    PwaBranding, PasswordInput, AiChat, ThemeApply, AppBackground, ...
+components/    PasswordInput, AiChat, ThemeApply, ThemePicker, PreviewSocio,
+              AppBackground, ViendoComo, InstallAppButton, ...
 lib/          plans.ts, admin.ts, mercadopago.ts, whatsapp.ts, google-places.ts,
               supabase-browser.ts, supabase-server.ts
 supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
@@ -383,10 +382,15 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
     volvé a medir: texto ≥4.5:1 sobre las tarjetas (incluida la superficie más
     clara) y el acento ≥3:1. De paso se corrigió `muted`, que en el tema viejo
     estaba en 3.75 (ilegible) en sus 209 usos.
-  - Se elige desde el panel del dueño (Página pública → Estilo de la app) y
+  - Se elige desde el panel del dueño (**Configuración** → Estilo de la app) y
     desde el Super Admin en cada demo (Demos → Editar → Estilo de la app).
     El componente es `components/ThemePicker.tsx`, con preview real de cada
     paleta; se usa en los dos lados.
+  - Al lado del selector va `components/PreviewSocio.tsx`: un teléfono que
+    muestra la app del socio con ESE estilo, el nombre y el logo del negocio, y
+    **solo las secciones que le dejó prendidas al socio**. Se dibuja con estilos
+    inline y no con clases de Tailwind, porque tiene que mostrar el estilo que se
+    está probando, no el que está aplicado.
   - ⚠️ **Un tema CLARO no entra con este esquema**: hay ~350 usos de `white/10`
     y `white/5` para bordes y fondos sutiles que asumen base oscura. Habría que
     tokenizarlos primero.
