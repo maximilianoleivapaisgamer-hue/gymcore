@@ -316,6 +316,35 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
   usando `wa.me`, que abre la app.
   ⚠️ En la **landing pública** y en el **portal del socio** NO se usa: ahí entra
   gente desde el celular y `wa.me` es lo correcto.
+- **Estilos de la app (5 presets) — `lib/theme.ts`.** Cada estilo cambia la
+  paleta ENTERA (fondo, superficies, textos y marca), no solo el acento: por eso
+  se sienten distintos y no como el mismo diseño repintado. Los cinco mantienen
+  la base oscura tipo "tech app"; lo que cambia es su temperatura.
+  - `celeste` (Cian, el default) · `rosa` (pilates/yoga) · `fucsia` (danza) ·
+    `verde` (funcional/crossfit) · `ambar` (musculación/box).
+  - **Todos los tokens base son variables CSS** (`--surface-rgb`, `--ink-rgb`,
+    `--muted-rgb`, …) que consume `tailwind.config.ts`. Cambiar de estilo
+    repinta los ~830 usos de `bg-surface` / `text-ink-2` / `text-muted` solos.
+    Van en formato "R G B" y no hex, para que Tailwind pueda aplicar alfa
+    (`bg-bg/80`).
+  - `ThemeApply` escribe las variables y guarda la clave en localStorage;
+    `app/layout.tsx` la aplica con un script inline **antes del primer pintado**.
+    Sin eso se ve un flash con el estilo por defecto — antes casi no se notaba,
+    ahora que cambia el fondo entero canta muchísimo.
+  - El color del texto del botón primario (`--on-brand`) es parte del preset:
+    hay paletas donde el texto oscuro no llega al contraste mínimo contra los
+    dos extremos del degradé (el fucsia con violeta daba 3.5 y hubo que abrirlo).
+  - ⚠️ **Los contrastes están medidos, no elegidos a ojo.** Si tocás un color,
+    volvé a medir: texto ≥4.5:1 sobre las tarjetas (incluida la superficie más
+    clara) y el acento ≥3:1. De paso se corrigió `muted`, que en el tema viejo
+    estaba en 3.75 (ilegible) en sus 209 usos.
+  - Se elige desde el panel del dueño (Página pública → Estilo de la app) y
+    desde el Super Admin en cada demo (Demos → Editar → Estilo de la app).
+    El componente es `components/ThemePicker.tsx`, con preview real de cada
+    paleta; se usa en los dos lados.
+  - ⚠️ **Un tema CLARO no entra con este esquema**: hay ~350 usos de `white/10`
+    y `white/5` para bordes y fondos sutiles que asumen base oscura. Habría que
+    tokenizarlos primero.
 - **Design tokens de Tailwind** que ya existen (usarlos, no inventar colores):
   `card`, `btn btn-primary`, `btn btn-ghost`, `input`, `text-ink`, `text-ink-2`,
   `text-muted`, `text-brand`, `text-good`, `text-warn`, `text-crit`, `bg-brand`,

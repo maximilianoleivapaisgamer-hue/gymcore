@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { TOGGLEABLE_SECTIONS, TOGGLEABLE_KEYS } from "@/lib/sections";
+import ThemePicker from "@/components/ThemePicker";
+import { themeOf } from "@/lib/theme";
 import { removeWhiteBackground } from "@/lib/remove-white-bg";
 import { dominantColor } from "@/lib/dominant-color";
 import { STOCK_GYM } from "@/lib/stock-images";
 
-interface DemoGym { id: string; name: string; slug: string; created_at: string | null; demo_suspended?: boolean; }
+interface DemoGym { id: string; name: string; slug: string; created_at: string | null; demo_suspended?: boolean; theme?: string | null; }
 interface ImgData { mediaType: string; data: string; name: string; }
 interface AccInfo { slug: string; name: string; owner: { user: string; url: string }; socio: { name: string; user: string; url: string } | null; }
 interface Metric { count: number; last: string | null; }
@@ -162,6 +164,7 @@ export default function DemosPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [eName, setEName] = useState(""); const [eTag, setETag] = useState(""); const [eDesc, setEDesc] = useState(""); const [eColor, setEColor] = useState("#22d3ee"); const [eDir, setEDir] = useState(""); const [eTipo, setETipo] = useState<"" | "gimnasio" | "personal">("");
+  const [eTheme, setETheme] = useState<string>("celeste");
   // Editar imágenes de una demo ya creada (fondo + galería)
   const [imgId, setImgId] = useState<string | null>(null);
   const [imgHero, setImgHero] = useState<string | null>(null);
@@ -186,7 +189,7 @@ export default function DemosPage() {
   const [result, setResult] = useState<{ slug: string; url: string; owner: { user: string; loginUrl: string }; socio: { name: string; user: string; loginUrl: string } | null } | null>(null);
 
   async function loadDemos() {
-    const { data } = await supabase.from("gyms").select("id, name, slug, created_at, demo_suspended")
+    const { data } = await supabase.from("gyms").select("id, name, slug, created_at, demo_suspended, theme")
       .eq("is_demo", true).order("created_at", { ascending: false });
     setDemos((data as DemoGym[]) || []);
   }
@@ -286,6 +289,7 @@ export default function DemosPage() {
     if (editId === d.id) { setEditId(null); return; }
     setEditId(d.id); setOpenId(null);
     setEName(d.name); setETag(""); setEDesc(""); setEColor("#22d3ee"); setEDir(""); setETipo("");
+    setETheme(themeOf(d.theme).key);
   }
   async function guardarEdit(d: DemoGym) {
     setBusyId(d.id);
@@ -295,9 +299,10 @@ export default function DemosPage() {
       direccion: eDir.trim() || undefined,
       tipo: eTipo || undefined,
       brandColor: /^#[0-9a-fA-F]{6}$/.test(eColor) ? eColor : undefined,
+      theme: eTheme || undefined,
     }).catch(() => null);
     setBusyId(null);
-    if (data?.ok) { setDemos((ds) => ds.map((x) => (x.id === d.id ? { ...x, name: eName || x.name } : x))); setEditId(null); }
+    if (data?.ok) { setDemos((ds) => ds.map((x) => (x.id === d.id ? { ...x, name: eName || x.name, theme: eTheme } : x))); setEditId(null); }
     else alert(data?.error || "No se pudo guardar.");
   }
   async function regenerar(d: DemoGym) {
@@ -982,6 +987,13 @@ export default function DemosPage() {
                           <span className="text-xs text-ink-2">Color:</span>
                           <input type="color" value={eColor} onChange={(e) => setEColor(e.target.value)} className="h-8 w-12 rounded" />
                           <button className="btn btn-primary ml-auto text-xs" onClick={() => guardarEdit(d)} disabled={busyId === d.id}>{busyId === d.id ? "Guardando…" : "Guardar"}</button>
+                        </div>
+                        <div className="border-t border-white/10 pt-2">
+                          <p className="mb-1.5 text-xs font-semibold text-ink-2">Estilo de la app</p>
+                          <ThemePicker value={eTheme} onChange={setETheme} compact />
+                          <p className="mt-1 text-[11px] text-muted">
+                            Pinta el panel del dueño y la app del socio. Elegí el que pegue con el rubro antes de mostrar la demo.
+                          </p>
                         </div>
                         <p className="text-[11px] text-muted">Para editar todo (secciones, fotos, planes) entrá con el login del dueño (botón Accesos) → Configurar página.</p>
                       </div>

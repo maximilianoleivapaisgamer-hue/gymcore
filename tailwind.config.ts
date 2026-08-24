@@ -6,19 +6,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: "#0a0d12",
-        surface: "#12161d",
-        "surface-2": "#171c25",
-        "surface-3": "#1d2431",
+        /* Toda la paleta base es variable: la reescribe ThemeApply según el
+           estilo elegido (ver lib/theme.ts). Así cambiar de estilo repinta la
+           app entera sin tocar los ~830 usos de estas clases. */
+        bg: "rgb(var(--bg-rgb) / <alpha-value>)",
+        surface: "rgb(var(--surface-rgb) / <alpha-value>)",
+        "surface-2": "rgb(var(--surface-2-rgb) / <alpha-value>)",
+        "surface-3": "rgb(var(--surface-3-rgb) / <alpha-value>)",
         brand: "rgb(var(--brand-rgb) / <alpha-value>)",
         "brand-2": "rgb(var(--brand-2-rgb) / <alpha-value>)",
+        ink: "rgb(var(--ink-rgb) / <alpha-value>)",
+        "ink-2": "rgb(var(--ink-2-rgb) / <alpha-value>)",
+        muted: "rgb(var(--muted-rgb) / <alpha-value>)",
+        /* Los de estado no cambian con el estilo: rojo es rojo en los cinco. */
         indigo: "#818cf8",
         good: "#22c55e",
         warn: "#f5b13d",
         crit: "#f05252",
-        ink: "#f4f6f8",
-        "ink-2": "#9aa3b2",
-        muted: "#6b7280",
       },
       borderRadius: { xl: "16px" },
       fontFamily: {

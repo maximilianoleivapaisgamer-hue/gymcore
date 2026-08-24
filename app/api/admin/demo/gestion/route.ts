@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { THEMES, BG_STYLES } from "@/lib/theme";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient as createServer } from "@/lib/supabase-server";
 import { generateDemoConfig } from "@/lib/ai/demo";
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
     action?: string; gymId?: string; suspended?: boolean;
     name?: string; tagline?: string; descripcion?: string; brandColor?: string; infoLibre?: string;
     direccion?: string; tipo?: string;
+    theme?: string; bgStyle?: string;
     heroUrl?: string; galeria?: { src: string; alt?: string }[];
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido" }, { status: 400 }); }
@@ -58,6 +60,9 @@ export async function POST(req: Request) {
     if (typeof body.tagline === "string") patch.tagline = body.tagline;
     if (typeof body.descripcion === "string") patch.description = body.descripcion;
     if (/^#[0-9a-fA-F]{6}$/.test(body.brandColor || "")) patch.accent_color = body.brandColor;
+    // Estilo de la app (panel del dueño + app del socio). Solo claves válidas.
+    if (typeof body.theme === "string" && THEMES.some((t) => t.key === body.theme)) patch.theme = body.theme;
+    if (typeof body.bgStyle === "string" && BG_STYLES.some((b) => b.key === body.bgStyle)) patch.bg_style = body.bgStyle;
     // La dirección se guarda en la columna, que manda sobre la config al resolver
     // la landing (así el texto de la web coincide con el mapa).
     if (typeof body.direccion === "string" && body.direccion.trim()) patch.address = body.direccion.trim();

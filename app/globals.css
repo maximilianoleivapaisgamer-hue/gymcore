@@ -3,14 +3,24 @@
 @tailwind utilities;
 
 :root {
-  /* Color de marca por defecto (celeste). ThemeApply lo sobreescribe por gimnasio. */
+  /* Estilo por defecto (Cian). ThemeApply lo sobreescribe según el estilo que
+     eligió cada negocio. Los valores viven en lib/theme.ts: si tocás uno,
+     tocalo allá, no acá. */
+  --bg-rgb: 10 13 18;
+  --surface-rgb: 18 22 29;
+  --surface-2-rgb: 23 28 37;
+  --surface-3-rgb: 29 36 49;
+  --ink-rgb: 244 246 248;
+  --ink-2-rgb: 154 163 178;
+  --muted-rgb: 134 140 151;
   --brand-rgb: 34 211 238;
   --brand-2-rgb: 59 130 246;
+  --on-brand: #0b0a10;
   --accent: #22d3ee;
 }
 
 html {
-  background: #0a0d12;
+  background: rgb(var(--bg-rgb));
 }
 html,
 body {
@@ -19,7 +29,7 @@ body {
 body {
   /* transparente para dejar ver el fondo (.app-bg) que va detrás */
   background: transparent;
-  color: #f4f6f8;
+  color: rgb(var(--ink-rgb));
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -30,7 +40,9 @@ body {
 }
 .btn-primary {
   background: linear-gradient(135deg, rgb(var(--brand-rgb)), rgb(var(--brand-2-rgb)));
-  color: #04121a;
+  /* Parte del estilo: hay paletas donde el texto oscuro no llega al contraste
+     mínimo contra los dos extremos del degradé. Ver lib/theme.ts. */
+  color: var(--on-brand);
 }
 .btn-ghost {
   @apply bg-surface border border-white/10 text-ink;
@@ -52,7 +64,7 @@ body {
   background-position: right 0.55rem center;
   background-size: 14px;
 }
-.sel option { background-color: #141a24; color: #e6edf3; }
+.sel option { background-color: rgb(var(--surface-2-rgb)); color: rgb(var(--ink-rgb)); }
 
 /* Demostración animada del ejercicio (librería): alterna foto de inicio y fin
    con un fundido gradual (sin zoom) → efecto tipo GIF con fotos de dominio público. */
@@ -70,16 +82,16 @@ body {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  background: #0a0d12;
+  background: rgb(var(--bg-rgb));
 }
 .app-bg-solido {
-  background: radial-gradient(120% 90% at 50% 16%, rgb(var(--brand-rgb) / 0.10), #0a0d12 60%);
+  background: radial-gradient(120% 90% at 50% 16%, rgb(var(--brand-rgb) / 0.10), rgb(var(--bg-rgb)) 60%);
 }
 .app-bg-suave {
-  background: linear-gradient(160deg, rgb(var(--brand-rgb) / 0.16) 0%, #0a0d12 46%, rgb(var(--brand-2-rgb) / 0.16) 100%);
+  background: linear-gradient(160deg, rgb(var(--brand-rgb) / 0.16) 0%, rgb(var(--bg-rgb)) 46%, rgb(var(--brand-2-rgb) / 0.16) 100%);
 }
 .app-bg-aurora {
-  background: radial-gradient(120% 90% at 50% 22%, rgb(var(--brand-2-rgb) / 0.12), #0a0d12 62%);
+  background: radial-gradient(120% 90% at 50% 22%, rgb(var(--brand-2-rgb) / 0.12), rgb(var(--bg-rgb)) 62%);
 }
 .app-bg-aurora::before,
 .app-bg-aurora::after {

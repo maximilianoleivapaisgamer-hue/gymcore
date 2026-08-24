@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import type { Gym } from "@/types/db";
-import { THEMES, BG_STYLES } from "@/lib/theme";
+import { THEMES, BG_STYLES, themeOf } from "@/lib/theme";
+import ThemePicker from "@/components/ThemePicker";
 import ThemeApply from "@/components/ThemeApply";
 import ShareGym from "@/components/ShareGym";
 import {
@@ -155,12 +156,35 @@ export default function ConfiguracionPage() {
         <h1 className="mb-1 text-lg font-bold">Configurá tu página</h1>
         <p className="mb-5 text-xs text-muted">Editá el contenido y mirá el resultado en vivo a la derecha.</p>
 
-        <Section title="Marca y colores">
+        <Section title="Estilo de la app">
+          <p className="mb-2 text-xs text-muted">
+            Cambia los colores de tu panel y de la app que ven tus socios. Elegí el que vaya con tu lugar.
+          </p>
+          <ThemePicker
+            value={theme}
+            onChange={(k) => { setTheme(k); patchMarca({ primary: themeOf(k).hex, secondary: themeOf(k).hex2 }); }}
+          />
+
+          <label className="mb-1 mt-4 block text-xs font-semibold text-ink-2">Fondo del panel</label>
+          <div className="grid grid-cols-3 gap-2">
+            {BG_STYLES.map((b) => (
+              <button key={b.key} type="button" onClick={() => setBgStyle(b.key)}
+                className={`rounded-lg border p-2 text-left transition ${bgStyle === b.key ? "border-brand bg-white/5" : "border-white/10 hover:bg-white/5"}`}>
+                <div className="text-xs font-semibold">{b.label}</div>
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Colores de tu página pública">
+          <p className="mb-2 text-xs text-muted">
+            Los de tu web, que puede tener otros colores que la app. Al elegir un estilo arriba se ajustan solos, pero podés cambiarlos.
+          </p>
           <label className="mb-2 block text-xs font-semibold text-ink-2">Color principal</label>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {THEMES.map((t) => (
               <button key={t.key} type="button" title={t.label}
-                onClick={() => { setTheme(t.key); patchMarca({ primary: t.hex }); }}
+                onClick={() => patchMarca({ primary: t.hex })}
                 className={`h-8 w-8 rounded-full border-2 transition ${cfg.marca.primary.toLowerCase() === t.hex.toLowerCase() ? "scale-110 border-white" : "border-white/20 hover:border-white/50"}`}
                 style={{ background: t.hex }} />
             ))}
@@ -178,15 +202,6 @@ export default function ConfiguracionPage() {
               className={`rounded-lg border p-2 text-xs font-semibold transition ${cfg.marca.dark ? "border-brand bg-white/5 text-brand" : "border-white/10 text-ink-2"}`}>🌙 Oscuro</button>
           </div>
 
-          <label className="mb-1 block text-xs font-semibold text-ink-2">Fondo del panel (interno)</label>
-          <div className="grid grid-cols-3 gap-2">
-            {BG_STYLES.map((b) => (
-              <button key={b.key} type="button" onClick={() => setBgStyle(b.key)}
-                className={`rounded-lg border p-2 text-left transition ${bgStyle === b.key ? "border-brand bg-white/5" : "border-white/10 hover:bg-white/5"}`}>
-                <div className="text-xs font-semibold">{b.label}</div>
-              </button>
-            ))}
-          </div>
         </Section>
 
         <Section title="Logo y fondo">
