@@ -7,6 +7,7 @@ import { BG_STYLES, themeOf } from "@/lib/theme";
 import ThemePicker from "@/components/ThemePicker";
 import ThemeApply from "@/components/ThemeApply";
 import PreviewSocio from "@/components/PreviewSocio";
+import { nuevoVencimiento, fechaCorta, type CobroConfig } from "@/lib/fechas";
 
 /**
  * Configuración del panel: cómo se ve la app y qué secciones se usan.
@@ -26,6 +27,8 @@ export default function AjustesPage() {
   const [theme, setTheme] = useState<string>("celeste");
   const [gym, setGym] = useState<{ name: string | null; logo_url: string | null }>({ name: null, logo_url: null });
   const [bgStyle, setBgStyle] = useState<string>("aurora");
+  /** Cómo cobra el negocio: aniversario o día fijo, y el recargo por atraso. */
+  const [cobro, setCobro] = useState<CobroConfig>({ cobro_modo: "aniversario", cobro_dia: 10, recargo_tipo: null, recargo_valor: null });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -48,6 +51,13 @@ export default function AjustesPage() {
           setHiddenMember(data.hidden_member_sections || []);
           setTheme(themeOf(data.theme).key);
           setBgStyle(data.bg_style || "aurora");
+          const d = data as unknown as CobroConfig;
+          setCobro({
+            cobro_modo: d.cobro_modo || "aniversario",
+            cobro_dia: Number(d.cobro_dia) || 10,
+            recargo_tipo: d.recargo_tipo || null,
+            recargo_valor: d.recargo_valor != null ? Number(d.recargo_valor) : null,
+          });
         }
       }
       setLoading(false);
@@ -73,7 +83,13 @@ export default function AjustesPage() {
     const clean = Array.from(new Set(hidden.filter((k) => TOGGLEABLE_KEYS.includes(k))));
     const cleanMember = Array.from(new Set(hiddenMember.filter((k) => MEMBER_KEYS.includes(k))));
     const { error } = await supabase.from("gyms")
-      .update({ hidden_sections: clean, hidden_member_sections: cleanMember, theme, bg_style: bgStyle })
+      .update({
+        hidden_sections: clean, hidden_member_sections: cleanMember, theme, bg_style: bgStyle,
+        cobro_modo: cobro.cobro_modo || "aniversario",
+        cobro_dia: Math.min(28, Math.max(1, Number(cobro.cobro_dia) || 10)),
+        recargo_tipo: cobro.recargo_tipo || null,
+        recargo_valor: cobro.recargo_tipo ? (Number(cobro.recargo_valor) || 0) : null,
+      })
       .eq("id", gymId);
     setSaving(false);
     if (error) { setErr("No se pudo guardar. Probá de nuevo."); return; }
@@ -118,6 +134,70 @@ export default function AjustesPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ── Cobros ─────────────────────────────────────────────────────────── */}
+      <h2 className="mb-1 mt-8 text-sm font-semibold text-ink">Cobros</h2>
+      <p className="mb-3 text-xs text-ink-2">Cuándo le vence la cuota a tus socios cuando les cobrás.</p>
+      <div className="card space-y-4">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {([
+            ["aniversario", "Un mes desde que paga", "Cada socio tiene su fecha. Paga el 20 → le vence el 20 del mes que viene."],
+            ["dia_fijo", "Todos el mismo día", "Como “las cuotas se pagan del 1 al 10”. A todos les vence el mismo día del mes."],
+          ] as const).map(([k, titulo, desc]) => (
+            <button key={k} type="button"
+              onClick={() => { limpiar(); setCobro((c) => ({ ...c, cobro_modo: k })); }}
+              className={`rounded-lg border p-3 text-left transition ${
+                (cobro.cobro_modo || "aniversario") === k ? "border-brand bg-[rgba(34,211,238,.07)]" : "border-white/10 hover:border-white/20"
+              }`}>
+              <div className={`text-sm font-semibold ${(cobro.cobro_modo || "aniversario") === k ? "text-brand" : "text-ink"}`}>{titulo}</div>
+              <p className="mt-0.5 text-[11px] leading-snug text-muted">{desc}</p>
+            </button>
+          ))}
+        </div>
+
+        {cobro.cobro_modo === "dia_fijo" && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+            <span className="text-xs text-ink-2">Vencen el día</span>
+            <input type="number" min={1} max={28} className="input w-20"
+              value={cobro.cobro_dia ?? 10}
+              onChange={(e) => { limpiar(); setCobro((c) => ({ ...c, cobro_dia: Number(e.target.value) || 10 })); }} />
+            <span className="text-xs text-ink-2">de cada mes</span>
+          </div>
+        )}
+
+        <div className="border-t border-white/10 pt-3">
+          <div className="mb-2 text-xs font-semibold text-ink-2">Recargo por pagar tarde</div>
+          <div className="flex flex-wrap gap-2">
+            {([
+              [null, "Sin recargo"],
+              ["monto", "$ fijo"],
+              ["porcentaje", "% de la cuota"],
+            ] as const).map(([k, label]) => (
+              <button key={String(k)} type="button"
+                onClick={() => { limpiar(); setCobro((c) => ({ ...c, recargo_tipo: k })); }}
+                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  (cobro.recargo_tipo ?? null) === k ? "border-brand/40 bg-[rgba(34,211,238,.12)] text-brand" : "border-white/10 text-ink-2 hover:text-ink"
+                }`}>{label}</button>
+            ))}
+            {cobro.recargo_tipo && (
+              <input type="number" min={0} className="input w-28"
+                placeholder={cobro.recargo_tipo === "porcentaje" ? "Ej: 10" : "Ej: 5000"}
+                value={cobro.recargo_valor ?? ""}
+                onChange={(e) => { limpiar(); setCobro((c) => ({ ...c, recargo_valor: e.target.value === "" ? null : Number(e.target.value) })); }} />
+            )}
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted">
+            {cobro.recargo_tipo
+              ? "Al cobrarle a un socio atrasado, la pantalla te propone el monto con el recargo sumado. Siempre lo podés cambiar: no se cobra solo."
+              : "Si algún socio paga tarde, le cobrás lo mismo de siempre."}
+          </p>
+        </div>
+
+        <p className="border-t border-white/10 pt-3 text-[11px] text-muted">
+          Ejemplo: a un socio que hoy está vencido, al cobrarle le va a quedar el{" "}
+          <b className="text-ink-2">{fechaCorta(nuevoVencimiento("2000-01-01", cobro))}</b>.
+        </p>
       </div>
 
       {/* ── Secciones del panel ────────────────────────────────────────────── */}

@@ -80,7 +80,7 @@ localmente de verdad hay que poner los valores reales en `.env.local`
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **040**.
+La numeración siguiente arranca en **042**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -191,6 +191,28 @@ Mi plan, **Mi cuenta**.
     previsualizarse con sus colores.
 - **Mi cuenta** (`app/dashboard/cuenta`): cambiar usuario/contraseña + subir el
   **ícono de la app** (`gyms.app_icon_url`) para la PWA del socio.
+
+### Cobros: cuándo vence la cuota y recargo por atraso
+Cada negocio elige **cómo cobra**, desde Configuración → Cobros
+(`gyms.cobro_modo`, `cobro_dia`, `recargo_tipo`, `recargo_valor`, `migration_041`).
+
+- **`aniversario`** (default, el de gimnasio): al cobrar suma un mes al
+  vencimiento del socio. Cada uno tiene su fecha. Si ya venció, cuenta desde hoy.
+- **`dia_fijo`** (estudios que cobran "del 1 al 10"): a todos les vence el mismo
+  día del mes. Si está al día, el mismo día del mes siguiente. Si venció, la
+  próxima vez que caiga ese día — así al que paga muy tarde **no se le regala un
+  mes**.
+- **Recargo por atraso**: `null` (ninguno), `monto` (pesos) o `porcentaje`. Se
+  **sugiere** al cobrarle a un socio atrasado, sumándolo al monto; el dueño lo
+  puede pisar. Nunca se cobra solo.
+- Todo vive en `lib/fechas.ts` (`nuevoVencimiento`, `recargoDe`, `estaAtrasado`)
+  para que Finanzas y la ficha del socio calculen igual.
+
+> ⚠️ **Cobrar TIENE que renovar el vencimiento.** Durante un tiempo registrar un
+> pago solo insertaba el movimiento en `cashflow_entries` y `membership_expiry`
+> quedaba igual: el dueño cobraba, veía la plata, y al socio le seguía figurando
+> "Vencido". Una clienta llegó a cargar el pago dos veces por eso. Si tocás un
+> flujo de cobro, asegurate de que corra la fecha.
 
 ### Tope de clases por plan
 Cada plan de socio (`gyms.real_plans`) puede tener `class_limit`: cuántas clases

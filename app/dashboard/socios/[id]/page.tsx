@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { nuevoVencimiento, fechaCorta, hoyISO } from "@/lib/fechas";
+import { nuevoVencimiento, fechaCorta, hoyISO, recargoDe, type CobroConfig } from "@/lib/fechas";
 import { PAY_METHODS, type PayMethod, type RealPlan } from "@/types/db";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
 
@@ -40,6 +40,7 @@ export default function SocioDetallePage() {
   const [cobroMonto, setCobroMonto] = useState("");
   const [cobroMedio, setCobroMedio] = useState("efectivo");
   const [cobrando, setCobrando] = useState(false);
+  const [cobroCfg, setCobroCfg] = useState<CobroConfig | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [diets, setDiets] = useState<Diet[]>([]);
@@ -69,12 +70,16 @@ export default function SocioDetallePage() {
     setRoutines((rout as Routine[]) || []);
     setDiets((diet as Diet[]) || []);
     if (m?.gym_id) {
-      const [{ data: sub }, { data: gym }] = await Promise.all([
+      const [{ data: sub }, { data: gym }, { data: cfg }] = await Promise.all([
         supabase.from("subscriptions").select("plan").eq("gym_id", m.gym_id).maybeSingle<{ plan: string }>(),
         supabase.from("gyms").select("real_plans").eq("id", m.gym_id).maybeSingle<{ real_plans: RealPlan[] }>(),
+        // Cómo cobra el negocio. Best-effort: sin migration_041 quedan los defaults.
+        supabase.from("gyms").select("cobro_modo, cobro_dia, recargo_tipo, recargo_valor")
+          .eq("id", m.gym_id).maybeSingle(),
       ]);
       setIsElite(allows(await loadPlans(supabase), sub?.plan, "dietas", await loadGymExtras(supabase, m.gym_id))); // Dieta: según el plan + bonificadas
       setGymPlans(gym?.real_plans || []);
+      setCobroCfg((cfg as CobroConfig) || null);
     }
     setLoading(false);
   }
@@ -120,7 +125,9 @@ export default function SocioDetallePage() {
 
   function abrirCobro() {
     if (!member) return;
-    setCobroMonto(member.plan_price != null ? String(member.plan_price) : "");
+    const base = Number(member.plan_price) || 0;
+    const rec = recargoDe(base, cobroCfg, member.membership_expiry);
+    setCobroMonto(base ? String(base + rec) : "");
     setCobroMedio("efectivo");
     setCobroModal(true);
   }
@@ -131,7 +138,7 @@ export default function SocioDetallePage() {
     if (!member) return;
     setCobrando(true);
     const monto = Number(cobroMonto) || 0;
-    const hasta = nuevoVencimiento(member.membership_expiry);
+    const hasta = nuevoVencimiento(member.membership_expiry, cobroCfg);
     if (monto > 0) {
       await supabase.from("cashflow_entries").insert({
         gym_id: member.gym_id,
@@ -303,7 +310,8 @@ export default function SocioDetallePage() {
       {/* MODAL: CAMBIAR PLAN */}
       {/* Cobrar la cuota: registra el pago y corre el vencimiento de una vez. */}
       {cobroModal && member && (() => {
-        const hasta = nuevoVencimiento(member.membership_expiry);
+        const hasta = nuevoVencimiento(member.membership_expiry, cobroCfg);
+        const rec = recargoDe(Number(member.plan_price) || 0, cobroCfg, member.membership_expiry);
         return (
           <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setCobroModal(false)}>
             <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
@@ -329,6 +337,9 @@ export default function SocioDetallePage() {
                   </select>
                 </div>
               </div>
+              {rec > 0 && (
+                <p className="mt-1.5 text-[11px] text-warn">⚠ Está atrasado: se le sumó un recargo de ${rec.toLocaleString("es-AR")}. Podés cambiar el monto.</p>
+              )}
               <p className="mt-1.5 text-[11px] text-muted">Si ponés 0 no se registra el movimiento en la caja, pero igual se renueva el vencimiento.</p>
 
               <div className="mt-4 flex gap-2">

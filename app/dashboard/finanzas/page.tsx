@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { nuevoVencimiento, fechaCorta } from "@/lib/fechas";
+import { nuevoVencimiento, fechaCorta, recargoDe, estaAtrasado, type CobroConfig } from "@/lib/fechas";
 import { PAY_METHODS, type PayMethod } from "@/types/db";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 
@@ -93,14 +93,18 @@ export default function FinanzasPage() {
     let q6 = supabase.from("cashflow_entries").select("date, type, amount")
       .gte("date", c6Iso).lt("date", nextMonthStart(y, m));
     if (activeSede) { qMonth = qMonth.eq("sede_id", activeSede); q6 = q6.eq("sede_id", activeSede); }
-    const [{ data: ent }, { data: mem }, { data: cf6 }] = await Promise.all([
+    const [{ data: ent }, { data: mem }, { data: cf6 }, { data: cfg }] = await Promise.all([
       qMonth.order("date", { ascending: false }),
       supabase.from("members").select("id, full_name, plan_price, membership_expiry").order("full_name"),
       q6,
+      // Best-effort: si todavía no se corrió migration_041, quedan los defaults.
+      supabase.from("gyms").select("cobro_modo, cobro_dia, recargo_tipo, recargo_valor")
+        .eq("id", profile?.gym_id ?? "").maybeSingle(),
     ]);
     setEntries((ent as Entry[]) || []);
     setMembers((mem as Member[]) || []);
     setCash6((cf6 as { date: string; type: "income" | "expense"; amount: number }[]) || []);
+    setCobroCfg((cfg as CobroConfig) || null);
     setLoading(false);
   }
   useEffect(() => { load(cur.y, cur.m); /* eslint-disable-next-line */ }, [cur.y, cur.m]);
@@ -163,6 +167,8 @@ export default function FinanzasPage() {
 
   /** Si al cobrar hay que correrle el vencimiento al socio. */
   const [renovar, setRenovar] = useState(true);
+  /** Cómo cobra el negocio (Configuración → Cobros). */
+  const [cobroCfg, setCobroCfg] = useState<CobroConfig | null>(null);
 
   const setF = (k: keyof ReturnType<typeof emptyForm>, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -176,7 +182,7 @@ export default function FinanzasPage() {
       ...f,
       member_id: id,
       concept: m ? `Cuota — ${m.full_name}` : f.concept,
-      amount: m?.plan_price ? String(m.plan_price) : f.amount,
+      amount: m?.plan_price ? String(Number(m.plan_price) + recargoDe(Number(m.plan_price), cobroCfg, m.membership_expiry)) : f.amount,
     }));
     setRenovar(!!id);
   }
@@ -199,7 +205,7 @@ export default function FinanzasPage() {
     // figurando "Vencido" — que es exactamente lo que pasaba antes.
     if (!error && renovar && form.member_id && form.type === "income") {
       const m = members.find((x) => x.id === form.member_id);
-      const hasta = nuevoVencimiento(m?.membership_expiry);
+      const hasta = nuevoVencimiento(m?.membership_expiry, cobroCfg);
       await supabase.from("members").update({ membership_expiry: hasta }).eq("id", form.member_id);
       setMembers((ms) => ms.map((x) => (x.id === form.member_id ? { ...x, membership_expiry: hasta } : x)));
     }
@@ -414,7 +420,8 @@ export default function FinanzasPage() {
               </div>
               {form.type === "income" && form.member_id && (() => {
                 const m = members.find((x) => x.id === form.member_id);
-                const hasta = nuevoVencimiento(m?.membership_expiry);
+                const hasta = nuevoVencimiento(m?.membership_expiry, cobroCfg);
+                const rec = recargoDe(Number(m?.plan_price) || 0, cobroCfg, m?.membership_expiry);
                 return (
                   <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
                     <input type="checkbox" className="mt-0.5" checked={renovar} onChange={(e) => setRenovar(e.target.checked)} />
@@ -425,6 +432,11 @@ export default function FinanzasPage() {
                           ? <>Le vence el <b className="text-ink">{fechaCorta(hasta)}</b> y deja de figurar como vencido.</>
                           : <>Solo se registra la plata; el vencimiento queda como está.</>}
                       </span>
+                      {rec > 0 && (
+                        <span className="mt-1 block text-xs text-warn">
+                          ⚠ Está atrasado: al monto se le sumó un recargo de ${rec.toLocaleString("es-AR")}. Podés cambiarlo arriba.
+                        </span>
+                      )}
                     </span>
                   </label>
                 );
