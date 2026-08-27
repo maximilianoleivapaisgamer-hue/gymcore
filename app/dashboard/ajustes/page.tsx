@@ -29,6 +29,8 @@ export default function AjustesPage() {
   const [bgStyle, setBgStyle] = useState<string>("aurora");
   /** Cómo cobra el negocio: aniversario o día fijo, y el recargo por atraso. */
   const [cobro, setCobro] = useState<CobroConfig>({ cobro_modo: "aniversario", cobro_dia: 10, recargo_tipo: null, recargo_valor: null });
+  /** Venta de clases sueltas: si las vende y a cuanto. */
+  const [clase, setClase] = useState<{ activa: boolean; precio: number | null }>({ activa: false, precio: null });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -52,6 +54,8 @@ export default function AjustesPage() {
           setTheme(themeOf(data.theme).key);
           setBgStyle(data.bg_style || "aurora");
           const d = data as unknown as CobroConfig;
+          const c = data as unknown as { clase_suelta_activa?: boolean; clase_suelta_precio?: number | null };
+          setClase({ activa: !!c.clase_suelta_activa, precio: c.clase_suelta_precio != null ? Number(c.clase_suelta_precio) : null });
           setCobro({
             cobro_modo: d.cobro_modo || "aniversario",
             cobro_dia: Number(d.cobro_dia) || 10,
@@ -89,6 +93,8 @@ export default function AjustesPage() {
         cobro_dia: Math.min(28, Math.max(1, Number(cobro.cobro_dia) || 10)),
         recargo_tipo: cobro.recargo_tipo || null,
         recargo_valor: cobro.recargo_tipo ? (Number(cobro.recargo_valor) || 0) : null,
+        clase_suelta_activa: clase.activa,
+        clase_suelta_precio: clase.activa ? (Number(clase.precio) || 0) : null,
       })
       .eq("id", gymId);
     setSaving(false);
@@ -192,6 +198,29 @@ export default function AjustesPage() {
               ? "Al cobrarle a un socio atrasado, la pantalla te propone el monto con el recargo sumado. Siempre lo podés cambiar: no se cobra solo."
               : "Si algún socio paga tarde, le cobrás lo mismo de siempre."}
           </p>
+        </div>
+
+        <div className="border-t border-white/10 pt-3">
+          <label className="flex cursor-pointer items-start gap-2">
+            <input type="checkbox" className="mt-0.5" checked={clase.activa}
+              onChange={(e) => { limpiar(); setClase((c) => ({ ...c, activa: e.target.checked })); }} />
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-ink">Vender clases sueltas</span>
+              <span className="block text-[11px] text-muted">
+                Para el que quiere probar, o el socio que ya usó las de su plan y quiere una más.
+                Aparece un botón en la ficha de cada socio.
+              </span>
+            </span>
+          </label>
+          {clase.activa && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 pl-6">
+              <span className="text-xs text-ink-2">Precio sugerido $</span>
+              <input type="number" min={0} className="input w-28" placeholder="Ej: 8000"
+                value={clase.precio ?? ""}
+                onChange={(e) => { limpiar(); setClase((c) => ({ ...c, precio: e.target.value === "" ? null : Number(e.target.value) })); }} />
+              <span className="text-[11px] text-muted">Al venderla te lo trae puesto, pero lo podés cambiar.</span>
+            </div>
+          )}
         </div>
 
         <p className="border-t border-white/10 pt-3 text-[11px] text-muted">

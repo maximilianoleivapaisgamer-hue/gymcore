@@ -89,7 +89,9 @@ export default function DashboardHome() {
       const now = new Date();
       const start6 = iso(new Date(now.getFullYear(), now.getMonth() - 5, 1));
       let qCash = supabase.from("cashflow_entries").select("date, type, amount").gte("date", start6);
-      if (activeSede) qCash = qCash.eq("sede_id", activeSede);
+      // Incluimos los que no tienen sucursal: si alguno se guardó sin sede,
+      // mejor que se vea a que la plata desaparezca del panel.
+      if (activeSede) qCash = qCash.or(`sede_id.eq.${activeSede},sede_id.is.null`);
       // Asistencias de hoy (control de acceso) de la sucursal activa.
       const startDay = new Date(); startDay.setHours(0, 0, 0, 0);
       let qAtt = supabase.from("attendances").select("id", { count: "exact", head: true })

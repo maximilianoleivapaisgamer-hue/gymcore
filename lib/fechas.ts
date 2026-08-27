@@ -105,3 +105,32 @@ export function fechaCorta(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
+
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+               "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+/** "2026-09" → "Septiembre 2026" */
+export function nombreMes(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return `${MESES[(m - 1 + 12) % 12]} ${y}`;
+}
+
+/** Meses para elegir a cuál corresponde la cuota: unos atrás y unos adelante. */
+export function mesesOpciones(centro: string, atras = 6, adelante = 3): { value: string; label: string }[] {
+  const base = `${centro.slice(0, 7)}-01`;
+  const out: { value: string; label: string }[] = [];
+  for (let i = -atras; i <= adelante; i++) {
+    const ym = sumarMeses(base, i).slice(0, 7);
+    out.push({ value: ym, label: nombreMes(ym) });
+  }
+  return out;
+}
+
+/**
+ * A qué mes corresponde la cuota que se está cobrando.
+ * Es el mes que va a quedar cubierto: si al pagar le queda vencimiento
+ * 10/10, está pagando SEPTIEMBRE (el mes que corre hasta ese vencimiento).
+ */
+export function mesQueCubre(nuevoVenc: string): string {
+  return sumarMeses(`${nuevoVenc.slice(0, 7)}-01`, -1).slice(0, 7);
+}

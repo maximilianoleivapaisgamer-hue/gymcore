@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { resolveActiveSede, type Sede } from "@/lib/sede";
 import { WA_TARGET, abrirWhatsapp } from "@/lib/wa-link";
 import { type RealPlan } from "@/types/db";
 import DatePicker from "@/components/DatePicker";
@@ -64,6 +65,8 @@ function statusOf(expiry: string | null): { label: string; cls: string } {
 export default function SociosPage() {
   const supabase = createClient();
   const [gymId, setGymId] = useState<string | null>(null);
+  /** Sucursal activa: sin esto el cobro del alta no aparece en el dashboard. */
+  const [sedeId, setSedeId] = useState<string | null>(null);
   const [gymSlug, setGymSlug] = useState<string | null>(null);
   const [plans, setPlans] = useState<RealPlan[]>([]);
   const [welcome, setWelcome] = useState<{ name: string; whatsapp: string | null; planName: string | null; planPrice: number | null } | null>(null);
@@ -97,6 +100,10 @@ export default function SociosPage() {
         .from("gyms").select("real_plans, slug").eq("id", profile.gym_id)
         .single<{ real_plans: RealPlan[]; slug: string }>();
       setPlans(gym?.real_plans || []);
+      const { data: sedes } = await supabase.from("sedes")
+        .select("id, gym_id, name, address, created_at")
+        .eq("gym_id", profile.gym_id).order("created_at", { ascending: true });
+      setSedeId(resolveActiveSede(profile.gym_id, ((sedes as Sede[]) || [])));
       setGymSlug(gym?.slug || null);
     }
     const { data } = await supabase
@@ -173,6 +180,9 @@ export default function SociosPage() {
     if (charge && price && price > 0) {
       await supabase.from("cashflow_entries").insert({
         gym_id: gymId,
+        // Sin sucursal el movimiento no aparece en el dashboard ni en Finanzas:
+        // las dos pantallas filtran por sede. Ya pasó una vez.
+        sede_id: sedeId,
         member_id: memberId,
         type: "income",
         amount: price,

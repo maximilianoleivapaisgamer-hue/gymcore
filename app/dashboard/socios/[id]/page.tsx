@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { nuevoVencimiento, fechaCorta, hoyISO, recargoDe, type CobroConfig } from "@/lib/fechas";
+import { resolveActiveSede, type Sede } from "@/lib/sede";
+import { nuevoVencimiento, fechaCorta, hoyISO, recargoDe, mesesOpciones, mesQueCubre, nombreMes, type CobroConfig } from "@/lib/fechas";
 import { PAY_METHODS, type PayMethod, type RealPlan } from "@/types/db";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
 
@@ -41,6 +42,17 @@ export default function SocioDetallePage() {
   const [cobroMedio, setCobroMedio] = useState("efectivo");
   const [cobrando, setCobrando] = useState(false);
   const [cobroCfg, setCobroCfg] = useState<CobroConfig | null>(null);
+  /** Sucursal activa: sin esto el cobro no aparece en el dashboard. */
+  const [sedeId, setSedeId] = useState<string | null>(null);
+  /** A que mes corresponde la cuota que se esta cobrando. */
+  const [cobroMes, setCobroMes] = useState("");
+  // Venta de clase suelta (se prende en Configuracion -> Cobros).
+  const [claseCfg, setClaseCfg] = useState<{ activa: boolean; precio: number | null }>({ activa: false, precio: null });
+  const [claseModal, setClaseModal] = useState(false);
+  const [claseMonto, setClaseMonto] = useState("");
+  const [claseMedio, setClaseMedio] = useState("efectivo");
+  const [claseNota, setClaseNota] = useState("");
+  const [vendiendo, setVendiendo] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [diets, setDiets] = useState<Diet[]>([]);
@@ -70,16 +82,21 @@ export default function SocioDetallePage() {
     setRoutines((rout as Routine[]) || []);
     setDiets((diet as Diet[]) || []);
     if (m?.gym_id) {
-      const [{ data: sub }, { data: gym }, { data: cfg }] = await Promise.all([
+      const [{ data: sub }, { data: gym }, { data: cfg }, { data: sedes }] = await Promise.all([
         supabase.from("subscriptions").select("plan").eq("gym_id", m.gym_id).maybeSingle<{ plan: string }>(),
         supabase.from("gyms").select("real_plans").eq("id", m.gym_id).maybeSingle<{ real_plans: RealPlan[] }>(),
         // Cómo cobra el negocio. Best-effort: sin migration_041 quedan los defaults.
-        supabase.from("gyms").select("cobro_modo, cobro_dia, recargo_tipo, recargo_valor")
+        supabase.from("gyms").select("cobro_modo, cobro_dia, recargo_tipo, recargo_valor, clase_suelta_activa, clase_suelta_precio")
           .eq("id", m.gym_id).maybeSingle(),
+        supabase.from("sedes").select("id, gym_id, name, address, created_at")
+          .eq("gym_id", m.gym_id).order("created_at", { ascending: true }),
       ]);
+      setSedeId(resolveActiveSede(m.gym_id, ((sedes as Sede[]) || [])));
       setIsElite(allows(await loadPlans(supabase), sub?.plan, "dietas", await loadGymExtras(supabase, m.gym_id))); // Dieta: según el plan + bonificadas
       setGymPlans(gym?.real_plans || []);
       setCobroCfg((cfg as CobroConfig) || null);
+      const cf = cfg as { clase_suelta_activa?: boolean; clase_suelta_precio?: number | null } | null;
+      setClaseCfg({ activa: !!cf?.clase_suelta_activa, precio: cf?.clase_suelta_precio != null ? Number(cf.clase_suelta_precio) : null });
     }
     setLoading(false);
   }
@@ -109,6 +126,7 @@ export default function SocioDetallePage() {
     if (priceDiff > 0) {
       await supabase.from("cashflow_entries").insert({
         gym_id: member.gym_id,
+        sede_id: sedeId,
         member_id: member.id,
         type: "income",
         amount: priceDiff,
@@ -128,6 +146,7 @@ export default function SocioDetallePage() {
     const base = Number(member.plan_price) || 0;
     const rec = recargoDe(base, cobroCfg, member.membership_expiry);
     setCobroMonto(base ? String(base + rec) : "");
+    setCobroMes(mesQueCubre(nuevoVencimiento(member.membership_expiry, cobroCfg)));
     setCobroMedio("efectivo");
     setCobroModal(true);
   }
@@ -142,18 +161,47 @@ export default function SocioDetallePage() {
     if (monto > 0) {
       await supabase.from("cashflow_entries").insert({
         gym_id: member.gym_id,
+        sede_id: sedeId,
         member_id: member.id,
         type: "income",
         amount: monto,
         method: cobroMedio,
         plan_name: member.plan_name || null,
-        concept: `Cuota — ${member.full_name}`,
+        concept: `Cuota ${nombreMes(cobroMes)} — ${member.full_name.trim()}`,
         date: hoyISO(),
       });
     }
     await supabase.from("members").update({ membership_expiry: hasta }).eq("id", member.id);
     setCobrando(false);
     setCobroModal(false);
+    load();
+  }
+
+  function abrirClase() {
+    setClaseMonto(claseCfg.precio != null ? String(claseCfg.precio) : "");
+    setClaseMedio("efectivo"); setClaseNota("");
+    setClaseModal(true);
+  }
+
+  /** Vende una clase suelta. NO le toca el vencimiento: es una clase extra, no
+   *  una cuota. Sirve tanto para el que esta al dia como para el que debe. */
+  async function confirmarClase() {
+    if (!member) return;
+    const monto = Number(claseMonto) || 0;
+    if (monto <= 0) return;
+    setVendiendo(true);
+    await supabase.from("cashflow_entries").insert({
+      gym_id: member.gym_id,
+      sede_id: sedeId,
+      member_id: member.id,
+      type: "income",
+      amount: monto,
+      method: claseMedio,
+      concept: `Clase suelta — ${member.full_name.trim()}${claseNota.trim() ? ` (${claseNota.trim()})` : ""}`,
+      date: hoyISO(),
+    });
+    setVendiendo(false);
+    setClaseModal(false);
     load();
   }
 
@@ -226,6 +274,9 @@ export default function SocioDetallePage() {
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button className="btn btn-primary text-sm" onClick={abrirCobro}>💵 Cobrar cuota</button>
+          {claseCfg.activa && (
+            <button className="btn btn-ghost text-sm" onClick={abrirClase}>🎟️ Vender clase suelta</button>
+          )}
           <Link href="/dashboard/socios" className="btn btn-ghost text-sm">✏️ Editar en Socios</Link>
           <button className="btn btn-ghost text-sm" onClick={openPlanModal}>🔄 Cambiar plan</button>
         </div>
@@ -325,6 +376,14 @@ export default function SocioDetallePage() {
                   : <span className="text-ink-2"> (estaba vencido, se cuenta desde hoy)</span>}
               </div>
 
+              <div className="mb-3">
+                <label className="mb-1 block text-xs text-ink-2">¿A qué mes corresponde?</label>
+                <select className="input" value={cobroMes} onChange={(e) => setCobroMes(e.target.value)}>
+                  {mesesOpciones(hoyISO()).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-muted">Queda anotado en el historial de pagos, para saber qué mes pagó.</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-ink-2">Monto ($)</label>
@@ -352,6 +411,48 @@ export default function SocioDetallePage() {
           </div>
         );
       })()}
+
+      {/* Venta de clase suelta: trae el precio configurado pero se puede pisar. */}
+      {claseModal && member && (
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setClaseModal(false)}>
+          <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-lg font-bold">Vender clase suelta</h3>
+            <p className="mb-4 text-sm text-ink-2">{member.full_name.trim()}</p>
+
+            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-ink-2">
+              Es una clase extra: <b className="text-ink">no le mueve el vencimiento</b>. Sirve igual si está al día o si debe.
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-ink-2">Monto ($)</label>
+                <input className="input" type="number" value={claseMonto} onChange={(e) => setClaseMonto(e.target.value)} placeholder="0" />
+                {claseCfg.precio != null && Number(claseMonto) !== claseCfg.precio && (
+                  <p className="mt-1 text-[11px] text-warn">Distinto al configurado (${claseCfg.precio.toLocaleString("es-AR")}).</p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-ink-2">Medio de pago</label>
+                <select className="input" value={claseMedio} onChange={(e) => setClaseMedio(e.target.value)}>
+                  {PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="mb-1 block text-xs text-ink-2">Aclaración (opcional)</label>
+              <input className="input" value={claseNota} onChange={(e) => setClaseNota(e.target.value)} placeholder="Ej: Zumba del jueves" />
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button className="btn btn-primary flex-1" onClick={confirmarClase} disabled={vendiendo || !(Number(claseMonto) > 0)}>
+                {vendiendo ? "Guardando…" : "Registrar venta"}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setClaseModal(false)} disabled={vendiendo}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {planModal && (
         <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setPlanModal(false)}>

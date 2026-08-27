@@ -92,7 +92,12 @@ export default function FinanzasPage() {
       .gte("date", monthStart(y, m)).lt("date", nextMonthStart(y, m));
     let q6 = supabase.from("cashflow_entries").select("date, type, amount")
       .gte("date", c6Iso).lt("date", nextMonthStart(y, m));
-    if (activeSede) { qMonth = qMonth.eq("sede_id", activeSede); q6 = q6.eq("sede_id", activeSede); }
+    // Incluimos los que no tienen sucursal: si alguno se guardó sin sede,
+    // mejor que se vea a que la plata desaparezca de la caja.
+    if (activeSede) {
+      qMonth = qMonth.or(`sede_id.eq.${activeSede},sede_id.is.null`);
+      q6 = q6.or(`sede_id.eq.${activeSede},sede_id.is.null`);
+    }
     const [{ data: ent }, { data: mem }, { data: cf6 }, { data: cfg }] = await Promise.all([
       qMonth.order("date", { ascending: false }),
       supabase.from("members").select("id, full_name, plan_price, membership_expiry").order("full_name"),

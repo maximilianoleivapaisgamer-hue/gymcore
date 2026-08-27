@@ -80,7 +80,7 @@ localmente de verdad hay que poner los valores reales en `.env.local`
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **042**.
+La numeración siguiente arranca en **043**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -207,6 +207,23 @@ Cada negocio elige **cómo cobra**, desde Configuración → Cobros
   puede pisar. Nunca se cobra solo.
 - Todo vive en `lib/fechas.ts` (`nuevoVencimiento`, `recargoDe`, `estaAtrasado`)
   para que Finanzas y la ficha del socio calculen igual.
+
+- **A qué mes corresponde la cuota**: al cobrar se elige el mes y queda en el
+  concepto ("Cuota Septiembre 2026 — Silvina"), así el historial de pagos dice
+  qué mes se pagó. Por defecto viene el mes que cubre ese pago.
+- **Clases sueltas** (`gyms.clase_suelta_activa`, `clase_suelta_precio`,
+  `migration_042`): se prenden en Configuración → Cobros con un precio sugerido.
+  Aparece "Vender clase suelta" en la ficha del socio; trae el precio puesto
+  pero se puede pisar (no todas valen lo mismo). **No le mueve el vencimiento**:
+  es una clase extra, no una cuota. Sirve igual si el socio está al día o si debe.
+
+> ⚠️ **TODO movimiento de caja necesita `sede_id`.** El dashboard y Finanzas
+> filtran por sucursal, así que un `cashflow_entries` guardado sin sede
+> **no se ve en ninguna de las dos pantallas**: la plata desaparece del panel.
+> Pasó de verdad — 3 cobros de 2 clientes, $140.000 invisibles, porque el alta
+> de socios insertaba sin `sede_id`. Se backfilleó y se arreglaron los 4 inserts.
+> Además las dos lecturas ahora incluyen `sede_id is null`, para que si alguien
+> vuelve a olvidarse la plata se vea igual en vez de desaparecer callada.
 
 > ⚠️ **Cobrar TIENE que renovar el vencimiento.** Durante un tiempo registrar un
 > pago solo insertaba el movimiento en `cashflow_entries` y `membership_expiry`
