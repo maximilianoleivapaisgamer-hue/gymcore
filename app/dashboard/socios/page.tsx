@@ -376,8 +376,8 @@ export default function SociosPage() {
       </div>
 
       {modal && editing && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setModal(false)}>
-          <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setModal(false)}>
+          <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-lg font-bold">
               {editing.id ? `Editar socio${editing.member_number ? ` · N° ${editing.member_number}` : ""}` : "Nuevo socio"}
             </h3>

@@ -95,9 +95,9 @@ export default function AiGenerate({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => !loading && setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/60 p-4" onClick={() => !loading && setOpen(false)}>
           <div
-            className="w-full max-w-lg rounded-2xl border border-white/10 bg-surface p-5 shadow-xl"
+            className="my-auto w-full max-w-lg rounded-2xl border border-white/10 bg-surface p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-1 flex items-center justify-between">

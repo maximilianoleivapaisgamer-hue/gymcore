@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
+import { nuevoVencimiento, fechaCorta, hoyISO } from "@/lib/fechas";
 import { PAY_METHODS, type PayMethod, type RealPlan } from "@/types/db";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
 
@@ -34,6 +35,11 @@ export default function SocioDetallePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const [member, setMember] = useState<Member | null>(null);
+  // Cobrar la cuota desde la ficha: registra el pago y corre el vencimiento.
+  const [cobroModal, setCobroModal] = useState(false);
+  const [cobroMonto, setCobroMonto] = useState("");
+  const [cobroMedio, setCobroMedio] = useState("efectivo");
+  const [cobrando, setCobrando] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [diets, setDiets] = useState<Diet[]>([]);
@@ -112,6 +118,38 @@ export default function SocioDetallePage() {
     load();
   }
 
+  function abrirCobro() {
+    if (!member) return;
+    setCobroMonto(member.plan_price != null ? String(member.plan_price) : "");
+    setCobroMedio("efectivo");
+    setCobroModal(true);
+  }
+
+  /** Registra el pago Y corre el vencimiento. Las dos cosas juntas: si solo se
+   *  registrara la plata, al socio le seguiría figurando "Vencido". */
+  async function confirmarCobro() {
+    if (!member) return;
+    setCobrando(true);
+    const monto = Number(cobroMonto) || 0;
+    const hasta = nuevoVencimiento(member.membership_expiry);
+    if (monto > 0) {
+      await supabase.from("cashflow_entries").insert({
+        gym_id: member.gym_id,
+        member_id: member.id,
+        type: "income",
+        amount: monto,
+        method: cobroMedio,
+        plan_name: member.plan_name || null,
+        concept: `Cuota — ${member.full_name}`,
+        date: hoyISO(),
+      });
+    }
+    await supabase.from("members").update({ membership_expiry: hasta }).eq("id", member.id);
+    setCobrando(false);
+    setCobroModal(false);
+    load();
+  }
+
   if (loading) return <main className="p-8 text-center text-ink-2">Cargando…</main>;
   if (!member) return (
     <main className="mx-auto max-w-3xl px-6 py-8 text-center">
@@ -180,6 +218,7 @@ export default function SocioDetallePage() {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
+          <button className="btn btn-primary text-sm" onClick={abrirCobro}>💵 Cobrar cuota</button>
           <Link href="/dashboard/socios" className="btn btn-ghost text-sm">✏️ Editar en Socios</Link>
           <button className="btn btn-ghost text-sm" onClick={openPlanModal}>🔄 Cambiar plan</button>
         </div>
@@ -262,9 +301,50 @@ export default function SocioDetallePage() {
       )}
 
       {/* MODAL: CAMBIAR PLAN */}
+      {/* Cobrar la cuota: registra el pago y corre el vencimiento de una vez. */}
+      {cobroModal && member && (() => {
+        const hasta = nuevoVencimiento(member.membership_expiry);
+        return (
+          <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setCobroModal(false)}>
+            <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-1 text-lg font-bold">Cobrar cuota</h3>
+              <p className="mb-4 text-sm text-ink-2">{member.full_name}{member.plan_name ? ` · ${member.plan_name.trim()}` : ""}</p>
+
+              <div className="mb-3 rounded-lg border border-good/30 bg-[rgba(34,197,94,.08)] px-3 py-2 text-sm text-good">
+                Le va a vencer el <b>{fechaCorta(hasta)}</b>
+                {member.membership_expiry && member.membership_expiry > hoyISO()
+                  ? <span className="text-ink-2"> (se le suma un mes a lo que ya tenía)</span>
+                  : <span className="text-ink-2"> (estaba vencido, se cuenta desde hoy)</span>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-ink-2">Monto ($)</label>
+                  <input className="input" type="number" value={cobroMonto} onChange={(e) => setCobroMonto(e.target.value)} placeholder="0" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-ink-2">Medio de pago</label>
+                  <select className="input" value={cobroMedio} onChange={(e) => setCobroMedio(e.target.value)}>
+                    {PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <p className="mt-1.5 text-[11px] text-muted">Si ponés 0 no se registra el movimiento en la caja, pero igual se renueva el vencimiento.</p>
+
+              <div className="mt-4 flex gap-2">
+                <button className="btn btn-primary flex-1" onClick={confirmarCobro} disabled={cobrando}>
+                  {cobrando ? "Guardando…" : "Cobrar y renovar"}
+                </button>
+                <button className="btn btn-ghost" onClick={() => setCobroModal(false)} disabled={cobrando}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {planModal && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setPlanModal(false)}>
-          <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setPlanModal(false)}>
+          <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-1 text-lg font-bold">Cambiar plan</h3>
             <p className="mb-4 text-sm text-ink-2">
               Plan actual: <strong>{member.plan_name || "sin plan"}</strong>{member.plan_price ? ` · ${money(member.plan_price)}` : ""}

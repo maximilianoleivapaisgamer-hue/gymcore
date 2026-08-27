@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { nuevoVencimiento, fechaCorta } from "@/lib/fechas";
 import { PAY_METHODS, type PayMethod } from "@/types/db";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 
@@ -160,9 +161,15 @@ export default function FinanzasPage() {
   function prevMonth() { setCur((c) => c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }); }
   function nextMonth() { setCur((c) => c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }); }
 
+  /** Si al cobrar hay que correrle el vencimiento al socio. */
+  const [renovar, setRenovar] = useState(true);
+
   const setF = (k: keyof ReturnType<typeof emptyForm>, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  /** Al elegir un socio damos por hecho que es la cuota: se autocompleta el
+   *  concepto, el monto de su plan y se marca la renovación. Se puede destildar
+   *  (ej: le vendiste una botella y no querés moverle el vencimiento). */
   function pickMember(id: string) {
     const m = members.find((x) => x.id === id);
     setForm((f) => ({
@@ -171,6 +178,7 @@ export default function FinanzasPage() {
       concept: m ? `Cuota — ${m.full_name}` : f.concept,
       amount: m?.plan_price ? String(m.plan_price) : f.amount,
     }));
+    setRenovar(!!id);
   }
 
   async function save() {
@@ -186,9 +194,19 @@ export default function FinanzasPage() {
       method: form.method,
       date: form.date || new Date().toISOString().slice(0, 10),
     });
+    // Cobrar la cuota TIENE que correr el vencimiento del socio. Si no, el
+    // dueño registra el pago, ve la plata en la caja, y al socio le sigue
+    // figurando "Vencido" — que es exactamente lo que pasaba antes.
+    if (!error && renovar && form.member_id && form.type === "income") {
+      const m = members.find((x) => x.id === form.member_id);
+      const hasta = nuevoVencimiento(m?.membership_expiry);
+      await supabase.from("members").update({ membership_expiry: hasta }).eq("id", form.member_id);
+      setMembers((ms) => ms.map((x) => (x.id === form.member_id ? { ...x, membership_expiry: hasta } : x)));
+    }
+
     setSaving(false);
     if (!error) {
-      setModal(false); setForm(emptyForm());
+      setModal(false); setForm(emptyForm()); setRenovar(true);
       // si el movimiento cae en el mes visible, recargar
       load(cur.y, cur.m);
     }
@@ -356,8 +374,8 @@ export default function FinanzasPage() {
       </div>
 
       {modal && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setModal(false)}>
-          <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setModal(false)}>
+          <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-lg font-bold">Nuevo movimiento</h3>
             <div className="mb-4 grid grid-cols-2 gap-2">
               <button
@@ -394,6 +412,24 @@ export default function FinanzasPage() {
                   <input className="input" type="date" value={form.date} onChange={(e) => setF("date", e.target.value)} />
                 </div>
               </div>
+              {form.type === "income" && form.member_id && (() => {
+                const m = members.find((x) => x.id === form.member_id);
+                const hasta = nuevoVencimiento(m?.membership_expiry);
+                return (
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                    <input type="checkbox" className="mt-0.5" checked={renovar} onChange={(e) => setRenovar(e.target.checked)} />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">Renovar la cuota (+1 mes)</span>
+                      <span className="block text-xs text-ink-2">
+                        {renovar
+                          ? <>Le vence el <b className="text-ink">{fechaCorta(hasta)}</b> y deja de figurar como vencido.</>
+                          : <>Solo se registra la plata; el vencimiento queda como está.</>}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })()}
+
               <div>
                 <label className="mb-1 block text-xs text-ink-2">Medio de pago</label>
                 <select className="input" value={form.method} onChange={(e) => setF("method", e.target.value)}>

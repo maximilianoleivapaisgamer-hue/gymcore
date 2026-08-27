@@ -275,8 +275,8 @@ export default function ClasesPage() {
 
       {/* Modal crear/editar clase */}
       {modal && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setModal(false)}>
-          <div className="card w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setModal(false)}>
+          <div className="card my-auto w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-lg font-bold">{form.id ? "Editar clase" : "Nueva clase"}</h3>
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
@@ -341,8 +341,8 @@ export default function ClasesPage() {
 
       {/* Modal reservas */}
       {resFor && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setResFor(null)}>
-          <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setResFor(null)}>
+          <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ backgroundColor: resFor.color || "#22d3ee" }} />
               <h3 className="text-lg font-bold">{resFor.name}</h3>

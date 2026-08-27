@@ -680,8 +680,8 @@ Esto cierra tu sesión de super admin; volvés con el botón "Volver al Super Ad
 
       {/* Modal de accesos del dueño (ver / reiniciar usuario y contraseña) */}
       {accesoGym && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setAccesoGym(null)}>
-          <div className="w-full max-w-md card" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/60 p-4" onClick={() => setAccesoGym(null)}>
+          <div className="my-auto w-full max-w-md card" onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="font-semibold">Accesos · {accesoGym.name}</h3>
               <button onClick={() => setAccesoGym(null)} className="text-muted hover:text-ink" title="Cerrar">✕</button>
@@ -729,8 +729,8 @@ Esto cierra tu sesión de super admin; volvés con el botón "Volver al Super Ad
         const delPlan = planCfg?.capabilities || [];
         const planName = planCfg?.label || PLAN_LABEL[planKey || ""] || "su plan";
         return (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setFeatGym(null)}>
-            <div className="w-full max-w-md card" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/60 p-4" onClick={() => setFeatGym(null)}>
+            <div className="my-auto w-full max-w-md card" onClick={(e) => e.stopPropagation()}>
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="font-semibold">Funciones · {featGym.name}</h3>
                 <button onClick={() => setFeatGym(null)} className="text-muted hover:text-ink" title="Cerrar">✕</button>

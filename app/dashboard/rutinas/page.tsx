@@ -491,8 +491,8 @@ export default function RutinasPage() {
 
       {/* Modal biblioteca de ejercicios */}
       {libOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setLibOpen(false)}>
-          <div className="card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setLibOpen(false)}>
+          <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-1 text-lg font-bold">Tus propios ejercicios</h3>
             <p className="mb-4 text-sm text-ink-2">
               Acá cargás y borrás los tuyos. Los <b>{libCount} de la librería</b> (con demostración) ya aparecen solos al armar rutinas y no se editan desde acá.
@@ -527,8 +527,8 @@ export default function RutinasPage() {
 
       {/* Buscador de ejercicios (para la librería de 800+) */}
       {picking && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-14" onClick={() => setPicking(null)}>
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-bg" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-14" onClick={() => setPicking(null)}>
+          <div className="mb-4 w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-bg" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-white/10 p-3">
               <div className="flex items-center gap-2">
                 {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
@@ -588,8 +588,8 @@ export default function RutinasPage() {
 
       {/* Modal: ver cómo se hace el ejercicio (demostración de la librería) */}
       {demoId && exById[demoId] && (
-        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4" onClick={() => setDemoId(null)}>
-          <div className="card w-full max-w-md overflow-hidden p-0" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setDemoId(null)}>
+          <div className="card my-auto w-full max-w-md overflow-hidden p-0" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-2 border-b border-white/10 p-3">
               <h3 className="truncate text-sm font-bold">{exById[demoId].name}</h3>
               <button className="shrink-0 px-2 text-muted hover:text-ink" onClick={() => setDemoId(null)}>✕</button>
