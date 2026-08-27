@@ -80,7 +80,7 @@ localmente de verdad hay que poner los valores reales en `.env.local`
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **043**.
+La numeración siguiente arranca en **044**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -216,6 +216,14 @@ Cada negocio elige **cómo cobra**, desde Configuración → Cobros
   Aparece "Vender clase suelta" en la ficha del socio; trae el precio puesto
   pero se puede pisar (no todas valen lo mismo). **No le mueve el vencimiento**:
   es una clase extra, no una cuota. Sirve igual si el socio está al día o si debe.
+  - Al venderla se elige si **le suma un cupo** (`members.clases_extra`,
+    `migration_043`) o no. Con cupo, el socio la ve y la reserva desde su app;
+    sin cupo solo se registra la plata (es la clase de hoy, ya está en la puerta).
+  - El cupo extra **se suma al tope del plan** en el trigger, y se pone en cero
+    al renovar la cuota: es para el período que está cursando, no se acumula.
+  - ⚠️ El cupo sube el TOPE, no habilita una actividad que el plan excluye. Si le
+    vendieron una clase de algo que su plan no cubre, la anota el dueño desde
+    Clases (donde puede pasarse).
 
 > ⚠️ **TODO movimiento de caja necesita `sede_id`.** El dashboard y Finanzas
 > filtran por sucursal, así que un `cashflow_entries` guardado sin sede

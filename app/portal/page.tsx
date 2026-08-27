@@ -15,6 +15,8 @@ interface Member {
   id: string; gym_id: string; full_name: string; dni: string | null;
   plan_name: string | null; plan_price: number | null; membership_expiry: string | null;
   height_cm: number | null;
+  /** Cupos extra por clases sueltas que le vendieron. */
+  clases_extra?: number | null;
 }
 interface ExerciseInfo { name: string; image_url: string | null; image_url_end: string | null; instructions: string[] | null; primary_muscles: string[] | null; equipment: string | null; }
 interface RExercise { id: string; day_number: number; block_name: string | null; position: number; sets: string | null; reps: string | null; notes: string | null; exercises: ExerciseInfo | null; }
@@ -91,7 +93,7 @@ export default function PortalPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { window.location.href = "/acceso"; return; }
     const { data: m } = await supabase
-      .from("members").select("id, gym_id, full_name, dni, plan_name, plan_price, membership_expiry, height_cm")
+      .from("members").select("id, gym_id, full_name, dni, plan_name, plan_price, membership_expiry, height_cm, clases_extra")
       .eq("linked_user_id", user.id).maybeSingle<Member>();
     if (!m) { setState("nomember"); return; }
     setMember(m);
@@ -196,8 +198,10 @@ export default function PortalPage() {
    *  Es solo para mostrar: al que frena de verdad es el trigger de la base. */
   async function recalcularCupo(m: Member, planes: RealPlan[] | null) {
     setMiPlan(planDelSocio(planes, m.plan_name));
-    const limite = topeDelPlan(planes, m.plan_name);
-    if (!limite) { setCupo(null); return; }
+    const base = topeDelPlan(planes, m.plan_name);
+    if (!base) { setCupo(null); return; }
+    // Las clases sueltas que le vendieron se suman a las del plan.
+    const limite = base + (Number(m.clases_extra) || 0);
     const { ini, fin } = cicloDe(todayIso(), m.membership_expiry);
     const { count } = await supabase.from("bookings")
       .select("id", { count: "exact", head: true })

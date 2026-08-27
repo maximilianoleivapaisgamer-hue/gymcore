@@ -15,6 +15,8 @@ interface Member {
   plan_name: string | null; plan_price: number | null; membership_expiry: string | null;
   observacion: string | null; reminder_whatsapp: boolean; reminder_email: boolean;
   height_cm: number | null; created_at: string;
+  /** Cupos extra por clases sueltas vendidas (migration_043). */
+  clases_extra?: number | null;
 }
 interface Payment { id: string; date: string; concept: string | null; amount: number; method: PayMethod | null; plan_name: string | null; }
 interface Routine { id: string; name: string | null; is_template: boolean; created_at: string; }
@@ -53,6 +55,8 @@ export default function SocioDetallePage() {
   const [claseMedio, setClaseMedio] = useState("efectivo");
   const [claseNota, setClaseNota] = useState("");
   const [vendiendo, setVendiendo] = useState(false);
+  /** Si la clase vendida le suma un cupo reservable desde su app. */
+  const [claseSumaCupo, setClaseSumaCupo] = useState(true);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [diets, setDiets] = useState<Diet[]>([]);
@@ -171,7 +175,11 @@ export default function SocioDetallePage() {
         date: hoyISO(),
       });
     }
-    await supabase.from("members").update({ membership_expiry: hasta }).eq("id", member.id);
+    // Al renovar arranca un período nuevo: los cupos extra del anterior no se
+    // acumulan (igual que las clases del plan, que tampoco se arrastran).
+    await supabase.from("members")
+      .update({ membership_expiry: hasta, clases_extra: 0 })
+      .eq("id", member.id);
     setCobrando(false);
     setCobroModal(false);
     load();
@@ -180,6 +188,7 @@ export default function SocioDetallePage() {
   function abrirClase() {
     setClaseMonto(claseCfg.precio != null ? String(claseCfg.precio) : "");
     setClaseMedio("efectivo"); setClaseNota("");
+    setClaseSumaCupo(true);
     setClaseModal(true);
   }
 
@@ -197,9 +206,16 @@ export default function SocioDetallePage() {
       type: "income",
       amount: monto,
       method: claseMedio,
-      concept: `Clase suelta — ${member.full_name.trim()}${claseNota.trim() ? ` (${claseNota.trim()})` : ""}`,
+      concept: `Clase suelta — ${member.full_name.trim()}${claseNota.trim() ? ` (${claseNota.trim()})` : ""}${claseSumaCupo ? "" : " · sin cupo"}`,
       date: hoyISO(),
     });
+    // El cupo extra le permite reservarla desde su app. Si es la clase de hoy
+    // y ya está en la puerta, no hace falta: solo se registra la plata.
+    if (claseSumaCupo) {
+      await supabase.from("members")
+        .update({ clases_extra: (Number(member.clases_extra) || 0) + 1 })
+        .eq("id", member.id);
+    }
     setVendiendo(false);
     setClaseModal(false);
     load();
@@ -245,6 +261,11 @@ export default function SocioDetallePage() {
           <div>
             <div className="text-xs uppercase tracking-wide text-muted">Plan</div>
             <div className="mt-0.5">{member.plan_name || "—"} {member.plan_price ? `· ${money(member.plan_price)}` : ""}</div>
+            {(Number(member.clases_extra) || 0) > 0 && (
+              <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-good/30 bg-[rgba(34,197,94,.08)] px-2 py-0.5 text-[11px] font-semibold text-good">
+                +{member.clases_extra} clase{Number(member.clases_extra) === 1 ? "" : "s"} suelta{Number(member.clases_extra) === 1 ? "" : "s"} para reservar
+              </div>
+            )}
           </div>
           <div>
             <div className="text-xs uppercase tracking-wide text-muted">Vencimiento</div>
@@ -437,6 +458,25 @@ export default function SocioDetallePage() {
                   {PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              <div className="text-xs font-semibold text-ink-2">¿Se la sumás a sus cupos?</div>
+              {([
+                [true, "Sí, que la reserve él", "Le queda un cupo extra y la elige desde su app, cuando quiera."],
+                [false, "No, es para hoy", "Solo se registra la plata. Ya está acá, no va a reservar nada por la web."],
+              ] as [boolean, string, string][]).map(([v, titulo, desc]) => (
+                <label key={String(v)}
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 transition ${
+                    claseSumaCupo === v ? "border-brand bg-[rgba(34,211,238,.07)]" : "border-white/10 hover:border-white/20"
+                  }`}>
+                  <input type="radio" className="mt-0.5" checked={claseSumaCupo === v} onChange={() => setClaseSumaCupo(v)} />
+                  <span className="min-w-0">
+                    <span className={`block text-sm font-semibold ${claseSumaCupo === v ? "text-brand" : "text-ink"}`}>{titulo}</span>
+                    <span className="block text-[11px] leading-snug text-muted">{desc}</span>
+                  </span>
+                </label>
+              ))}
             </div>
 
             <div className="mt-3">
