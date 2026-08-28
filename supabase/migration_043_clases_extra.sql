@@ -8,9 +8,9 @@
 --
 -- El contador vive en members.clases_extra y se SUMA al tope del plan.
 --
--- Se pone en cero al renovarle la cuota: la clase extra que compró es para el
--- período que está cursando, no se acumula para siempre. Si no la usa antes de
--- renovar, la pierde — igual que las clases del plan.
+-- ⚠️ NOTA: en la primera versión los cupos se borraban al renovar la cuota.
+-- Se cambió en migration_044: ahora se ACUMULAN hasta que el socio los use.
+-- Si compró una clase suelta y no llegó a usarla, la conserva.
 
 alter table public.members
   add column if not exists clases_extra int not null default 0;

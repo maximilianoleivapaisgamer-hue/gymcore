@@ -175,10 +175,10 @@ export default function SocioDetallePage() {
         date: hoyISO(),
       });
     }
-    // Al renovar arranca un período nuevo: los cupos extra del anterior no se
-    // acumulan (igual que las clases del plan, que tampoco se arrastran).
+    // Los cupos extra NO se tocan al renovar: se acumulan hasta que los use.
+    // Si compró una clase suelta y no llegó a usarla, la conserva.
     await supabase.from("members")
-      .update({ membership_expiry: hasta, clases_extra: 0 })
+      .update({ membership_expiry: hasta })
       .eq("id", member.id);
     setCobrando(false);
     setCobroModal(false);
@@ -463,7 +463,7 @@ export default function SocioDetallePage() {
             <div className="mt-3 space-y-2">
               <div className="text-xs font-semibold text-ink-2">¿Se la sumás a sus cupos?</div>
               {([
-                [true, "Sí, que la reserve él", "Le queda un cupo extra y la elige desde su app, cuando quiera."],
+                [true, "Sí, que la reserve él", "Le queda un cupo extra que no vence: lo usa cuando quiera, aunque le renueves la cuota."],
                 [false, "No, es para hoy", "Solo se registra la plata. Ya está acá, no va a reservar nada por la web."],
               ] as [boolean, string, string][]).map(([v, titulo, desc]) => (
                 <label key={String(v)}

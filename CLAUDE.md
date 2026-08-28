@@ -80,7 +80,7 @@ localmente de verdad hay que poner los valores reales en `.env.local`
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **044**.
+La numeración siguiente arranca en **045**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -219,8 +219,10 @@ Cada negocio elige **cómo cobra**, desde Configuración → Cobros
   - Al venderla se elige si **le suma un cupo** (`members.clases_extra`,
     `migration_043`) o no. Con cupo, el socio la ve y la reserva desde su app;
     sin cupo solo se registra la plata (es la clase de hoy, ya está en la puerta).
-  - El cupo extra **se suma al tope del plan** en el trigger, y se pone en cero
-    al renovar la cuota: es para el período que está cursando, no se acumula.
+  - El cupo extra **se suma al tope del plan** en el trigger y **se acumula**:
+    no se borra al renovar la cuota (`migration_044`). Si compró una clase y no
+    llegó a usarla, la conserva. La primera versión los reseteaba al renovar; se
+    cambió porque el socio perdía algo que ya había pagado.
   - ⚠️ El cupo sube el TOPE, no habilita una actividad que el plan excluye. Si le
     vendieron una clase de algo que su plan no cubre, la anota el dueño desde
     Clases (donde puede pasarse).
