@@ -223,6 +223,9 @@ Cada negocio elige **cómo cobra**, desde Configuración → Cobros
     no se borra al renovar la cuota (`migration_044`). Si compró una clase y no
     llegó a usarla, la conserva. La primera versión los reseteaba al renovar; se
     cambió porque el socio perdía algo que ya había pagado.
+    **No caducan**, y es a propósito (decidido el 2026-08-27). Si algún día se
+    acumulan de más, la ficha los muestra y el dueño decide; no agregar
+    vencimiento sin que lo pidan.
   - ⚠️ El cupo sube el TOPE, no habilita una actividad que el plan excluye. Si le
     vendieron una clase de algo que su plan no cubre, la anota el dueño desde
     Clases (donde puede pasarse).
