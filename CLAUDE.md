@@ -80,7 +80,7 @@ localmente de verdad hay que poner los valores reales en `.env.local`
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **045**.
+La numeración siguiente arranca en **046**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -302,6 +302,11 @@ web pública NO usa la lista de clases cargada a mano: lee **en vivo** la tabla
   estaban duplicados en el panel de Clases.
 - Por defecto viene apagado a propósito: prenderlo le cambiaría la web a un
   cliente que ya la tenía cargada a mano.
+- ⚠️ **La web la mira gente anónima**, así que la tabla necesita lectura pública
+  en RLS. `gyms` ya la tenía; `classes` no, y la grilla llegaba VACÍA sin ningún
+  error visible (`migration_045` la agrega, solo SELECT). Si algún día la web
+  muestra datos de otra tabla, chequeá lo mismo: probá la página **deslogueado**,
+  porque logueado como dueño anda igual y no te enterás.
 
 ### Página pública / landing — `app/(public)/[slug]` y `/g/[slug]`
 Landing white-label por gimnasio: logo, portada, galería, colores/tema, dirección
