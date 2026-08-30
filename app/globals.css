@@ -34,7 +34,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Utilidades del sistema de diseño */
+/* Utilidades del sistema de diseño.
+
+   Van dentro de @layer components A PROPÓSITO: así las utilidades de Tailwind
+   (w-16, p-0, flex-1…) pueden pisarlas, que es lo que uno espera al escribir
+   className="input w-16".
+
+   Sin la capa, estas reglas se emiten DESPUÉS de las utilidades y le ganan a
+   todo con la misma especificidad. `.input` trae width:100% (de @apply w-full),
+   así que anulaba cualquier ancho: en el editor de Clases los campos de Días y
+   Horarios quedaban aplastados a cero y la dueña escribía sin ver lo que
+   tipeaba. Lo mismo pasaba con los `card p-0` y los `sel w-40`. */
+@layer components {
+
 .btn {
   @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 font-semibold text-sm cursor-pointer transition;
 }
@@ -65,6 +77,9 @@ body {
   background-size: 14px;
 }
 .sel option { background-color: rgb(var(--surface-2-rgb)); color: rgb(var(--ink-rgb)); }
+
+}
+/* fin de @layer components */
 
 /* Demostración animada del ejercicio (librería): alterna foto de inicio y fin
    con un fundido gradual (sin zoom) → efecto tipo GIF con fotos de dominio público. */
