@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import type { Gym } from "@/types/db";
 import { resolveLandingConfig } from "@/lib/landing-config";
+import { clasesALanding, type ClaseFila } from "@/lib/clases";
 import LandingSite from "@/components/landing/site/LandingSite";
 import DemoVisitPing from "@/components/DemoVisitPing";
 import "../landing.css";
@@ -60,6 +61,17 @@ export default async function GymLanding({ params }: { params: { slug: string } 
   }
 
   const config = resolveLandingConfig(gym);
+
+  // Si el dueño prendió "sincronizar", la grilla de la web sale de las clases
+  // que ya tiene cargadas en el panel. Se leen EN VIVO (no se copian), así no
+  // hay dos listas que se desincronicen: agrega una clase en el panel y
+  // aparece acá sola.
+  if (config.clases_sync) {
+    const supabase = createClient();
+    const { data: filas } = await supabase
+      .from("classes").select("name, weekdays, start_time, capacity").eq("gym_id", gym.id);
+    config.clases = clasesALanding((filas as ClaseFila[]) || []);
+  }
 
   return (
     <div className={`${inter.variable} ${grotesk.variable}`}>

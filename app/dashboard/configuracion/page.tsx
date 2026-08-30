@@ -18,6 +18,7 @@ import {
 } from "@/lib/landing-config";
 import { Icon, BENEFIT_ICONS } from "@/components/landing/site/Icon";
 import LandingSite from "@/components/landing/site/LandingSite";
+import { clasesALanding, type ClaseFila } from "@/lib/clases";
 import { removeWhiteBackground } from "@/lib/remove-white-bg";
 import "../../(public)/landing.css";
 
@@ -56,6 +57,9 @@ export default function ConfiguracionPage() {
           setSlug(data.slug || "");
           setTheme(data.theme || "celeste");
           setCfg(resolveLandingConfig(data));
+          const { data: filas } = await supabase.from("classes")
+            .select("name, weekdays, start_time, capacity").eq("gym_id", data.id);
+          setClasesPanel(clasesALanding((filas as ClaseFila[]) || []));
         }
       }
       setLoading(false);
@@ -64,6 +68,13 @@ export default function ConfiguracionPage() {
   }, []);
 
   // ---- helpers de edición ----
+  /** Las clases cargadas en el panel, para sincronizarlas con la web. */
+  const [clasesPanel, setClasesPanel] = useState<LandingConfig["clases"]>([]);
+
+  /** Lo que se dibuja en la vista previa: si está sincronizado, con las clases
+   *  reales del panel, para que muestre lo mismo que va a ver la gente. */
+  const cfgPreview: LandingConfig = cfg.clases_sync ? { ...cfg, clases: clasesPanel } : cfg;
+
   const patch = (p: Partial<LandingConfig>) => setCfg((c) => ({ ...c, ...p }));
   const patchMarca = (p: Partial<LandingConfig["marca"]>) => setCfg((c) => ({ ...c, marca: { ...c.marca, ...p } }));
   const patchUbic = (p: Partial<LandingConfig["ubicacion"]>) => setCfg((c) => ({ ...c, ubicacion: { ...c.ubicacion, ...p } }));
@@ -285,6 +296,47 @@ export default function ConfiguracionPage() {
         </Section>
 
         <Section title="Clases" toggle={{ on: cfg.secciones.clases, set: (v) => patchSecc({ clases: v }) }}>
+          {/* Sincronizar con el panel: para no cargar la grilla dos veces. */}
+          <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
+            <input type="checkbox" className="mt-0.5" checked={!!cfg.clases_sync}
+              onChange={(e) => patch({ clases_sync: e.target.checked })} />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">Usar las clases que ya cargué en el panel</span>
+              <span className="block text-[11px] leading-snug text-muted">
+                La web muestra tu grilla de <b className="text-ink-2">Clases</b> y se actualiza sola.
+                Si agregás o sacás una clase allá, acá cambia sin tocar nada.
+              </span>
+            </span>
+          </label>
+
+          {cfg.clases_sync ? (
+            <div>
+              {clasesPanel.length === 0 ? (
+                <p className="rounded-lg border border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)] p-3 text-xs text-[#f5b13d]">
+                  Todavía no tenés clases cargadas en el panel, así que la web no va a mostrar la grilla.
+                  Cargalas en <b>Clases</b> y aparecen acá solas.
+                </p>
+              ) : (
+                <>
+                  <div className="mb-2 text-[11px] text-muted">
+                    Estas son las {clasesPanel.length} clases que se muestran. Se editan en <b className="text-ink-2">Clases</b>.
+                  </div>
+                  <div className="space-y-1">
+                    {clasesPanel.map((c, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs">
+                        <span className="min-w-0 truncate font-semibold">{c.nombre}</span>
+                        <span className="shrink-0 text-muted">
+                          {[c.dias, c.horario].filter(Boolean).join(" · ")}
+                          {c.cupo ? ` · ${c.cupo} cupos` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+          <>
           <div className="mb-2 flex justify-end">
             <button type="button" onClick={addClase} className="rounded-lg border border-white/15 px-2 py-1 text-xs font-semibold hover:bg-white/5">+ Agregar clase</button>
           </div>
@@ -303,6 +355,8 @@ export default function ConfiguracionPage() {
               </div>
             ))}
           </div>
+          </>
+          )}
         </Section>
 
         <Section title="Planes" toggle={{ on: cfg.secciones.planes, set: (v) => patchSecc({ planes: v }) }}>
@@ -359,7 +413,7 @@ export default function ConfiguracionPage() {
         <ShareGym slug={slug || ""} gymName={cfg.nombre} />
         <p className="mb-3 text-sm text-ink-2">Vista previa · turnogym.app/{slug || "tu-gym"}</p>
         <div className="overflow-hidden rounded-2xl border border-white/10">
-          <LandingSite config={cfg} slug={slug || "tu-gym"} preview />
+          <LandingSite config={cfgPreview} slug={slug || "tu-gym"} preview />
         </div>
       </div>
     </div>

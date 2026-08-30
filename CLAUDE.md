@@ -288,6 +288,21 @@ Se **instala como PWA** (web a pantalla de inicio) con `components/InstallAppBut
 > git). La columna `gyms.app_icon_url` existe en la base pero no la lee ni la
 > escribe ninguna parte del código.
 
+### Sincronizar la grilla de clases con la web
+`landing_config.clases_sync` (bool, por defecto **false**). Con eso prendido, la
+web pública NO usa la lista de clases cargada a mano: lee **en vivo** la tabla
+`classes` del gimnasio y la convierte con `clasesALanding()` de `lib/clases.ts`.
+
+- Se lee en vivo y no se copia: si el dueño agrega una clase en el panel,
+  aparece en la web sola. Dos listas separadas se desincronizan siempre.
+- Se prende desde Página pública → Clases. Con el interruptor activado, el
+  editor manual se reemplaza por la lista de solo lectura de lo que hay en el
+  panel, y la vista previa muestra lo mismo.
+- `lib/clases.ts` centraliza `DAYS`, `dayLabels()` y `fmtTime()`, que antes
+  estaban duplicados en el panel de Clases.
+- Por defecto viene apagado a propósito: prenderlo le cambiaría la web a un
+  cliente que ya la tenía cargada a mano.
+
 ### Página pública / landing — `app/(public)/[slug]` y `/g/[slug]`
 Landing white-label por gimnasio: logo, portada, galería, colores/tema, dirección
 con Google Maps, planes de socio, beneficios. Editable desde

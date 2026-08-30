@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
+import { DAYS, dayLabels, fmtTime } from "@/lib/clases";
 import type { RealPlan } from "@/types/db";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 
@@ -21,18 +22,8 @@ interface Klass {
 interface Member { id: string; full_name: string; plan_name: string | null; membership_expiry: string | null; }
 interface Booking { id: string; member_id: string; class_date: string; members?: { full_name: string } | null; }
 
-const DAYS = [
-  { code: "lun", label: "Lun", js: 1 },
-  { code: "mar", label: "Mar", js: 2 },
-  { code: "mie", label: "Mié", js: 3 },
-  { code: "jue", label: "Jue", js: 4 },
-  { code: "vie", label: "Vie", js: 5 },
-  { code: "sab", label: "Sáb", js: 6 },
-  { code: "dom", label: "Dom", js: 0 },
-];
 const COLORS = ["#22d3ee", "#3b82f6", "#818cf8", "#22c55e", "#f5b13d", "#f05252"];
 
-const fmtTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 
 function pad(n: number) { return String(n).padStart(2, "0"); }
 function iso(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
@@ -208,8 +199,6 @@ export default function ClasesPage() {
     if (!date) return 0;
     return allBookings.filter((b) => b.class_id === c.id && b.class_date === date).length;
   };
-  const dayLabels = (codes: string[]) =>
-    (codes || []).map((code) => DAYS.find((d) => d.code === code)?.label).filter(Boolean).join("/");
   const BADGE: Record<string, string> = {
     ok: "bg-[rgba(34,197,94,.14)] text-[#4ade80]",
     info: "bg-brand/20 text-brand",

@@ -80,6 +80,10 @@ export interface LandingConfig {
   facebook: string;
   tiktok: string;
   beneficios: LBenefit[];
+  /** Si la grilla de la web sale de las clases cargadas en el panel.
+   *  Con esto prendido, `clases` (la lista de abajo) se ignora: la web lee las
+   *  clases reales para que el dueño no las cargue dos veces. */
+  clases_sync?: boolean;
   clases: LClass[];
   planes: LPlan[];
   galeria: LPhoto[];
