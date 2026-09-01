@@ -230,6 +230,19 @@ Cada negocio elige **cómo cobra**, desde Configuración → Cobros
     vendieron una clase de algo que su plan no cubre, la anota el dueño desde
     Clases (donde puede pasarse).
 
+## Vencimientos y pruebas en el panel de admin
+
+`isProximoVence` / `isVencido` miran **solo los `active`**. La prueba gratis
+dura 7 días y la ventana de aviso también era de 7, así que **toda cuenta nueva
+aparecía en "Abonos por vencer" el día que se registraba**, mezclada con los
+clientes que pagan. Las pruebas tienen sus propios helpers
+(`isTrialPorTerminar`, a 2 días del final, e `isTrialVencido`) y su propio
+bloque en el dashboard.
+
+La tabla de Gimnasios lista los `active` **y los `trial`**: antes solo mostraba
+activos, así que se avisaba arriba que una prueba se terminaba y abajo ese
+gimnasio no figuraba en ningún lado, sin forma de convertirlo ni borrarlo.
+
 ## La grilla de clases
 
 **El socio la ve por día, no por horario.** La tabla `classes` guarda una fila
@@ -238,8 +251,14 @@ salteadas por la lista: la socia la veía arriba y otra vez más abajo. Desde el
 2026-09-01 el portal muestra solapas de días (solo los que tienen clases, con
 el número al lado) y abajo únicamente lo de ese día, ordenado por hora.
 
-- La solapa arranca en **hoy**; si hoy no hay clases, en el próximo día que
-  tenga. Sale de `proximaFechaDe()` en `lib/clases.ts`.
+- Arriba de las solapas hay flechas de **semana**. El socio puede reservar la
+  semana en curso y las `SEMANAS_ADELANTE` siguientes (hoy: 2, o sea tres
+  semanas en total). Es una constante en `app/portal/page.tsx`: subirla abre más
+  el calendario, ponerla en 0 deja solo la semana actual.
+- La solapa arranca en **hoy**; los días que ya pasaron quedan apagados y no se
+  pueden tocar. Al cambiar de semana cae en el primer día disponible.
+- Las solapas usan `flex-1`, no scroll horizontal: en un iPhone SE (375 px) el
+  sábado quedaba cortado y no se veía.
 - **Todas las clases de una solapa comparten la misma fecha**, que es la que se
   guarda en `bookings.class_date`. Antes cada fila resolvía su propia "próxima
   fecha" por separado.
@@ -261,9 +280,13 @@ huecos libres se ven como espacios en blanco. Las clases que se pisan se
 reparten en carriles para que no se tapen. La elección se guarda en
 `localStorage` (`tg_clases_vista`).
 
-> ⚠️ **TODO movimiento de caja necesita `sede_id`.** El dashboard y Finanzas
-> filtran por sucursal, así que un `cashflow_entries` guardado sin sede
-> **no se ve en ninguna de las dos pantallas**: la plata desaparece del panel.
+> ⚠️ **TODO lo que el panel filtre por sucursal necesita `sede_id` al
+> insertarse.** Pasó dos veces:
+> - `cashflow_entries` sin sede → $140.000 invisibles en el dashboard y Finanzas.
+> - `bookings` desde el portal del socio sin sede (`migration_048`) → DanzArte
+>   tenía 13 socias anotadas y todas las tarjetas de Clases decían "0 / 20",
+>   porque el panel filtra las reservas por sede. La sede de una reserva sale
+>   de la clase (`classes.sede_id`).
 > Pasó de verdad — 3 cobros de 2 clientes, $140.000 invisibles, porque el alta
 > de socios insertaba sin `sede_id`. Se backfilleó y se arreglaron los 4 inserts.
 > Además las dos lecturas ahora incluyen `sede_id is null`, para que si alguien

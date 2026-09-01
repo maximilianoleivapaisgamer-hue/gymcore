@@ -7,6 +7,7 @@ import { WA_TARGET, waHrefBase, abrirWhatsapp } from "@/lib/wa-link";
 import {
   PLAN_LABEL, PLAN_PRICES, STATUS, METHOD_LABEL,
   money, fdate, venceOf, daysUntil, isProximoVence, isVencido,
+  isTrialPorTerminar, isTrialVencido,
 } from "@/lib/admin";
 
 interface Gym { id: string; name: string; slug: string; owner_id: string; created_at: string; whatsapp: string | null; archived: boolean; is_test: boolean; }
@@ -333,6 +334,16 @@ export default function AdminDashboard() {
     /* eslint-disable-next-line */
   }, [subs, activeGyms, planCfgs, gymById, demoOwnerIds]);
 
+  // Pruebas gratis que se están terminando (o que ya se terminaron sin
+  // convertirse). Van aparte de los abonos: son otra conversación.
+  const pruebas = useMemo(() => {
+    const rows: { g: Gym; s: Sub | undefined }[] = activeGyms.map((g) => ({ g, s: subByGym[g.id] }));
+    return rows
+      .filter(({ g, s }) => esCliente(g) && (isTrialPorTerminar(s) || isTrialVencido(s)))
+      .sort((a, b) => (daysUntil(venceOf(a.s)) ?? 999) - (daysUntil(venceOf(b.s)) ?? 999));
+    /* eslint-disable-next-line */
+  }, [activeGyms, subByGym, demoOwnerIds]);
+
   // Gimnasios cuyo abono está por vencer o ya venció (para el bloque de alertas).
   const vencimientos = useMemo(() => {
     const rows: { g: Gym; s: Sub | undefined }[] = activeGyms.map((g) => ({ g, s: subByGym[g.id] }));
@@ -343,14 +354,18 @@ export default function AdminDashboard() {
   }, [activeGyms, subByGym, demoOwnerIds]);
 
   const filtered = useMemo(() => {
-    // Dashboard: solo clientes activos (estado "active" y que no sean prueba).
-    const base = activeGyms.filter((g) => !isTestGym(g) && subByGym[g.id]?.status === "active");
+    // Clientes de verdad, activos y en prueba. Las pruebas tienen que estar:
+    // antes se avisaba arriba que una se terminaba y abajo no figuraba, así que
+    // no había forma de convertirla ni de borrarla desde acá.
+    const base = activeGyms.filter(
+      (g) => esCliente(g) && ["active", "trial"].includes(subByGym[g.id]?.status ?? ""),
+    );
     const t = q.trim().toLowerCase();
     if (!t) return base;
     return base.filter((g) =>
       g.name.toLowerCase().includes(t) || g.slug.toLowerCase().includes(t) || ownerName(g.owner_id).toLowerCase().includes(t));
     /* eslint-disable-next-line */
-  }, [activeGyms, subByGym, q, owners]);
+  }, [activeGyms, subByGym, q, owners, demoOwnerIds]);
 
   async function saveSub(gymId: string, patch: Partial<Sub>) {
     setSavingId(gymId);
@@ -441,6 +456,34 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Pruebas gratis que se terminan */}
+      {pruebas.length > 0 && (
+        <div className="mt-4 card border-brand/30">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-semibold">\ud83c\udf81 Pruebas que se terminan</span>
+            <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand">{pruebas.length}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {pruebas.map(({ g, s }: { g: Gym; s: Sub | undefined }) => {
+              const d = daysUntil(venceOf(s));
+              const terminada = isTrialVencido(s);
+              return (
+                <div key={g.id}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs ${
+                    terminada ? "border-white/15 bg-white/[.03]" : "border-brand/30 bg-brand/[.08]"
+                  }`}>
+                  <span className="font-semibold">{g.name.trim()}</span>
+                  <span className="text-ink-2">{ownerName(g.owner_id)}</span>
+                  <span className={terminada ? "text-muted" : "text-brand"}>
+                    {terminada ? `se terminó hace ${Math.abs(d ?? 0)}d` : d === 0 ? "termina hoy" : `termina en ${d}d`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Tabla de gimnasios (a todo el ancho) */}
       <div className="mt-6 card p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 p-4">
@@ -476,6 +519,8 @@ export default function AdminDashboard() {
                   const vence = venceOf(s);
                   const porVencer = isProximoVence(s);
                   const vencido = isVencido(s);
+                  const pruebaTermina = isTrialPorTerminar(s);
+                  const pruebaTerminada = isTrialVencido(s);
                   return (
                     <tr key={g.id} className="border-t border-white/10 align-middle hover:bg-white/[.02]">
                       <td className="px-4 py-3">
@@ -515,6 +560,11 @@ export default function AdminDashboard() {
                           {(porVencer || vencido) && (
                             <span className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${vencido ? "bg-[rgba(240,82,82,.14)] text-crit" : "bg-[rgba(245,177,61,.14)] text-warn"}`}>
                               {vencido ? "Vencido" : "Próximo a vencer"}
+                            </span>
+                          )}
+                          {(pruebaTermina || pruebaTerminada) && (
+                            <span className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${pruebaTerminada ? "bg-white/10 text-ink-2" : "bg-brand/15 text-brand"}`}>
+                              {pruebaTerminada ? "Prueba terminada" : "Prueba por terminar"}
                             </span>
                           )}
                         </div>

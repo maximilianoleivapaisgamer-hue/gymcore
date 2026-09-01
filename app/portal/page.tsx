@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
 import { cicloDe, topeDelPlan, claseIncluida, planDelSocio } from "@/lib/cupo-clases";
-import { proximaFechaDe, fechaLarga } from "@/lib/clases";
+import { lunesDe, sumarDias, fechaDeDia, rangoSemana, fechaLarga } from "@/lib/clases";
 import type { RealPlan } from "@/types/db";
 import InstallAppButton from "@/components/InstallAppButton";
 import ThemeApply from "@/components/ThemeApply";
@@ -23,7 +23,7 @@ interface ExerciseInfo { name: string; image_url: string | null; image_url_end: 
 interface RExercise { id: string; day_number: number; block_name: string | null; position: number; sets: string | null; reps: string | null; notes: string | null; exercises: ExerciseInfo | null; }
 interface Routine { id: string; name: string | null; routine_exercises: RExercise[]; }
 interface MyBooking { id: string; class_id: string; class_date: string; classes: { name: string; start_time: string | null; instructor: string | null } | null; }
-interface Klass { id: string; name: string; instructor: string | null; weekdays: string[]; start_time: string | null; duration: number | null; capacity: number | null; color: string | null; image_url: string | null; }
+interface Klass { id: string; sede_id: string | null; name: string; instructor: string | null; weekdays: string[]; start_time: string | null; duration: number | null; capacity: number | null; color: string | null; image_url: string | null; }
 interface BookingLite { id: string; class_id: string; member_id: string; class_date: string; }
 interface WeightLog { date: string; weight_kg: number; }
 interface DMeal { id: string; day_number: number; meal_type: string; position: number; title: string | null; detail: string | null; photo_url: string | null; }
@@ -48,6 +48,15 @@ function minutosDe(t: string | null): number {
   const [h, m] = fmtTime(t).split(":");
   return Number(h || 0) * 60 + Number(m || 0);
 }
+/**
+ * Cuantas semanas para adelante puede reservar el socio, ademas de la actual.
+ *
+ * Con 2, hoy puede anotarse a cualquier clase de esta semana, la que viene y la
+ * siguiente. Subirlo abre mas el calendario; bajarlo a 0 deja solo la semana en
+ * curso, que es como funcionaba antes.
+ */
+const SEMANAS_ADELANTE = 2;
+
 const BASE_TABS = [
   { key: "perfil", label: "Mi perfil" },
   { key: "rutina", label: "Rutina" },
@@ -76,6 +85,8 @@ export default function PortalPage() {
   const [allBookings, setAllBookings] = useState<BookingLite[]>([]);
   /** Dia de la semana que esta mirando el socio en la grilla ("lun", "mar"...). */
   const [diaSel, setDiaSel] = useState<string | null>(null);
+  /** 0 = esta semana, 1 = la que viene, y asi. */
+  const [semanaOffset, setSemanaOffset] = useState(0);
   const [lastWeight, setLastWeight] = useState<WeightLog | null>(null);
   const [busyClassKey, setBusyClassKey] = useState<string | null>(null);
   const [isElite, setIsElite] = useState(false);
@@ -215,7 +226,10 @@ export default function PortalPage() {
     setBusyClassKey(c.id + date);
     setReservaErr("");
     const { data, error } = await supabase.from("bookings")
-      .insert({ gym_id: member.gym_id, class_id: c.id, member_id: member.id, class_date: date })
+      // La sede sale de la clase. Sin esto la reserva queda sin sucursal y el
+      // panel del dueño no la cuenta: filtra por sede y no la ve. Es el mismo
+      // agujero que hizo desaparecer plata de Finanzas (ver CLAUDE.md).
+      .insert({ gym_id: member.gym_id, sede_id: c.sede_id, class_id: c.id, member_id: member.id, class_date: date })
       .select("id, class_id, member_id, class_date").single<BookingLite>();
     if (error) {
       // El trigger del tope devuelve un mensaje ya escrito para el socio.
@@ -255,19 +269,31 @@ export default function PortalPage() {
     [classes],
   );
 
-  // Abrimos en el día de hoy. Si hoy no hay clases, en el próximo que tenga.
+  /** El lunes de la semana que se está mirando. */
+  const lunesSemana = useMemo(() => sumarDias(lunesDe(), semanaOffset * 7), [semanaOffset]);
+
+  /** Las solapas de arriba: qué día es, qué fecha le toca y si ya pasó. */
+  const solapas = useMemo(() => {
+    const hoy = todayIso();
+    return diasConClases.map((d) => {
+      const fecha = fechaDeDia(lunesSemana, d.code) || "";
+      return { ...d, fecha, numero: Number(fecha.slice(8, 10)), pasado: fecha < hoy };
+    });
+  }, [diasConClases, lunesSemana]);
+
+  // El día elegido tiene que existir y no haber pasado. Al abrir la app cae en
+  // hoy; al cambiar de semana, en el primer día disponible de esa semana.
   useEffect(() => {
-    if (diaSel || diasConClases.length === 0) return;
-    const hoyJs = new Date().getDay();
-    for (let i = 0; i < 7; i++) {
-      const code = DAYS.find((d) => d.js === (hoyJs + i) % 7)?.code;
-      const hit = diasConClases.find((d) => d.code === code);
-      if (hit) { setDiaSel(hit.code); return; }
-    }
-  }, [diasConClases, diaSel]);
+    if (solapas.some((t) => t.code === diaSel && !t.pasado)) return;
+    const primero = solapas.find((t) => !t.pasado);
+    setDiaSel(primero ? primero.code : null);
+  }, [solapas, diaSel]);
 
   /** La fecha real de la solapa elegida: todas sus clases se reservan ahí. */
-  const fechaSel = useMemo(() => (diaSel ? proximaFechaDe(diaSel) : null), [diaSel]);
+  const fechaSel = useMemo(
+    () => solapas.find((t) => t.code === diaSel)?.fecha || null,
+    [solapas, diaSel],
+  );
 
   const clasesDelDia = useMemo(
     () => (diaSel
@@ -718,21 +744,47 @@ export default function PortalPage() {
               <p className="p-6 text-center text-sm text-ink-2">Las clases todavía no tienen días asignados.</p>
             ) : (
               <>
-                {/* Solapas por día. El número es cuántas clases hay ese día. */}
-                <div className="flex gap-1.5 overflow-x-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {diasConClases.map((dia) => {
-                    const activo = dia.code === diaSel;
+                {/* Qué semana se está mirando. */}
+                <div className="flex items-center justify-between gap-2 px-3 pt-3">
+                  <button type="button" aria-label="Semana anterior"
+                    onClick={() => setSemanaOffset((n) => Math.max(0, n - 1))}
+                    disabled={semanaOffset === 0}
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 text-ink-2 transition enabled:hover:border-white/25 enabled:hover:text-ink disabled:opacity-25">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 6 9 12 15 18" /></svg>
+                  </button>
+                  <span className="min-w-0 truncate text-center text-xs font-semibold text-ink-2">
+                    {semanaOffset === 0 ? "Esta semana" : rangoSemana(lunesSemana)}
+                  </span>
+                  <button type="button" aria-label="Semana siguiente"
+                    onClick={() => setSemanaOffset((n) => Math.min(SEMANAS_ADELANTE, n + 1))}
+                    disabled={semanaOffset >= SEMANAS_ADELANTE}
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 text-ink-2 transition enabled:hover:border-white/25 enabled:hover:text-ink disabled:opacity-25">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18" /></svg>
+                  </button>
+                </div>
+
+                {/* Solapas por día. Se reparten el ancho, así entran todas en
+                    cualquier celular sin que el sábado quede cortado. */}
+                <div className="flex gap-1 px-3 pb-1 pt-2">
+                  {solapas.map((t) => {
+                    const activo = t.code === diaSel && !t.pasado;
                     return (
-                      <button key={dia.code} onClick={() => setDiaSel(dia.code)} aria-pressed={activo}
-                        className={`min-w-[52px] shrink-0 rounded-xl border px-2 py-1.5 text-center transition ${
-                          activo ? "border-transparent" : "border-white/10 bg-surface-2 hover:border-white/25"
+                      <button key={t.code} type="button" onClick={() => setDiaSel(t.code)}
+                        disabled={t.pasado} aria-pressed={activo}
+                        title={t.pasado ? "Ese día ya pasó" : `${t.cuantas} ${t.cuantas === 1 ? "clase" : "clases"}`}
+                        className={`min-w-0 flex-1 rounded-xl border px-0.5 py-1.5 text-center transition ${
+                          t.pasado
+                            ? "cursor-not-allowed border-white/5 opacity-35"
+                            : activo
+                              ? "border-transparent"
+                              : "border-white/10 bg-surface-2 hover:border-white/25"
                         }`}
                         style={activo ? {
                           background: "linear-gradient(135deg, rgb(var(--brand-rgb)), rgb(var(--brand-2-rgb)))",
                           color: "var(--on-brand)",
                         } : undefined}>
-                        <span className={`block text-[13px] font-bold leading-tight ${activo ? "" : "text-ink"}`}>{dia.label}</span>
-                        <span className={`block text-[10px] leading-tight tabular-nums ${activo ? "" : "text-muted"}`}>{dia.cuantas}</span>
+                        <span className={`block text-[12px] font-bold leading-tight ${activo ? "" : "text-ink"}`}>{t.label}</span>
+                        <span className={`block text-[10px] leading-tight tabular-nums ${activo ? "" : "text-muted"}`}>{t.numero}</span>
                       </button>
                     );
                   })}
@@ -742,6 +794,12 @@ export default function PortalPage() {
                   {clasesDelDia.length} {clasesDelDia.length === 1 ? "clase" : "clases"}
                   {fechaSel ? ` · ${fechaLarga(fechaSel)}` : ""}
                 </div>
+
+                {semanaOffset >= SEMANAS_ADELANTE && (
+                  <p className="px-4 pb-1 text-[11px] text-muted">
+                    Hasta acá llegan las reservas: se abren {SEMANAS_ADELANTE + 1} semanas antes.
+                  </p>
+                )}
 
                 <ul className="divide-y divide-white/5">
                   {clasesDelDia.map((c) => {

@@ -37,21 +37,52 @@ export function daysUntil(iso: string | null | undefined): number | null {
   return Math.ceil(ms / 86400000);
 }
 
-/** ¿El abono está por vencer? (activo/trial, dentro de los próximos `dias` días). */
+/**
+ * ¿El abono de un cliente que paga está por vencer?
+ *
+ * Mira SOLO los `active`, a propósito. La prueba gratis dura 7 días y esta
+ * ventana también era de 7: toda cuenta nueva aparecía en "Abonos por vencer"
+ * el mismo día que se registraba, mezclada con los clientes de verdad. Las
+ * pruebas ahora avisan por su cuenta, en `isTrialPorTerminar`.
+ */
 export function isProximoVence(
   sub: { status: string; trial_ends_at: string | null; current_period_end: string | null } | undefined,
   dias = 7
 ): boolean {
-  if (!sub || (sub.status !== "active" && sub.status !== "trial")) return false;
+  if (!sub || sub.status !== "active") return false;
   const d = daysUntil(venceOf(sub));
   return d !== null && d >= 0 && d <= dias;
 }
 
-/** ¿El abono ya venció? (activo/trial con fecha pasada). */
+/** ¿El abono de un cliente que paga ya venció? */
 export function isVencido(
   sub: { status: string; trial_ends_at: string | null; current_period_end: string | null } | undefined
 ): boolean {
-  if (!sub || (sub.status !== "active" && sub.status !== "trial")) return false;
+  if (!sub || sub.status !== "active") return false;
+  const d = daysUntil(venceOf(sub));
+  return d !== null && d < 0;
+}
+
+/**
+ * Prueba gratis que se está terminando.
+ *
+ * Avisa recién sobre el final: el día que alguien se registra no hay nada que
+ * hacer, y ese aviso temprano era justamente el que ensuciaba el tablero.
+ */
+export function isTrialPorTerminar(
+  sub: { status: string; trial_ends_at: string | null; current_period_end: string | null } | undefined,
+  dias = 2
+): boolean {
+  if (!sub || sub.status !== "trial") return false;
+  const d = daysUntil(venceOf(sub));
+  return d !== null && d >= 0 && d <= dias;
+}
+
+/** Prueba que ya se terminó sin convertirse en cliente. */
+export function isTrialVencido(
+  sub: { status: string; trial_ends_at: string | null; current_period_end: string | null } | undefined
+): boolean {
+  if (!sub || sub.status !== "trial") return false;
   const d = daysUntil(venceOf(sub));
   return d !== null && d < 0;
 }

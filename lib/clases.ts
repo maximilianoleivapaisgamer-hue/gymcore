@@ -31,26 +31,43 @@ export function fmtTime(t: string | null | undefined): string {
 function pad(n: number) { return String(n).padStart(2, "0"); }
 function iso(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
-/** Día de la semana de una fecha, en nuestro código: "lun", "mar", … */
-export function codigoDelDia(d: Date = new Date()): string {
-  return DAYS.find((x) => x.js === d.getDay())?.code || "lun";
+/** Hoy en formato "2026-09-01". */
+export function hoyIso(desde: Date = new Date()): string { return iso(desde); }
+
+/** Corre una fecha N días (sin tocar la original). */
+export function sumarDias(d: Date, dias: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + dias);
 }
 
 /**
- * Próxima fecha que caiga en ese día de la semana, contando hoy.
+ * El lunes de la semana en la que cae esa fecha.
  *
- * El portal muestra las clases por día ("Mar"), pero las reservas se guardan
- * con fecha. Un martes a la mañana, "mar" es hoy; un miércoles, es dentro de
- * seis días. Todas las clases de una misma solapa comparten esta fecha.
+ * La semana arranca en lunes y cierra en domingo, como la grilla de clases.
  */
-export function proximaFechaDe(code: string, desde: Date = new Date()): string | null {
-  const js = DAYS.find((d) => d.code === code)?.js;
-  if (js === undefined) return null;
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate() + i);
-    if (d.getDay() === js) return iso(d);
-  }
-  return null;
+export function lunesDe(d: Date = new Date()): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return sumarDias(x, -((x.getDay() + 6) % 7));
+}
+
+/**
+ * Qué fecha le toca a un día dentro de una semana concreta.
+ *
+ * El socio elige "Mié" y una semana; la reserva se guarda con esta fecha. DAYS
+ * va de lunes a domingo, así que la posición en la lista es el desplazamiento
+ * desde el lunes.
+ */
+export function fechaDeDia(lunes: Date, code: string): string | null {
+  const i = DAYS.findIndex((d) => d.code === code);
+  return i < 0 ? null : iso(sumarDias(lunes, i));
+}
+
+/** "1 al 7 de septiembre" · "29 de septiembre al 5 de octubre" */
+export function rangoSemana(lunes: Date): string {
+  const domingo = sumarDias(lunes, 6);
+  const mes = (d: Date) => d.toLocaleDateString("es-AR", { month: "long" });
+  return lunes.getMonth() === domingo.getMonth()
+    ? `${lunes.getDate()} al ${domingo.getDate()} de ${mes(domingo)}`
+    : `${lunes.getDate()} de ${mes(lunes)} al ${domingo.getDate()} de ${mes(domingo)}`;
 }
 
 /** "2026-09-01" → "hoy · martes 1 de septiembre" (o "mañana", o el día solo). */
