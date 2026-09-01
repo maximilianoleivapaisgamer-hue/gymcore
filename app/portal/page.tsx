@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
 import { cicloDe, topeDelPlan, claseIncluida, planDelSocio } from "@/lib/cupo-clases";
+import { proximaFechaDe, fechaLarga } from "@/lib/clases";
 import type { RealPlan } from "@/types/db";
 import InstallAppButton from "@/components/InstallAppButton";
 import ThemeApply from "@/components/ThemeApply";
@@ -22,7 +23,7 @@ interface ExerciseInfo { name: string; image_url: string | null; image_url_end: 
 interface RExercise { id: string; day_number: number; block_name: string | null; position: number; sets: string | null; reps: string | null; notes: string | null; exercises: ExerciseInfo | null; }
 interface Routine { id: string; name: string | null; routine_exercises: RExercise[]; }
 interface MyBooking { id: string; class_id: string; class_date: string; classes: { name: string; start_time: string | null; instructor: string | null } | null; }
-interface Klass { id: string; name: string; instructor: string | null; weekdays: string[]; start_time: string | null; duration: number | null; capacity: number | null; color: string | null; }
+interface Klass { id: string; name: string; instructor: string | null; weekdays: string[]; start_time: string | null; duration: number | null; capacity: number | null; color: string | null; image_url: string | null; }
 interface BookingLite { id: string; class_id: string; member_id: string; class_date: string; }
 interface WeightLog { date: string; weight_kg: number; }
 interface DMeal { id: string; day_number: number; meal_type: string; position: number; title: string | null; detail: string | null; photo_url: string | null; }
@@ -38,21 +39,15 @@ const DAYS = [
 function pad(n: number) { return String(n).padStart(2, "0"); }
 function iso(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function todayIso() { return iso(new Date()); }
-function nextOccurrence(weekdays: string[]): string | null {
-  if (!weekdays || weekdays.length === 0) return null;
-  const jsDays = weekdays.map((c) => DAYS.find((d) => d.code === c)?.js).filter((x) => x !== undefined) as number[];
-  const today = new Date();
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
-    if (jsDays.includes(d.getDay())) return iso(d);
-  }
-  return null;
-}
 function daysLeft(expiry: string | null): number | null {
   if (!expiry) return null;
   return Math.ceil((new Date(expiry + "T00:00:00").getTime() - Date.now()) / 86400000);
 }
 const fmtTime = (t: string | null) => (t ? t.slice(0, 5) : "");
+function minutosDe(t: string | null): number {
+  const [h, m] = fmtTime(t).split(":");
+  return Number(h || 0) * 60 + Number(m || 0);
+}
 const BASE_TABS = [
   { key: "perfil", label: "Mi perfil" },
   { key: "rutina", label: "Rutina" },
@@ -79,6 +74,8 @@ export default function PortalPage() {
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
   const [classes, setClasses] = useState<Klass[]>([]);
   const [allBookings, setAllBookings] = useState<BookingLite[]>([]);
+  /** Dia de la semana que esta mirando el socio en la grilla ("lun", "mar"...). */
+  const [diaSel, setDiaSel] = useState<string | null>(null);
   const [lastWeight, setLastWeight] = useState<WeightLog | null>(null);
   const [busyClassKey, setBusyClassKey] = useState<string | null>(null);
   const [isElite, setIsElite] = useState(false);
@@ -244,6 +241,45 @@ export default function PortalPage() {
   // Cuántas clases le quedan al socio en el ciclo (null = plan sin tope).
   const restantes = cupo ? Math.max(0, cupo.limite - cupo.usadas) : Infinity;
   const sinCupo = cupo ? restantes <= 0 : false;
+
+  // ── La grilla, día por día ────────────────────────────────────────────
+  // Antes se listaba una fila por horario: un estudio con cuatro Zumbas veía
+  // "Zumba" cuatro veces salteado por la lista. Ahora se elige el día y se ve
+  // solo lo de ese día, en orden de hora.
+
+  /** Días que tienen al menos una clase, de lunes a domingo. */
+  const diasConClases = useMemo(
+    () => DAYS
+      .map((d) => ({ ...d, cuantas: classes.filter((c) => (c.weekdays || []).includes(d.code)).length }))
+      .filter((d) => d.cuantas > 0),
+    [classes],
+  );
+
+  // Abrimos en el día de hoy. Si hoy no hay clases, en el próximo que tenga.
+  useEffect(() => {
+    if (diaSel || diasConClases.length === 0) return;
+    const hoyJs = new Date().getDay();
+    for (let i = 0; i < 7; i++) {
+      const code = DAYS.find((d) => d.js === (hoyJs + i) % 7)?.code;
+      const hit = diasConClases.find((d) => d.code === code);
+      if (hit) { setDiaSel(hit.code); return; }
+    }
+  }, [diasConClases, diaSel]);
+
+  /** La fecha real de la solapa elegida: todas sus clases se reservan ahí. */
+  const fechaSel = useMemo(() => (diaSel ? proximaFechaDe(diaSel) : null), [diaSel]);
+
+  const clasesDelDia = useMemo(
+    () => (diaSel
+      ? classes
+        .filter((c) => (c.weekdays || []).includes(diaSel))
+        .slice()
+        .sort((a, b) => fmtTime(a.start_time).localeCompare(fmtTime(b.start_time)))
+      : []),
+    [classes, diaSel],
+  );
+
+  const ahoraMin = new Date().getHours() * 60 + new Date().getMinutes();
 
   if (state === "loading") return <main className="grid min-h-screen place-items-center text-ink-2">Cargando…</main>;
 
@@ -651,7 +687,7 @@ export default function PortalPage() {
           <div className="card p-0">
             <div className="border-b border-white/10 p-4">
               <h2 className="font-semibold">Todas las clases</h2>
-              <p className="text-xs text-muted">Tocá "Reservar" para anotarte a la próxima fecha.</p>
+              <p className="text-xs text-muted">Elegí el día y anotate en la clase que quieras.</p>
 
               {/* Cupo del plan. Solo aparece si el plan del socio tiene tope. */}
               {cupo && (
@@ -678,58 +714,108 @@ export default function PortalPage() {
             </div>
             {classes.length === 0 ? (
               <p className="p-6 text-center text-sm text-ink-2">Tu gimnasio todavía no cargó clases.</p>
+            ) : diasConClases.length === 0 ? (
+              <p className="p-6 text-center text-sm text-ink-2">Las clases todavía no tienen días asignados.</p>
             ) : (
-              <ul className="divide-y divide-white/5">
-                {classes.map((c) => {
-                  const date = nextOccurrence(c.weekdays);
-                  if (!date) return null;
-                  const occupied = allBookings.filter((b) => b.class_id === c.id && b.class_date === date).length;
-                  const mine = allBookings.find((b) => b.class_id === c.id && b.class_date === date && b.member_id === member!.id);
-                  const full = c.capacity != null && occupied >= c.capacity;
-                  const key = c.id + date;
-                  // ¿Esta actividad entra en su plan? (ej: "Pase Libre" sin Kangoo)
-                  const incluida = claseIncluida(miPlan, c.name);
-                  return (
-                    <li key={key} className="flex items-center justify-between px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color || "#22d3ee" }} />
-                        <div>
-                          <div className="text-sm font-medium">{c.name}</div>
-                          <div className="text-xs text-muted">
-                            {new Date(date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
-                            {c.start_time ? ` · ${fmtTime(c.start_time)}` : ""}
-                            {c.instructor ? ` · ${c.instructor}` : ""}
-                          </div>
-                          <div className="text-xs text-muted">{occupied}{c.capacity != null ? ` / ${c.capacity}` : ""} anotados</div>
+              <>
+                {/* Solapas por día. El número es cuántas clases hay ese día. */}
+                <div className="flex gap-1.5 overflow-x-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {diasConClases.map((dia) => {
+                    const activo = dia.code === diaSel;
+                    return (
+                      <button key={dia.code} onClick={() => setDiaSel(dia.code)} aria-pressed={activo}
+                        className={`min-w-[52px] shrink-0 rounded-xl border px-2 py-1.5 text-center transition ${
+                          activo ? "border-transparent" : "border-white/10 bg-surface-2 hover:border-white/25"
+                        }`}
+                        style={activo ? {
+                          background: "linear-gradient(135deg, rgb(var(--brand-rgb)), rgb(var(--brand-2-rgb)))",
+                          color: "var(--on-brand)",
+                        } : undefined}>
+                        <span className={`block text-[13px] font-bold leading-tight ${activo ? "" : "text-ink"}`}>{dia.label}</span>
+                        <span className={`block text-[10px] leading-tight tabular-nums ${activo ? "" : "text-muted"}`}>{dia.cuantas}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="px-4 pb-1 text-xs text-muted">
+                  {clasesDelDia.length} {clasesDelDia.length === 1 ? "clase" : "clases"}
+                  {fechaSel ? ` · ${fechaLarga(fechaSel)}` : ""}
+                </div>
+
+                <ul className="divide-y divide-white/5">
+                  {clasesDelDia.map((c) => {
+                    const date = fechaSel;
+                    if (!date) return null;
+                    const occupied = allBookings.filter((b) => b.class_id === c.id && b.class_date === date).length;
+                    const mine = allBookings.find((b) => b.class_id === c.id && b.class_date === date && b.member_id === member!.id);
+                    const full = c.capacity != null && occupied >= c.capacity;
+                    const libres = c.capacity != null ? Math.max(0, c.capacity - occupied) : null;
+                    const key = c.id + date;
+                    // ¿Esta actividad entra en su plan? (ej: "Pase Libre" sin Kangoo)
+                    const incluida = claseIncluida(miPlan, c.name);
+                    // Una clase de hoy que ya arrancó no se puede reservar.
+                    const yaPaso = date === todayIso() && c.start_time != null && minutosDe(c.start_time) <= ahoraMin;
+                    const color = c.color || "#22d3ee";
+                    return (
+                      <li key={key} className="flex gap-3 px-4 py-3">
+                        <div className="w-[42px] shrink-0 pt-0.5 text-sm font-bold tabular-nums text-brand">
+                          {fmtTime(c.start_time) || "—"}
+                        </div>
+                        {c.image_url ? (
+                          <img src={c.image_url} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                        ) : (
+                          <span className="h-12 w-12 shrink-0 rounded-xl border"
+                            style={{ background: `${color}1f`, borderColor: `${color}4d` }} />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold">{c.name.trim()}</div>
+                          {c.instructor && <div className="truncate text-xs text-muted">con {c.instructor.trim()}</div>}
                           {!incluida && (
                             <div className="text-xs text-[#f5b13d]">No entra en tu plan · se contrata aparte</div>
                           )}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            {libres != null && (
+                              <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold tabular-nums ${
+                                libres === 0
+                                  ? "bg-[rgba(240,82,82,.14)] text-[#f87171]"
+                                  : libres <= 3
+                                    ? "bg-[rgba(245,177,61,.14)] text-[#f5b13d]"
+                                    : "bg-[rgba(74,222,128,.14)] text-[#4ade80]"
+                              }`}>
+                                {libres === 0 ? "Sin lugar" : `${libres} ${libres === 1 ? "libre" : "libres"}`}
+                              </span>
+                            )}
+                            {mine ? (
+                              <button className="btn btn-ghost px-3 py-1 text-[11.5px]"
+                                disabled={busyClassKey === mine.id} onClick={() => cancelar(mine.id)}>
+                                Cancelar
+                              </button>
+                            ) : (
+                              <button
+                                className="btn btn-primary px-3 py-1 text-[11.5px]"
+                                disabled={full || !incluida || sinCupo || yaPaso || busyClassKey === key}
+                                title={
+                                  yaPaso
+                                    ? "Esta clase ya empezó"
+                                    : !incluida
+                                      ? `${c.name.trim()} no está incluida en tu plan${member?.plan_name ? ` ${member.plan_name.trim()}` : ""}`
+                                      : sinCupo
+                                        ? "Ya usaste todas las clases que incluye tu plan este mes"
+                                        : undefined
+                                }
+                                onClick={() => reservar(c, date)}
+                              >
+                                {yaPaso ? "Ya pasó" : full ? "Cupo lleno" : !incluida ? "No incluida" : sinCupo ? "Sin clases" : "Reservar"}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      {mine ? (
-                        <button className="btn btn-ghost text-xs" disabled={busyClassKey === mine.id} onClick={() => cancelar(mine.id)}>
-                          Cancelar
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn-primary text-xs"
-                          disabled={full || !incluida || sinCupo || busyClassKey === key}
-                          title={
-                            !incluida
-                              ? `${c.name.trim()} no está incluida en tu plan${member?.plan_name ? ` ${member.plan_name.trim()}` : ""}`
-                              : sinCupo
-                                ? "Ya usaste todas las clases que incluye tu plan este mes"
-                                : undefined
-                          }
-                          onClick={() => reservar(c, date)}
-                        >
-                          {full ? "Cupo lleno" : !incluida ? "No incluida" : sinCupo ? "Sin clases" : "Reservar"}
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )}
           </div>
         </div>

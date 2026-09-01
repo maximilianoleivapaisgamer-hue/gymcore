@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
@@ -18,6 +18,8 @@ interface Klass {
   duration: number | null;
   capacity: number | null;
   color: string | null;
+  /** Foto opcional: la ven los socios en la app. */
+  image_url: string | null;
 }
 interface Member { id: string; full_name: string; plan_name: string | null; membership_expiry: string | null; }
 interface Booking { id: string; member_id: string; class_date: string; members?: { full_name: string } | null; }
@@ -45,7 +47,130 @@ const emptyForm = () => ({
   weekdays: [] as string[],
   start_time: "18:00", duration: "60", capacity: "12",
   color: COLORS[0],
+  image_url: "",
 });
+
+/** Alto de una hora en el calendario semanal, en pixeles. */
+const PX_HORA = 58;
+
+function minutos(t: string | null): number {
+  const [h, m] = fmtTime(t).split(":");
+  return Number(h || 0) * 60 + Number(m || 0);
+}
+
+/**
+ * La semana completa, con cada clase en su lugar real segun hora y duracion.
+ *
+ * Es la vista para mirar la grilla desde arriba: los huecos libres quedan como
+ * espacios en blanco, asi se ve de una donde entra una clase nueva.
+ */
+function Semana({ classes, onPick }: { classes: Klass[]; onPick: (c: Klass) => void }) {
+  const conHora = useMemo(
+    () => classes.filter((c) => c.start_time && (c.weekdays || []).length > 0),
+    [classes],
+  );
+
+  // El rango va de la primera clase a la ultima, redondeado a horas enteras.
+  const { desde, hasta } = useMemo(() => {
+    if (conHora.length === 0) return { desde: 7, hasta: 22 };
+    let ini = 24 * 60, fin = 0;
+    conHora.forEach((c) => {
+      const m = minutos(c.start_time);
+      ini = Math.min(ini, m);
+      fin = Math.max(fin, m + (c.duration || 60));
+    });
+    return { desde: Math.max(0, Math.floor(ini / 60)), hasta: Math.min(24, Math.ceil(fin / 60)) };
+  }, [conHora]);
+
+  // Carriles: si dos clases del mismo dia se pisan, van una al lado de la otra
+  // en vez de taparse.
+  const porDia = useMemo(() => DAYS.map((d) => {
+    const items = conHora
+      .filter((c) => (c.weekdays || []).includes(d.code))
+      .map((c) => ({ c, ini: minutos(c.start_time), fin: minutos(c.start_time) + (c.duration || 60) }))
+      .sort((a, b) => a.ini - b.ini);
+    const finDeCarril: number[] = [];
+    const puestos = items.map((it) => {
+      let carril = finDeCarril.findIndex((f) => f <= it.ini);
+      if (carril < 0) { carril = finDeCarril.length; finDeCarril.push(it.fin); }
+      else finDeCarril[carril] = it.fin;
+      return { ...it, carril };
+    });
+    return { dia: d, items: puestos, carriles: Math.max(1, finDeCarril.length) };
+  }), [conHora]);
+
+  if (conHora.length === 0) {
+    return (
+      <p className="card p-8 text-center text-sm text-ink-2">
+        Para ver la semana, tus clases tienen que tener dia y horario cargados.
+      </p>
+    );
+  }
+
+  const horas = Array.from({ length: hasta - desde }, (_, i) => desde + i);
+  const alto = horas.length * PX_HORA;
+  const hoy = new Date().getDay();
+
+  return (
+    <div className="card overflow-x-auto p-0">
+      <div className="min-w-[760px]">
+        <div className="flex border-b border-white/10">
+          <div className="w-14 shrink-0" />
+          {DAYS.map((d) => (
+            <div key={d.code}
+              className={`flex-1 py-2.5 text-center text-xs font-semibold ${d.js === hoy ? "text-brand" : "text-ink-2"}`}>
+              {d.label}{d.js === hoy ? " \u00b7 hoy" : ""}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex">
+          <div className="w-14 shrink-0">
+            {horas.map((h) => (
+              <div key={h} className="relative" style={{ height: PX_HORA }}>
+                <span className="absolute -top-1.5 right-2 text-[10px] tabular-nums text-muted">
+                  {String(h).padStart(2, "0")}:00
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {porDia.map(({ dia, items, carriles }) => (
+            <div key={dia.code}
+              className={`relative flex-1 border-l border-white/5 ${dia.js === hoy ? "bg-white/[.02]" : ""}`}
+              style={{ height: alto }}>
+              {horas.map((h) => (
+                <div key={h} className="border-b border-white/5" style={{ height: PX_HORA }} />
+              ))}
+              {items.map(({ c, ini, fin, carril }) => {
+                const color = c.color || "#22d3ee";
+                const ancho = 100 / carriles;
+                return (
+                  <button key={c.id + dia.code} onClick={() => onPick(c)}
+                    title={`${c.name.trim()} \u00b7 ${fmtTime(c.start_time)}${c.instructor ? ` \u00b7 ${c.instructor.trim()}` : ""}`}
+                    className="absolute overflow-hidden rounded-md px-1.5 py-1 text-left transition hover:brightness-125"
+                    style={{
+                      top: ((ini - desde * 60) / 60) * PX_HORA,
+                      height: Math.max(26, ((fin - ini) / 60) * PX_HORA - 3),
+                      left: `calc(${carril * ancho}% + 2px)`,
+                      width: `calc(${ancho}% - 4px)`,
+                      background: `${color}26`,
+                      borderLeft: `3px solid ${color}`,
+                    }}>
+                    <div className="truncate text-[11px] font-semibold leading-tight">{c.name.trim()}</div>
+                    <div className="truncate text-[10px] leading-tight text-ink-2">
+                      {fmtTime(c.start_time)}{c.instructor ? ` \u00b7 ${c.instructor.trim()}` : ""}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ClasesPage() {
   const supabase = createClient();
@@ -60,6 +185,11 @@ export default function ClasesPage() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
+  /** "tarjetas" (una por clase) o "semana" (calendario, para ver los huecos). */
+  const [vista, setVista] = useState<"tarjetas" | "semana">("tarjetas");
+  const fotoInput = useRef<HTMLInputElement | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [fotoErr, setFotoErr] = useState("");
   // reservas
   const [resFor, setResFor] = useState<Klass | null>(null);
   const [resDate, setResDate] = useState<string | null>(null);
@@ -103,6 +233,28 @@ export default function ClasesPage() {
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => {
+    const guardada = localStorage.getItem("tg_clases_vista");
+    if (guardada === "semana" || guardada === "tarjetas") setVista(guardada);
+  }, []);
+  function cambiarVista(v: "tarjetas" | "semana") {
+    setVista(v);
+    localStorage.setItem("tg_clases_vista", v);
+  }
+
+  /** Sube la foto de la clase al mismo bucket público que el logo y la galería. */
+  async function subirFoto(file: File) {
+    setFotoErr("");
+    if (!file.type.startsWith("image/")) { setFotoErr("Eso no es una imagen."); return; }
+    if (file.size > 5 * 1024 * 1024) { setFotoErr("La foto pesa más de 5 MB. Probá con una más liviana."); return; }
+    setSubiendoFoto(true);
+    const path = `clases/${crypto.randomUUID()}-${file.name}`;
+    const { error } = await supabase.storage.from("gym-assets").upload(path, file, { upsert: true });
+    if (error) { setFotoErr("No se pudo subir la foto. Probá de nuevo."); setSubiendoFoto(false); return; }
+    const { data } = supabase.storage.from("gym-assets").getPublicUrl(path);
+    setF("image_url", data.publicUrl);
+    setSubiendoFoto(false);
+  }
 
   // ---- form ----
   const setF = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -119,6 +271,7 @@ export default function ClasesPage() {
       weekdays: c.weekdays || [], start_time: fmtTime(c.start_time) || "18:00",
       duration: c.duration ? String(c.duration) : "60", capacity: c.capacity ? String(c.capacity) : "12",
       color: c.color || COLORS[0],
+      image_url: c.image_url || "",
     });
     setModal(true);
   }
@@ -136,6 +289,7 @@ export default function ClasesPage() {
       duration: form.duration ? Number(form.duration) : null,
       capacity: form.capacity ? Number(form.capacity) : null,
       color: form.color,
+      image_url: form.image_url || null,
     };
     if (form.id) await supabase.from("classes").update(payload).eq("id", form.id);
     else await supabase.from("classes").insert({ ...payload, sede_id: sedeId });
@@ -220,11 +374,24 @@ export default function ClasesPage() {
             Grilla{sedeName ? <> de <span className="font-semibold text-ink">{sedeName}</span></> : ""}. Tocá una clase para ver y anotar reservas.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={openNew}>+ Nueva clase</button>
+        <div className="flex items-center gap-2">
+          {/* La semana sirve para mirar la grilla desde arriba y ver los huecos. */}
+          <div className="flex rounded-[10px] border border-white/10 bg-surface p-0.5">
+            {([["tarjetas", "Tarjetas"], ["semana", "Semana"]] as const).map(([v, txt]) => (
+              <button key={v} onClick={() => cambiarVista(v)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${vista === v ? "bg-surface-3 text-ink" : "text-ink-2 hover:text-ink"}`}>
+                {txt}
+              </button>
+            ))}
+          </div>
+          <button className="btn btn-primary" onClick={openNew}>+ Nueva clase</button>
+        </div>
       </div>
 
       {loading ? (
         <p className="p-8 text-center text-ink-2">Cargando…</p>
+      ) : vista === "semana" ? (
+        <Semana classes={classes} onPick={openReservas} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {classes.map((c) => {
@@ -235,8 +402,16 @@ export default function ClasesPage() {
             return (
               <button key={c.id} onClick={() => openReservas(c)} className="card text-left transition hover:border-brand/40">
                 <div className="flex items-center justify-between gap-2">
-                  <b className="text-base">{c.name}</b>
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${BADGE[badge.cls]}`}>
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {c.image_url ? (
+                      <img src={c.image_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                    ) : (
+                      <span className="h-9 w-9 shrink-0 rounded-lg border"
+                        style={{ background: `${c.color || "#22d3ee"}1f`, borderColor: `${c.color || "#22d3ee"}4d` }} />
+                    )}
+                    <b className="truncate text-base">{c.name}</b>
+                  </div>
+                  <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${BADGE[badge.cls]}`}>
                     <i className="h-1.5 w-1.5 rounded-full bg-current" />{badge.txt}
                   </span>
                 </div>
@@ -312,6 +487,42 @@ export default function ClasesPage() {
                       style={{ backgroundColor: col }} aria-label={col} />
                   ))}
                 </div>
+              </div>
+
+              {/* Foto de la clase: la ven los socios en la app, al lado del nombre. */}
+              <div>
+                <label className="mb-1 block text-xs text-ink-2">Foto (opcional)</label>
+                <div className="flex items-center gap-3">
+                  {form.image_url ? (
+                    <img src={form.image_url} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                  ) : (
+                    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-dashed border-white/15 text-muted">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="btn btn-ghost text-xs" disabled={subiendoFoto}
+                        onClick={() => fotoInput.current?.click()}>
+                        {subiendoFoto ? "Subiendo\u2026" : form.image_url ? "Cambiar foto" : "Subir foto"}
+                      </button>
+                      {form.image_url && (
+                        <button type="button" className="text-xs text-ink-2 hover:text-crit"
+                          onClick={() => setF("image_url", "")}>
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-[11px] leading-snug text-muted">
+                      La ven tus socios en la app cuando eligen la clase. Si no ponés ninguna, se muestra el color.
+                    </p>
+                  </div>
+                </div>
+                <input ref={fotoInput} type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFoto(f); e.target.value = ""; }} />
+                {fotoErr && <p className="mt-1.5 text-[11px] text-crit">{fotoErr}</p>}
               </div>
             </div>
 

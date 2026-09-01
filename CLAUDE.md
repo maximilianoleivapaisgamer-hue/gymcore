@@ -230,6 +230,37 @@ Cada negocio elige **cómo cobra**, desde Configuración → Cobros
     vendieron una clase de algo que su plan no cubre, la anota el dueño desde
     Clases (donde puede pasarse).
 
+## La grilla de clases
+
+**El socio la ve por día, no por horario.** La tabla `classes` guarda una fila
+por horario, así que un estudio con cuatro Zumbas tenía cuatro filas "Zumba"
+salteadas por la lista: la socia la veía arriba y otra vez más abajo. Desde el
+2026-09-01 el portal muestra solapas de días (solo los que tienen clases, con
+el número al lado) y abajo únicamente lo de ese día, ordenado por hora.
+
+- La solapa arranca en **hoy**; si hoy no hay clases, en el próximo día que
+  tenga. Sale de `proximaFechaDe()` en `lib/clases.ts`.
+- **Todas las clases de una solapa comparten la misma fecha**, que es la que se
+  guarda en `bookings.class_date`. Antes cada fila resolvía su propia "próxima
+  fecha" por separado.
+- Una clase de **hoy que ya empezó** no se puede reservar: el botón dice
+  "Ya pasó". Se compara contra la hora actual, no contra la fecha.
+- Si se toca esta pantalla, ojo con los **nombres con espacios de más**
+  (`"Zumba "`, `" Maria"`): hay varios cargados así en producción. Cualquier
+  cosa que agrupe por actividad tiene que normalizar con `trim()` + minúsculas,
+  como ya hacen `clasesALanding()` y el trigger de límite de clases.
+
+**Foto por clase** (`classes.image_url`, `migration_047`): la sube el dueño
+desde el modal de Clases al bucket público `gym-assets` (el mismo del logo),
+y el socio la ve al lado del nombre. Es opcional: sin foto se muestra el color
+de la clase.
+
+**Vista semanal para el dueño**: en Clases, arriba a la derecha, un interruptor
+"Tarjetas / Semana". La semana ubica cada clase según hora y duración, así los
+huecos libres se ven como espacios en blanco. Las clases que se pisan se
+reparten en carriles para que no se tapen. La elección se guarda en
+`localStorage` (`tg_clases_vista`).
+
 > ⚠️ **TODO movimiento de caja necesita `sede_id`.** El dashboard y Finanzas
 > filtran por sucursal, así que un `cashflow_entries` guardado sin sede
 > **no se ve en ninguna de las dos pantallas**: la plata desaparece del panel.
