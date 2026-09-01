@@ -302,6 +302,10 @@ export default function AdminDashboard() {
   // Única fuente de verdad de "no cuenta para la plata ni las métricas". Así, al
   // pasarlo a cliente real (is_test=false), la conversión queda firme.
   const isTestGym = (g: Gym) => g.is_test;
+  // Cliente de verdad: ni prueba interna, ni el "Mi Gimnasio" que se autocrea
+  // cuando el dueño de una demo entra al panel. Lo que no pasa por acá no suma
+  // a las métricas ni dispara el aviso de abono por vencer.
+  const esCliente = (g: Gym) => !isTestGym(g) && !isDemoDerived(g);
   const priceOf = (k: string) => planCfgs.find((p) => p.key === k)?.price ?? (PLAN_PRICES[k] || 0);
 
   const metrics = useMemo(() => {
@@ -310,7 +314,7 @@ export default function AdminDashboard() {
       // Solo gimnasios reales (no demos ni pruebas): filtramos por los que están
       // en la lista y no están marcados como prueba.
       const gg = gymById[s.gym_id];
-      if (!gg || isTestGym(gg)) return;
+      if (!gg || !esCliente(gg)) return;
       if (s.status === "active") {
         active++;
         if (s.payment_method === "gratis") {
@@ -324,7 +328,7 @@ export default function AdminDashboard() {
       } else if (s.status === "trial") trial++;
       if (isProximoVence(s) || isVencido(s)) porVencer++;
     });
-    const total = activeGyms.filter((g) => !isTestGym(g)).length;
+    const total = activeGyms.filter(esCliente).length;
     return { total, active, trial, mrr, transfer, mp, transferN, mpN, porVencer };
     /* eslint-disable-next-line */
   }, [subs, activeGyms, planCfgs, gymById, demoOwnerIds]);
@@ -333,7 +337,7 @@ export default function AdminDashboard() {
   const vencimientos = useMemo(() => {
     const rows: { g: Gym; s: Sub | undefined }[] = activeGyms.map((g) => ({ g, s: subByGym[g.id] }));
     return rows
-      .filter(({ g, s }) => !isTestGym(g) && (isProximoVence(s) || isVencido(s)))
+      .filter(({ g, s }) => esCliente(g) && (isProximoVence(s) || isVencido(s)))
       .sort((a, b) => (daysUntil(venceOf(a.s)) ?? 999) - (daysUntil(venceOf(b.s)) ?? 999));
     /* eslint-disable-next-line */
   }, [activeGyms, subByGym, demoOwnerIds]);
