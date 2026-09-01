@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
 import { cicloDe, topeDelPlan, claseIncluida, planDelSocio } from "@/lib/cupo-clases";
-import { lunesDe, sumarDias, fechaDeDia, rangoSemana, fechaLarga } from "@/lib/clases";
+import { lunesDe, sumarDias, fechaDeDia, rangoSemana, fechaLarga, inicialDe } from "@/lib/clases";
 import type { RealPlan } from "@/types/db";
 import InstallAppButton from "@/components/InstallAppButton";
 import ThemeApply from "@/components/ThemeApply";
@@ -268,6 +268,15 @@ export default function PortalPage() {
       .filter((d) => d.cuantas > 0),
     [classes],
   );
+
+  /**
+   * ¿Este estudio cargó fotos en sus clases?
+   *
+   * Si no cargó ninguna, la lista va sin la columna de la foto y queda igual de
+   * prolija que antes. Nadie tiene que destildar nada: si no hay fotos, no hay
+   * recuadros.
+   */
+  const hayFotos = useMemo(() => classes.some((c) => c.image_url), [classes]);
 
   /** El lunes de la semana que se está mirando. */
   const lunesSemana = useMemo(() => sumarDias(lunesDe(), semanaOffset * 7), [semanaOffset]);
@@ -820,12 +829,14 @@ export default function PortalPage() {
                         <div className="w-[42px] shrink-0 pt-0.5 text-sm font-bold tabular-nums text-brand">
                           {fmtTime(c.start_time) || "—"}
                         </div>
-                        {c.image_url ? (
+                        {hayFotos && (c.image_url ? (
                           <img src={c.image_url} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
                         ) : (
-                          <span className="h-12 w-12 shrink-0 rounded-xl border"
-                            style={{ background: `${color}1f`, borderColor: `${color}4d` }} />
-                        )}
+                          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border text-lg font-bold"
+                            style={{ background: `${color}1f`, borderColor: `${color}4d`, color }}>
+                            {inicialDe(c.name)}
+                          </span>
+                        ))}
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-semibold">{c.name.trim()}</div>
                           {c.instructor && <div className="truncate text-xs text-muted">con {c.instructor.trim()}</div>}

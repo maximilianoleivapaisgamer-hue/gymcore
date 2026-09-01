@@ -23,6 +23,16 @@ export function dayLabels(codes: string[] | null | undefined): string {
     .join("/");
 }
 
+/**
+ * La primera letra de una clase, para el recuadro cuando no tiene foto.
+ *
+ * Se usa cuando el estudio cargó fotos en algunas clases y en otras no: en vez
+ * de un cuadrado vacío, va la inicial en el color de la clase.
+ */
+export function inicialDe(nombre: string | null | undefined): string {
+  return String(nombre || "").trim().charAt(0).toUpperCase() || "?";
+}
+
 /** "08:30:00" → "08:30" */
 export function fmtTime(t: string | null | undefined): string {
   return t ? String(t).slice(0, 5) : "";

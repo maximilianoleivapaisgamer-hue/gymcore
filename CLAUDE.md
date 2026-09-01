@@ -271,8 +271,13 @@ el número al lado) y abajo únicamente lo de ese día, ordenado por hora.
 
 **Foto por clase** (`classes.image_url`, `migration_047`): la sube el dueño
 desde el modal de Clases al bucket público `gym-assets` (el mismo del logo),
-y el socio la ve al lado del nombre. Es opcional: sin foto se muestra el color
-de la clase.
+y el socio la ve al lado del nombre.
+
+Es opcional, y **se resuelve sola**: si el estudio no cargó foto en NINGUNA
+clase, ni el panel ni la app muestran el recuadro, así que la lista queda igual
+de prolija que antes. Si cargó en algunas, las que no tienen muestran la
+inicial de la clase en su color (`inicialDe()`). No hace falta una opción para
+apagarlo: no hay fotos, no hay recuadros.
 
 **Vista semanal para el dueño**: en Clases, arriba a la derecha, un interruptor
 "Tarjetas / Semana". La semana ubica cada clase según hora y duración, así los

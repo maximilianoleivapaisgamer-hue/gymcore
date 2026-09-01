@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
-import { DAYS, dayLabels, fmtTime } from "@/lib/clases";
+import { DAYS, dayLabels, fmtTime, inicialDe } from "@/lib/clases";
 import type { RealPlan } from "@/types/db";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 
@@ -355,6 +355,10 @@ export default function ClasesPage() {
     if (!date) return 0;
     return allBookings.filter((b) => b.class_id === c.id && b.class_date === date).length;
   };
+  // Mismo criterio que la app del socio: sin ninguna foto cargada, las
+  // tarjetas van sin recuadro.
+  const hayFotos = classes.some((c) => c.image_url);
+
   const BADGE: Record<string, string> = {
     ok: "bg-[rgba(34,197,94,.14)] text-[#4ade80]",
     info: "bg-brand/20 text-brand",
@@ -403,12 +407,14 @@ export default function ClasesPage() {
               <button key={c.id} onClick={() => openReservas(c)} className="card text-left transition hover:border-brand/40">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    {c.image_url ? (
+                    {hayFotos && (c.image_url ? (
                       <img src={c.image_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
                     ) : (
-                      <span className="h-9 w-9 shrink-0 rounded-lg border"
-                        style={{ background: `${c.color || "#22d3ee"}1f`, borderColor: `${c.color || "#22d3ee"}4d` }} />
-                    )}
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border text-sm font-bold"
+                        style={{ background: `${c.color || "#22d3ee"}1f`, borderColor: `${c.color || "#22d3ee"}4d`, color: c.color || "#22d3ee" }}>
+                        {inicialDe(c.name)}
+                      </span>
+                    ))}
                     <b className="truncate text-base">{c.name}</b>
                   </div>
                   <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${BADGE[badge.cls]}`}>
@@ -516,7 +522,8 @@ export default function ClasesPage() {
                       )}
                     </div>
                     <p className="mt-1.5 text-[11px] leading-snug text-muted">
-                      La ven tus socios en la app cuando eligen la clase. Si no ponés ninguna, se muestra el color.
+                      La ven tus socios en la app cuando eligen la clase.
+                      Si no le ponés foto a ninguna, la lista va sin recuadros y queda igual de prolija.
                     </p>
                   </div>
                 </div>
