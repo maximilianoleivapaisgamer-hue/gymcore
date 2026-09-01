@@ -5,6 +5,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import type { Gym } from "@/types/db";
 import { resolveLandingConfig } from "@/lib/landing-config";
 import { clasesALanding, type ClaseFila } from "@/lib/clases";
+import { createClient as createAdmin } from "@supabase/supabase-js";
 import LandingSite from "@/components/landing/site/LandingSite";
 import DemoVisitPing from "@/components/DemoVisitPing";
 import "../landing.css";
@@ -67,10 +68,19 @@ export default async function GymLanding({ params }: { params: { slug: string } 
   // hay dos listas que se desincronicen: agrega una clase en el panel y
   // aparece acá sola.
   if (config.clases_sync) {
-    const supabase = createClient();
-    const { data: filas } = await supabase
-      .from("classes").select("name, weekdays, start_time, capacity").eq("gym_id", gym.id);
-    config.clases = clasesALanding((filas as ClaseFila[]) || []);
+    // Se lee con el service role, del lado del SERVIDOR. La visita a la web es
+    // anónima y las clases no son públicas en RLS — y NO hay que hacerlas
+    // públicas: cuando se probó eso, el portal del socio (que confiaba en RLS
+    // para aislarse) empezó a mostrar las clases de todos los gimnasios.
+    // Acá la consulta está acotada a mano a ESTE gimnasio y a 4 columnas.
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      const admin = createAdmin(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+      const { data: filas } = await admin
+        .from("classes").select("name, weekdays, start_time, capacity").eq("gym_id", gym.id);
+      config.clases = clasesALanding((filas as ClaseFila[]) || []);
+    }
   }
 
   return (

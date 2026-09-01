@@ -80,7 +80,7 @@ localmente de verdad hay que poner los valores reales en `.env.local`
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **046**.
+La numeración siguiente arranca en **047**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -302,11 +302,13 @@ web pública NO usa la lista de clases cargada a mano: lee **en vivo** la tabla
   estaban duplicados en el panel de Clases.
 - Por defecto viene apagado a propósito: prenderlo le cambiaría la web a un
   cliente que ya la tenía cargada a mano.
-- ⚠️ **La web la mira gente anónima**, así que la tabla necesita lectura pública
-  en RLS. `gyms` ya la tenía; `classes` no, y la grilla llegaba VACÍA sin ningún
-  error visible (`migration_045` la agrega, solo SELECT). Si algún día la web
-  muestra datos de otra tabla, chequeá lo mismo: probá la página **deslogueado**,
-  porque logueado como dueño anda igual y no te enterás.
+- ⚠️ **La web la mira gente anónima**, así que sin permiso la grilla llega VACÍA
+  y sin ningún error visible. Probá siempre la página **deslogueado**: logueado
+  como dueño anda igual y no te enterás.
+  **La solución NO es abrir la tabla en RLS.** Se probó (`migration_045`) y
+  reventó todo — ver el gotcha de aislamiento en §10. La grilla se lee desde el
+  SERVIDOR con el service role en `app/(public)/[slug]/page.tsx`, acotada a ese
+  gimnasio y a 4 columnas.
 
 ### Página pública / landing — `app/(public)/[slug]` y `/g/[slug]`
 Landing white-label por gimnasio: logo, portada, galería, colores/tema, dirección
@@ -569,6 +571,19 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
   que las usan explotan con "permission denied" y todos los dueños y socios
   pierden acceso a sus propios datos. Probado. Además no filtran nada: devuelven
   info del que llama. Ver `migration_037`.
+- **NUNCA abrir una tabla con `using (true)` sin revisar quién la consulta.**
+  Mordió fuerte: para que la grilla de clases se viera en la web pública se
+  agregó lectura pública a `classes` (`migration_045`). Pero el portal del socio
+  hacía `from("classes").select("*")` **sin filtrar por gym_id** — se apoyaba en
+  RLS para aislarse. Resultado: los socios de un estudio vieron las clases de
+  TODOS los gimnasios y demos, y la dueña reportó "clases que no existen".
+  - Revertido en `migration_046`. Ahora las consultas filtran por `gym_id` A
+    MANO (portal y panel) y la web pública usa el service role del lado del
+    servidor.
+  - **Regla:** el aislamiento entre clientes no puede depender de una sola capa.
+    Filtrá por `gym_id` en la consulta AUNQUE la política ya lo haga. Antes de
+    tocar una política, buscá todos los `from("<tabla>")` y fijate cuáles no
+    filtran.
 - **Correr `get_advisors` después de tocar la base.** El linter de Supabase
   agarra RLS faltante, funciones abiertas y search_path mutable. Es la forma
   rápida de no dejar un agujero.

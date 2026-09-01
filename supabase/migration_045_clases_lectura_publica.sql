@@ -1,18 +1,17 @@
--- Lectura pública de la grilla de clases.
+-- ⛔ REVERTIDA. NO VOLVER A APLICAR. Ver migration_046.
 --
--- La web de cada gimnasio la mira gente ANÓNIMA (un prospecto que entra a ver
--- los horarios). `gyms` ya tenía una política de lectura pública para eso, pero
--- `classes` no: solo la veían el dueño y sus socios. Resultado: con
--- `clases_sync` prendido la grilla llegaba vacía a la web.
+-- Esta política abría la lectura de `classes` a todo el mundo, para que la
+-- grilla se viera en la web pública. El problema: el PORTAL DEL SOCIO no
+-- filtraba por gym_id — confiaba en RLS para aislarse. Al abrir la tabla, a los
+-- socios de un estudio les aparecieron las clases de TODOS los gimnasios y
+-- demos ("Pilates Reformer", "Danza Contemporánea", decenas de "Funcional").
 --
--- Qué se expone: nombre de la clase, días, horario, duración, cupo y profe.
--- Es exactamente lo que un gimnasio publica en su web y pega en la puerta.
--- No hay datos de socios ni nada personal: las reservas viven en `bookings`,
--- que sigue cerrada.
+-- Lección: el aislamiento entre clientes no puede depender de una sola capa.
+-- Ahora las consultas filtran por gym_id A MANO, y la web pública lee las
+-- clases desde el servidor con el service role, sin tocar RLS.
 --
--- Es SOLO SELECT. Crear, editar y borrar clases lo siguen manejando las
--- políticas de siempre ("classes del gym").
+-- Se deja el archivo como registro de lo que se hizo y por qué se deshizo.
 
-drop policy if exists "clases lectura pública" on public.classes;
-create policy "clases lectura pública" on public.classes
-  for select using (true);
+-- drop policy if exists "clases lectura pública" on public.classes;
+-- create policy "clases lectura pública" on public.classes
+--   for select using (true);

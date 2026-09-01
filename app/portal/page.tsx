@@ -105,8 +105,12 @@ export default function PortalPage() {
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
         .eq("member_id", m.id).gte("class_date", iso0).order("class_date"),
-      supabase.from("classes").select("*").order("start_time"),
-      supabase.from("bookings").select("id, class_id, member_id, class_date").gte("class_date", iso0),
+      // SIEMPRE filtrar por gym_id. RLS es la red de seguridad, no el único
+      // control: cuando se abrió la lectura de classes para la web pública,
+      // esta consulta empezó a traer las clases de TODOS los gimnasios y los
+      // socios de DanzArte vieron clases que no existían en su estudio.
+      supabase.from("classes").select("*").eq("gym_id", m.gym_id).order("start_time"),
+      supabase.from("bookings").select("id, class_id, member_id, class_date").eq("gym_id", m.gym_id).gte("class_date", iso0),
       supabase.from("weight_logs").select("date, weight_kg").eq("member_id", m.id).order("date", { ascending: false }).limit(1),
       supabase.from("subscriptions").select("plan").eq("gym_id", m.gym_id).maybeSingle<{ plan: string }>(),
       supabase.from("diets").select("id, name, diet_meals(id, day_number, meal_type, position, title, detail, photo_url)")

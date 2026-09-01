@@ -87,8 +87,10 @@ export default function ClasesPage() {
         .maybeSingle<{ real_plans: RealPlan[] | null }>();
       setRealPlans(g?.real_plans || []);
     }
-    let qClasses = supabase.from("classes").select("*").order("start_time");
-    let qBookings = supabase.from("bookings").select("class_id, class_date").gte("class_date", iso(new Date()));
+    // Filtro explícito por gimnasio: no dejar que el aislamiento dependa solo
+    // de las políticas de la base (ver el comentario en app/portal/page.tsx).
+    let qClasses = supabase.from("classes").select("*").eq("gym_id", profile?.gym_id ?? "").order("start_time");
+    let qBookings = supabase.from("bookings").select("class_id, class_date").eq("gym_id", profile?.gym_id ?? "").gte("class_date", iso(new Date()));
     if (activeSede) { qClasses = qClasses.eq("sede_id", activeSede); qBookings = qBookings.eq("sede_id", activeSede); }
     const [{ data: cl }, { data: mem }, { data: bk }] = await Promise.all([
       qClasses,
