@@ -192,3 +192,67 @@ export async function chatWithTool<T = unknown>(
     result: (toolBlock?.input as T) ?? null,
   };
 }
+
+export interface ChatTextOpts {
+  /** Instrucciones + la documentación. Se cachea: es siempre igual. */
+  system: string;
+  messages: ChatMsg[];
+  /** Modelo a usar. Por defecto el de la variable de entorno o el general. */
+  model?: string;
+  maxTokens?: number;
+}
+
+/**
+ * Turno de chat que devuelve TEXTO, sin herramientas.
+ *
+ * Lo usa el ayudante del centro de ayuda: no tiene que armar nada estructurado,
+ * solo contestar la pregunta con la documentación que le pasamos.
+ *
+ * El `system` va con `cache_control` porque son siempre los mismos artículos:
+ * si vienen dos preguntas seguidas, la segunda lee ese bloque desde el caché y
+ * sale unas diez veces más barata.
+ */
+export async function chatText(opts: ChatTextOpts): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "Falta ANTHROPIC_API_KEY en el servidor. Cargala en Vercel → Project Settings → Environment Variables."
+    );
+  }
+  const model = opts.model || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+
+  let res: Response;
+  try {
+    res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: opts.maxTokens ?? 700,
+        system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
+        messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+      }),
+    });
+  } catch {
+    throw new Error("No se pudo conectar con la IA. Probá de nuevo en un momento.");
+  }
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`La IA respondió con error ${res.status}. ${t.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const texto = (Array.isArray(data.content) ? data.content : [])
+    .filter((c) => c.type === "text" && c.text)
+    .map((c) => c.text as string)
+    .join("\n")
+    .trim();
+
+  if (!texto) throw new Error("La IA no devolvió una respuesta.");
+  return texto;
+}

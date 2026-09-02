@@ -230,6 +230,40 @@ Cada negocio elige **cómo cobra**, desde Configuración → Cobros
     vendieron una clase de algo que su plan no cubre, la anota el dueño desde
     Clases (donde puede pasarse).
 
+## Ayuda al cliente (para bajar la atencion por WhatsApp)
+
+Tres capas, de la mas barata a la mas cara. Se armaron juntas el 2026-09-02.
+
+**1. Puesta en marcha** (`components/PrimerosPasos.tsx`, arriba del dashboard).
+Checklist que LEE LA BASE: planes, clases, socios, primer cobro, logo y web.
+No es un tour ni un cartel de bienvenida — muestra el dato real al lado ("16
+clases cargadas") y desaparece solo cuando esta completo. Los pasos de una
+seccion apagada en `hidden_sections` no aparecen, asi un personal trainer no ve
+"carga tus clases" para siempre. Se puede ocultar a mano (`localStorage`:
+`tg_primeros_pasos_oculto`). A los empleados no se les muestra.
+
+**2. Centro de ayuda** (`lib/ayuda.ts` + `components/AyudaPanel.tsx`, en el
+signo de pregunta de la barra). 27 articulos con buscador propio, sin IA y sin
+costo. El buscador normaliza acentos y puntua titulo > claves > cuerpo, para que
+"cancelar" traiga el articulo de cancelacion y no el de cobros.
+- `claves` son las palabras con las que BUSCA LA GENTE, no las nuestras: alguien
+  escribe "faltar" cuando la funcion se llama "cancelacion". Al agregar un
+  articulo, pensa en como lo diria la duena por telefono.
+
+**3. El ayudante** (`app/api/ayuda/route.ts`). Chat con IA que responde SOLO con
+esos articulos; si algo no esta escrito, lo dice y manda a soporte.
+- Usa **Haiku 4.5** (`AYUDA_MODEL` para cambiarlo) y manda los articulos en el
+  `system` con `cache_control`. Medido: ~3.650 tokens de contexto,
+  **US$ 0,005 por pregunta** (~200 por dolar, ~600 con cache caliente).
+- `chatText()` en `lib/ai/anthropic.ts` es el helper: texto plano, sin tools.
+- Pide sesion iniciada: si no, es un endpoint abierto quemando tokens. Ademas
+  corta el historial a 8 turnos y 1.000 caracteres por mensaje.
+- Aparece DESPUES del buscador a proposito: la mayoria de las preguntas las
+  contesta un articulo y no tiene sentido pagar por eso.
+
+> Si agregas una funcion a la app, escribi el articulo en `lib/ayuda.ts`. Con eso
+> queda contestada en el buscador Y en el chat, que leen la misma fuente.
+
 ## Vencimientos y pruebas en el panel de admin
 
 `isProximoVence` / `isVencido` miran **solo los `active`**. La prueba gratis

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { WA_TARGET, abrirWhatsapp } from "@/lib/wa-link";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
+import PrimerosPasos from "@/components/PrimerosPasos";
 
 interface Member {
   id: string;
@@ -182,6 +183,8 @@ export default function DashboardHome() {
           Agregar socio
         </Link>
       </div>
+
+      <PrimerosPasos />
 
       {/* KPIs */}
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
