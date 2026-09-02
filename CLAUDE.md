@@ -243,6 +243,24 @@ La tabla de Gimnasios lista los `active` **y los `trial`**: antes solo mostraba
 activos, así que se avisaba arriba que una prueba se terminaba y abajo ese
 gimnasio no figuraba en ningún lado, sin forma de convertirlo ni borrarlo.
 
+## No reservar más allá del vencimiento
+
+`gyms.reserva_hasta_vencimiento` (`migration_051`), en Configuración → Reservas
+de clases. Salió de abrir el mes entero: con el calendario largo, un socio se
+anota a clases de dentro de tres semanas sin haber pagado ese mes. El tope del
+pack no lo frena, porque cuenta contra el ciclo al que corresponde cada fecha.
+
+- Arranca **apagado**. DanzArte lo tiene prendido desde el 2026-09-01.
+- Lo aplica el trigger `enforce_booking_expiry` (before insert on `bookings`),
+  igual que el tope de clases: el socio inserta directo desde el navegador.
+- **Solo frena al socio.** El dueño anota a quien quiera desde Clases.
+- Un socio **sin `membership_expiry` cargado no se frena**: no hay contra qué
+  comparar, y hay gimnasios que no llevan vencimientos.
+- ⚠️ Consecuencia: para un socio YA vencido, todas las fechas son posteriores,
+  así que no puede reservar nada hasta pagar. En un negocio donde se paga unos
+  días tarde (DanzArte cobra recargo desde el día 10), eso lo deja afuera esos
+  días. Si molesta, se agrega un margen de días; no se saca la regla.
+
 ## Cancelar una clase
 
 `gyms.cancelacion_activa` + `gyms.cancelacion_horas` (`migration_049`), en

@@ -52,6 +52,8 @@ export default function AjustesPage() {
   const [cancelacion, setCancelacion] = useState<{ activa: boolean; horas: number }>({ activa: false, horas: 2 });
   /** Cuántas semanas para adelante puede reservar el socio (incluye la actual). */
   const [reservaSemanas, setReservaSemanas] = useState(3);
+  /** Si solo puede reservar hasta la fecha en que le vence la cuota. */
+  const [topeVencimiento, setTopeVencimiento] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -79,8 +81,9 @@ export default function AjustesPage() {
           setClase({ activa: !!c.clase_suelta_activa, precio: c.clase_suelta_precio != null ? Number(c.clase_suelta_precio) : null });
           const x = data as unknown as { cancelacion_activa?: boolean; cancelacion_horas?: number | null };
           setCancelacion({ activa: !!x.cancelacion_activa, horas: x.cancelacion_horas != null ? Number(x.cancelacion_horas) : 2 });
-          const y = data as unknown as { reserva_semanas?: number | null };
+          const y = data as unknown as { reserva_semanas?: number | null; reserva_hasta_vencimiento?: boolean };
           setReservaSemanas(y.reserva_semanas != null ? Number(y.reserva_semanas) : 3);
+          setTopeVencimiento(!!y.reserva_hasta_vencimiento);
           setCobro({
             cobro_modo: d.cobro_modo || "aniversario",
             cobro_dia: Number(d.cobro_dia) || 10,
@@ -123,6 +126,7 @@ export default function AjustesPage() {
         cancelacion_activa: cancelacion.activa,
         cancelacion_horas: Math.min(72, Math.max(0, Number(cancelacion.horas) || 0)),
         reserva_semanas: Math.min(12, Math.max(1, Number(reservaSemanas) || 3)),
+        reserva_hasta_vencimiento: topeVencimiento,
       })
       .eq("id", gymId);
     setSaving(false);
@@ -281,6 +285,24 @@ export default function AjustesPage() {
             ? "Solo pueden anotarse a las clases de esta semana. El lunes se les abre la siguiente."
             : `Hoy pueden anotarse a cualquier clase de esta semana y de las ${reservaSemanas - 1} siguientes.`}
         </p>
+
+        <div className="mt-4 border-t border-white/10 pt-3">
+          <label className="flex cursor-pointer items-start gap-2">
+            <input type="checkbox" className="mt-0.5" checked={topeVencimiento}
+              onChange={(e) => { limpiar(); setTopeVencimiento(e.target.checked); }} />
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-ink">Solo hasta que les vence la cuota</span>
+              <span className="block text-[11px] leading-snug text-muted">
+                Para que nadie se anote a clases de un mes que todavía no pagó.
+              </span>
+            </span>
+          </label>
+          <p className="mt-1.5 pl-6 text-[11px] leading-snug text-muted">
+            {topeVencimiento
+              ? "Un socio con la cuota paga hasta el 10 no se puede anotar a clases del 11 en adelante. Si está vencido, no puede anotarse a ninguna hasta que renueve: tenelo en cuenta si en tu negocio se paga unos días tarde."
+              : "Hoy pueden anotarse a cualquier clase del calendario, aunque su cuota venza antes."}
+          </p>
+        </div>
 
         <div className="mt-4 border-t border-white/10 pt-3" />
 

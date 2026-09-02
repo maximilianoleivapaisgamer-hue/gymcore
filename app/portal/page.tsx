@@ -78,7 +78,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null; reserva_semanas?: number | null } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null; reserva_semanas?: number | null; reserva_hasta_vencimiento?: boolean } | null>(null);
   /** Cupo de clases del plan del socio. null = plan sin tope. */
   const [cupo, setCupo] = useState<{ limite: number; usadas: number } | null>(null);
   /** El plan del socio, para saber qué actividades tiene incluidas. */
@@ -115,7 +115,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null; reserva_semanas: number | null }>(),
+      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null; reserva_semanas: number | null; reserva_hasta_vencimiento: boolean }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -291,6 +291,18 @@ export default function PortalPage() {
    * solo es para que el botón no prometa algo que después va a fallar.
    */
   const cancelHoras = gym?.cancelacion_activa ? Number(gym.cancelacion_horas ?? 2) : null;
+
+  /**
+   * Hasta que fecha llega la cuota paga, si el negocio usa ese tope.
+   *
+   * null = no hay tope (la regla esta apagada, o el socio no tiene vencimiento
+   * cargado). La misma regla la aplica el trigger `enforce_booking_expiry`.
+   */
+  const topeCuota = gym?.reserva_hasta_vencimiento ? (member?.membership_expiry || null) : null;
+  const fueraDeCuota = (fecha: string | null) => !!topeCuota && !!fecha && fecha > topeCuota;
+  const topeCuotaTexto = topeCuota
+    ? new Date(topeCuota + "T00:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })
+    : "";
 
   /** Cuantas semanas se puede avanzar con la flecha, sin contar la actual. */
   const semanasAdelante = Math.max(
@@ -861,6 +873,14 @@ export default function PortalPage() {
                   </p>
                 )}
 
+                {fueraDeCuota(fechaSel) && (
+                  <div className="mx-4 mb-2 rounded-lg border border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)] px-3 py-2 text-[11px] leading-snug text-[#f5b13d]">
+                    Tu cuota está paga hasta el{" "}
+                    <b>{topeCuotaTexto}</b>.
+                    Para anotarte a las clases de este día, renovala.
+                  </div>
+                )}
+
                 <ul className="divide-y divide-white/5">
                   {clasesDelDia.map((c) => {
                     const date = fechaSel;
@@ -874,6 +894,8 @@ export default function PortalPage() {
                     const incluida = claseIncluida(miPlan, c.name);
                     // Una clase de hoy que ya arrancó no se puede reservar.
                     const yaPaso = date === todayIso() && c.start_time != null && minutosDe(c.start_time) <= ahoraMin;
+                    // Clase posterior al vencimiento de su cuota.
+                    const sinCuota = fueraDeCuota(date);
                     const color = c.color || "#22d3ee";
                     return (
                       <li key={key} className="flex gap-3 px-4 py-3">
@@ -920,9 +942,11 @@ export default function PortalPage() {
                             ) : (
                               <button
                                 className="btn btn-primary px-3 py-1 text-[11.5px]"
-                                disabled={full || !incluida || sinCupo || yaPaso || busyClassKey === key}
+                                disabled={full || !incluida || sinCupo || yaPaso || sinCuota || busyClassKey === key}
                                 title={
-                                  yaPaso
+                                  sinCuota
+                                    ? `Tu cuota está paga hasta el ${topeCuotaTexto}. Renovala para anotarte a partir de ahí.`
+                                    : yaPaso
                                     ? "Esta clase ya empezó"
                                     : !incluida
                                       ? `${c.name.trim()} no está incluida en tu plan${member?.plan_name ? ` ${member.plan_name.trim()}` : ""}`
@@ -932,7 +956,7 @@ export default function PortalPage() {
                                 }
                                 onClick={() => reservar(c, date)}
                               >
-                                {yaPaso ? "Ya pasó" : full ? "Cupo lleno" : !incluida ? "No incluida" : sinCupo ? "Sin clases" : "Reservar"}
+                                {sinCuota ? "Sin cuota" : yaPaso ? "Ya pasó" : full ? "Cupo lleno" : !incluida ? "No incluida" : sinCupo ? "Sin clases" : "Reservar"}
                               </button>
                             )}
                           </div>
