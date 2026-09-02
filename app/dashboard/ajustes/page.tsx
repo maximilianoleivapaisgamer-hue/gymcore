@@ -19,6 +19,16 @@ import { nuevoVencimiento, fechaCorta, type CobroConfig } from "@/lib/fechas";
  * El estilo se previsualiza en vivo al tocarlo, pero recién se guarda con el
  * botón: un solo Guardar para todo lo de esta pantalla.
  */
+/** Las opciones de anticipación. El número INCLUYE la semana en curso. */
+const ANTICIPACION = [
+  { semanas: 1, label: "Solo esta semana" },
+  { semanas: 2, label: "2 semanas" },
+  { semanas: 3, label: "3 semanas" },
+  { semanas: 4, label: "Un mes" },
+  { semanas: 6, label: "Mes y medio" },
+  { semanas: 8, label: "Dos meses" },
+];
+
 /** "19:00" menos N horas → "17:00". Solo para el ejemplo de la pantalla. */
 function horaMenos(hhmm: string, horas: number): string {
   const [h, m] = hhmm.split(":").map(Number);
@@ -40,6 +50,8 @@ export default function AjustesPage() {
   const [clase, setClase] = useState<{ activa: boolean; precio: number | null }>({ activa: false, precio: null });
   /** Hasta cuándo puede el socio cancelar una clase desde su app. */
   const [cancelacion, setCancelacion] = useState<{ activa: boolean; horas: number }>({ activa: false, horas: 2 });
+  /** Cuántas semanas para adelante puede reservar el socio (incluye la actual). */
+  const [reservaSemanas, setReservaSemanas] = useState(3);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -67,6 +79,8 @@ export default function AjustesPage() {
           setClase({ activa: !!c.clase_suelta_activa, precio: c.clase_suelta_precio != null ? Number(c.clase_suelta_precio) : null });
           const x = data as unknown as { cancelacion_activa?: boolean; cancelacion_horas?: number | null };
           setCancelacion({ activa: !!x.cancelacion_activa, horas: x.cancelacion_horas != null ? Number(x.cancelacion_horas) : 2 });
+          const y = data as unknown as { reserva_semanas?: number | null };
+          setReservaSemanas(y.reserva_semanas != null ? Number(y.reserva_semanas) : 3);
           setCobro({
             cobro_modo: d.cobro_modo || "aniversario",
             cobro_dia: Number(d.cobro_dia) || 10,
@@ -108,6 +122,7 @@ export default function AjustesPage() {
         clase_suelta_precio: clase.activa ? (Number(clase.precio) || 0) : null,
         cancelacion_activa: cancelacion.activa,
         cancelacion_horas: Math.min(72, Math.max(0, Number(cancelacion.horas) || 0)),
+        reserva_semanas: Math.min(12, Math.max(1, Number(reservaSemanas) || 3)),
       })
       .eq("id", gymId);
     setSaving(false);
@@ -246,6 +261,29 @@ export default function AjustesPage() {
       <h2 className="mb-1 mt-8 text-sm font-semibold text-ink">Reservas de clases</h2>
       <p className="mb-3 text-xs text-ink-2">Hasta cuándo pueden cancelar tus socios desde su app.</p>
       <div className="card">
+        <div className="mb-1 text-xs font-semibold text-ink">Con cuánta anticipación pueden reservar</div>
+        <p className="mb-2 text-[11px] leading-snug text-muted">
+          En la app, tus socios se mueven entre semanas con flechitas. Esto define hasta dónde llegan.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {ANTICIPACION.map(({ semanas, label }) => (
+            <button key={semanas} type="button"
+              onClick={() => { limpiar(); setReservaSemanas(semanas); }}
+              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                reservaSemanas === semanas
+                  ? "border-brand/40 bg-[rgba(34,211,238,.12)] text-brand"
+                  : "border-white/10 text-ink-2 hover:text-ink"
+              }`}>{label}</button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[11px] leading-snug text-muted">
+          {reservaSemanas === 1
+            ? "Solo pueden anotarse a las clases de esta semana. El lunes se les abre la siguiente."
+            : `Hoy pueden anotarse a cualquier clase de esta semana y de las ${reservaSemanas - 1} siguientes.`}
+        </p>
+
+        <div className="mt-4 border-t border-white/10 pt-3" />
+
         <label className="flex cursor-pointer items-start gap-2">
           <input type="checkbox" className="mt-0.5" checked={cancelacion.activa}
             onChange={(e) => { limpiar(); setCancelacion((c) => ({ ...c, activa: e.target.checked })); }} />

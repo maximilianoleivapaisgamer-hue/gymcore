@@ -270,10 +270,11 @@ salteadas por la lista: la socia la veía arriba y otra vez más abajo. Desde el
 2026-09-01 el portal muestra solapas de días (solo los que tienen clases, con
 el número al lado) y abajo únicamente lo de ese día, ordenado por hora.
 
-- Arriba de las solapas hay flechas de **semana**. El socio puede reservar la
-  semana en curso y las `SEMANAS_ADELANTE` siguientes (hoy: 2, o sea tres
-  semanas en total). Es una constante en `app/portal/page.tsx`: subirla abre más
-  el calendario, ponerla en 0 deja solo la semana actual.
+- Arriba de las solapas hay flechas de **semana**. Hasta dónde llegan lo elige
+  cada negocio en Configuración → Reservas de clases (`gyms.reserva_semanas`,
+  `migration_050`). El número **incluye la semana en curso**: 1 = solo esta
+  semana, 4 = un mes. El default es 3, que es como venía funcionando.
+  DanzArte lo tiene en 4 desde el 2026-09-01, pidió abrir el mes entero.
 - La solapa arranca en **hoy**; los días que ya pasaron quedan apagados y no se
   pueden tocar. Al cambiar de semana cae en el primer día disponible.
 - Las solapas usan `flex-1`, no scroll horizontal: en un iPhone SE (375 px) el

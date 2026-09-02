@@ -56,13 +56,13 @@ function arranqueDe(fecha: string, hora: string | null): Date {
   return d;
 }
 /**
- * Cuantas semanas para adelante puede reservar el socio, ademas de la actual.
+ * Cuantas semanas puede reservar el socio, contando la actual.
  *
- * Con 2, hoy puede anotarse a cualquier clase de esta semana, la que viene y la
- * siguiente. Subirlo abre mas el calendario; bajarlo a 0 deja solo la semana en
- * curso, que es como funcionaba antes.
+ * Lo elige cada negocio en Configuracion -> Reservas de clases
+ * (gyms.reserva_semanas). Este es el valor por si el gimnasio todavia no lo
+ * guardo: esta semana y las dos siguientes.
  */
-const SEMANAS_ADELANTE = 2;
+const RESERVA_SEMANAS_DEFECTO = 3;
 
 const BASE_TABS = [
   { key: "perfil", label: "Mi perfil" },
@@ -78,7 +78,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null; reserva_semanas?: number | null } | null>(null);
   /** Cupo de clases del plan del socio. null = plan sin tope. */
   const [cupo, setCupo] = useState<{ limite: number; usadas: number } | null>(null);
   /** El plan del socio, para saber qué actividades tiene incluidas. */
@@ -115,7 +115,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null }>(),
+      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null; reserva_semanas: number | null }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -291,6 +291,12 @@ export default function PortalPage() {
    * solo es para que el botón no prometa algo que después va a fallar.
    */
   const cancelHoras = gym?.cancelacion_activa ? Number(gym.cancelacion_horas ?? 2) : null;
+
+  /** Cuantas semanas se puede avanzar con la flecha, sin contar la actual. */
+  const semanasAdelante = Math.max(
+    0,
+    Math.min(12, Number(gym?.reserva_semanas ?? RESERVA_SEMANAS_DEFECTO) || RESERVA_SEMANAS_DEFECTO) - 1,
+  );
 
   function puedeCancelar(fecha: string, hora: string | null): boolean {
     if (cancelHoras === null) return true;
@@ -808,8 +814,8 @@ export default function PortalPage() {
                     {semanaOffset === 0 ? "Esta semana" : rangoSemana(lunesSemana)}
                   </span>
                   <button type="button" aria-label="Semana siguiente"
-                    onClick={() => setSemanaOffset((n) => Math.min(SEMANAS_ADELANTE, n + 1))}
-                    disabled={semanaOffset >= SEMANAS_ADELANTE}
+                    onClick={() => setSemanaOffset((n) => Math.min(semanasAdelante, n + 1))}
+                    disabled={semanaOffset >= semanasAdelante}
                     className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 text-ink-2 transition enabled:hover:border-white/25 enabled:hover:text-ink disabled:opacity-25">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18" /></svg>
                   </button>
@@ -847,9 +853,11 @@ export default function PortalPage() {
                   {fechaSel ? ` · ${fechaLarga(fechaSel)}` : ""}
                 </div>
 
-                {semanaOffset >= SEMANAS_ADELANTE && (
+                {semanaOffset >= semanasAdelante && (
                   <p className="px-4 pb-1 text-[11px] text-muted">
-                    Hasta acá llegan las reservas: se abren {SEMANAS_ADELANTE + 1} semanas antes.
+                    {semanasAdelante === 0
+                      ? "Por ahora solo se reservan las clases de esta semana."
+                      : `Hasta acá llegan las reservas: se abren ${semanasAdelante + 1} semanas antes.`}
                   </p>
                 )}
 
