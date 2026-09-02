@@ -48,6 +48,13 @@ function minutosDe(t: string | null): number {
   const [h, m] = fmtTime(t).split(":");
   return Number(h || 0) * 60 + Number(m || 0);
 }
+
+/** Cuándo arranca una clase, como fecha real. Sin horario, a las 00:00. */
+function arranqueDe(fecha: string, hora: string | null): Date {
+  const d = new Date(fecha + "T00:00:00");
+  d.setMinutes(minutosDe(hora));
+  return d;
+}
 /**
  * Cuantas semanas para adelante puede reservar el socio, ademas de la actual.
  *
@@ -71,7 +78,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null } | null>(null);
   /** Cupo de clases del plan del socio. null = plan sin tope. */
   const [cupo, setCupo] = useState<{ limite: number; usadas: number } | null>(null);
   /** El plan del socio, para saber qué actividades tiene incluidas. */
@@ -108,7 +115,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null }>(),
+      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -244,7 +251,15 @@ export default function PortalPage() {
   async function cancelar(bookingId: string) {
     setBusyClassKey(bookingId);
     setReservaErr("");
-    await supabase.from("bookings").delete().eq("id", bookingId);
+    // Si el plazo ya pasó, el trigger de la base la frena y devuelve el motivo
+    // escrito para el socio. Antes esto no se miraba y la fila desaparecía de
+    // la pantalla aunque la reserva siguiera existiendo.
+    const { error } = await supabase.from("bookings").delete().eq("id", bookingId);
+    if (error) {
+      setReservaErr(error.message || "No se pudo cancelar. Probá de nuevo.");
+      setBusyClassKey(null);
+      return;
+    }
     setAllBookings((bs) => bs.filter((b) => b.id !== bookingId));
     setMyBookings((mb) => mb.filter((b) => b.id !== bookingId));
     // Cancelar le devuelve el lugar, pero solo si la clase caía en este ciclo.
@@ -268,6 +283,19 @@ export default function PortalPage() {
       .filter((d) => d.cuantas > 0),
     [classes],
   );
+
+  /**
+   * Hasta cuándo puede cancelar el socio, según lo que configuró el negocio.
+   *
+   * La misma regla la aplica el trigger `enforce_cancel_window` en la base: acá
+   * solo es para que el botón no prometa algo que después va a fallar.
+   */
+  const cancelHoras = gym?.cancelacion_activa ? Number(gym.cancelacion_horas ?? 2) : null;
+
+  function puedeCancelar(fecha: string, hora: string | null): boolean {
+    if (cancelHoras === null) return true;
+    return Date.now() <= arranqueDe(fecha, hora).getTime() - cancelHoras * 3600000;
+  }
 
   /**
    * ¿Este estudio cargó fotos en sus clases?
@@ -705,13 +733,20 @@ export default function PortalPage() {
                         <div>{new Date(b.class_date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
                         {b.classes?.start_time && <div className="text-xs text-muted">{fmtTime(b.classes.start_time)}</div>}
                       </div>
-                      <button
-                        className="text-xs text-ink-2 hover:text-crit"
-                        disabled={busyClassKey === b.id}
-                        onClick={() => cancelar(b.id)}
-                      >
-                        Cancelar
-                      </button>
+                      {puedeCancelar(b.class_date, b.classes?.start_time ?? null) ? (
+                        <button
+                          className="text-xs text-ink-2 hover:text-crit"
+                          disabled={busyClassKey === b.id}
+                          onClick={() => cancelar(b.id)}
+                        >
+                          Cancelar
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted"
+                          title={`Se podía cancelar hasta ${cancelHoras} ${cancelHoras === 1 ? "hora" : "horas"} antes de que empiece`}>
+                          Sin cancelar
+                        </span>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -723,6 +758,14 @@ export default function PortalPage() {
             <div className="border-b border-white/10 p-4">
               <h2 className="font-semibold">Todas las clases</h2>
               <p className="text-xs text-muted">Elegí el día y anotate en la clase que quieras.</p>
+              {cancelHoras !== null && (
+                <p className="mt-1 text-[11px] leading-snug text-muted">
+                  {cancelHoras === 0
+                    ? "Podés cancelar hasta que empiece la clase."
+                    : `Podés cancelar hasta ${cancelHoras} ${cancelHoras === 1 ? "hora" : "horas"} antes de que empiece.`}
+                  {" "}Después ya no, y si no vas te cuenta como clase usada.
+                </p>
+              )}
 
               {/* Cupo del plan. Solo aparece si el plan del socio tiene tope. */}
               {cupo && (
@@ -856,10 +899,16 @@ export default function PortalPage() {
                               </span>
                             )}
                             {mine ? (
-                              <button className="btn btn-ghost px-3 py-1 text-[11.5px]"
-                                disabled={busyClassKey === mine.id} onClick={() => cancelar(mine.id)}>
-                                Cancelar
-                              </button>
+                              puedeCancelar(date, c.start_time) ? (
+                                <button className="btn btn-ghost px-3 py-1 text-[11.5px]"
+                                  disabled={busyClassKey === mine.id} onClick={() => cancelar(mine.id)}>
+                                  Cancelar
+                                </button>
+                              ) : (
+                                <span className="rounded-full bg-white/[.06] px-2 py-0.5 text-[10.5px] font-semibold text-ink-2">
+                                  Anotada · ya no se cancela
+                                </span>
+                              )
                             ) : (
                               <button
                                 className="btn btn-primary px-3 py-1 text-[11.5px]"

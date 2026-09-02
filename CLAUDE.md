@@ -243,6 +243,25 @@ La tabla de Gimnasios lista los `active` **y los `trial`**: antes solo mostraba
 activos, así que se avisaba arriba que una prueba se terminaba y abajo ese
 gimnasio no figuraba en ningún lado, sin forma de convertirlo ni borrarlo.
 
+## Cancelar una clase
+
+`gyms.cancelacion_activa` + `gyms.cancelacion_horas` (`migration_049`), en
+Configuración → **Reservas de clases**. Lo pidió DanzArte: *"si quiere cancelar
+tiene hasta 2 hs antes; y si estaba anotada y no fue, perdió una clase"*.
+
+- Arranca **apagado** para todos, así no le cambia las reglas a nadie que ya
+  venía andando. DanzArte lo tiene en 2 horas desde el 2026-09-01.
+- **"Perder la clase" no necesita código extra**: si el socio no puede cancelar,
+  la reserva queda, y el tope del plan cuenta las reservas del ciclo haya ido o
+  no. Ese es todo el mecanismo.
+- Lo aplica el trigger `enforce_cancel_window` (before delete on `bookings`), no
+  la pantalla: el socio borra la reserva directo contra Supabase desde el
+  navegador. La pantalla solo evita ofrecer un botón que va a fallar.
+- **Solo frena al socio** (`profiles.role = 'member'`). El dueño y los profes
+  sacan a alguien de una reserva cuando quieran, igual que con el tope de clases.
+- La hora de corte se calcula en `America/Argentina/Buenos_Aires`. Una clase sin
+  `start_time` cuenta como que arranca a las 00:00 de ese día.
+
 ## La grilla de clases
 
 **El socio la ve por día, no por horario.** La tabla `classes` guarda una fila

@@ -19,6 +19,13 @@ import { nuevoVencimiento, fechaCorta, type CobroConfig } from "@/lib/fechas";
  * El estilo se previsualiza en vivo al tocarlo, pero recién se guarda con el
  * botón: un solo Guardar para todo lo de esta pantalla.
  */
+/** "19:00" menos N horas → "17:00". Solo para el ejemplo de la pantalla. */
+function horaMenos(hhmm: string, horas: number): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const t = ((h - horas) % 24 + 24) % 24;
+  return `${String(t).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export default function AjustesPage() {
   const supabase = createClient();
   const [gymId, setGymId] = useState<string | null>(null);
@@ -31,6 +38,8 @@ export default function AjustesPage() {
   const [cobro, setCobro] = useState<CobroConfig>({ cobro_modo: "aniversario", cobro_dia: 10, recargo_tipo: null, recargo_valor: null });
   /** Venta de clases sueltas: si las vende y a cuanto. */
   const [clase, setClase] = useState<{ activa: boolean; precio: number | null }>({ activa: false, precio: null });
+  /** Hasta cuándo puede el socio cancelar una clase desde su app. */
+  const [cancelacion, setCancelacion] = useState<{ activa: boolean; horas: number }>({ activa: false, horas: 2 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -56,6 +65,8 @@ export default function AjustesPage() {
           const d = data as unknown as CobroConfig;
           const c = data as unknown as { clase_suelta_activa?: boolean; clase_suelta_precio?: number | null };
           setClase({ activa: !!c.clase_suelta_activa, precio: c.clase_suelta_precio != null ? Number(c.clase_suelta_precio) : null });
+          const x = data as unknown as { cancelacion_activa?: boolean; cancelacion_horas?: number | null };
+          setCancelacion({ activa: !!x.cancelacion_activa, horas: x.cancelacion_horas != null ? Number(x.cancelacion_horas) : 2 });
           setCobro({
             cobro_modo: d.cobro_modo || "aniversario",
             cobro_dia: Number(d.cobro_dia) || 10,
@@ -95,6 +106,8 @@ export default function AjustesPage() {
         recargo_valor: cobro.recargo_tipo ? (Number(cobro.recargo_valor) || 0) : null,
         clase_suelta_activa: clase.activa,
         clase_suelta_precio: clase.activa ? (Number(clase.precio) || 0) : null,
+        cancelacion_activa: cancelacion.activa,
+        cancelacion_horas: Math.min(72, Math.max(0, Number(cancelacion.horas) || 0)),
       })
       .eq("id", gymId);
     setSaving(false);
@@ -227,6 +240,53 @@ export default function AjustesPage() {
           Ejemplo: a un socio que hoy está vencido, al cobrarle le va a quedar el{" "}
           <b className="text-ink-2">{fechaCorta(nuevoVencimiento("2000-01-01", cobro))}</b>.
         </p>
+      </div>
+
+      {/* ── Reservas ───────────────────────────────────────────────────────── */}
+      <h2 className="mb-1 mt-8 text-sm font-semibold text-ink">Reservas de clases</h2>
+      <p className="mb-3 text-xs text-ink-2">Hasta cuándo pueden cancelar tus socios desde su app.</p>
+      <div className="card">
+        <label className="flex cursor-pointer items-start gap-2">
+          <input type="checkbox" className="mt-0.5" checked={cancelacion.activa}
+            onChange={(e) => { limpiar(); setCancelacion((c) => ({ ...c, activa: e.target.checked })); }} />
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold text-ink">Poner un plazo para cancelar</span>
+            <span className="block text-[11px] leading-snug text-muted">
+              Para que se anoten en serio y no dejen el lugar ocupado hasta último momento.
+            </span>
+          </span>
+        </label>
+
+        {cancelacion.activa ? (
+          <div className="mt-3 border-t border-white/10 pt-3 pl-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-ink-2">Pueden cancelar hasta</span>
+              <input type="number" min={0} max={72} className="input w-20"
+                value={cancelacion.horas}
+                onChange={(e) => { limpiar(); setCancelacion((c) => ({ ...c, horas: e.target.value === "" ? 0 : Number(e.target.value) })); }} />
+              <span className="text-xs text-ink-2">
+                {Number(cancelacion.horas) === 1 ? "hora antes" : "horas antes"} de que empiece la clase
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] leading-snug text-muted">
+              {Number(cancelacion.horas) === 0 ? (
+                <>Una clase de las <b className="text-ink-2">19:00</b> se puede cancelar hasta que arranca.</>
+              ) : (
+                <>Una clase de las <b className="text-ink-2">19:00</b> se puede cancelar hasta las{" "}
+                  <b className="text-ink-2">{horaMenos("19:00", Number(cancelacion.horas))}</b>.</>
+              )}{" "}
+              Después ya no: si la socia no va, esa clase le cuenta igual y le descuenta una del pack.
+            </p>
+            <p className="mt-1.5 text-[11px] leading-snug text-muted">
+              A vos no te frena: desde <b className="text-ink-2">Clases</b> podés sacar a alguien de una
+              reserva cuando quieras, aunque el plazo haya pasado.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 border-t border-white/10 pt-3 text-[11px] leading-snug text-muted">
+            Sin plazo, tus socios pueden cancelar en cualquier momento y la clase les vuelve al pack.
+          </p>
+        )}
       </div>
 
       {/* ── Secciones del panel ────────────────────────────────────────────── */}
