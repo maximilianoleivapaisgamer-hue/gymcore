@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { themeOf } from "@/lib/theme";
+import { nombreLimpio, nombreCorto } from "@/lib/marca";
 
 /**
  * El manifest de la app instalada, uno por gimnasio.
@@ -40,16 +41,14 @@ export async function GET(
       .from("gyms").select("name, app_icon_url, logo_url, theme").eq("slug", slug)
       .maybeSingle<{ name: string | null; app_icon_url: string | null; logo_url: string | null; theme: string | null }>();
     if (data) {
-      nombre = (data.name || "turnogym").trim();
+      nombre = nombreLimpio(data.name);
       // El ícono de la app gana; si no cargó uno, probamos con el logo.
       icono = data.app_icon_url || data.logo_url || null;
       tema = themeOf(data.theme);
     }
   }
 
-  // El nombre corto es el que entra abajo del ícono en el teléfono: 12
-  // caracteres es lo que muestra Android antes de cortar con puntos.
-  const corto = nombre.length <= 12 ? nombre : nombre.slice(0, 12).trim();
+  const corto = nombreCorto(nombre);
 
   const manifest = {
     name: nombre,

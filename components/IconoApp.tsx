@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
+import { nombreCorto } from "@/lib/marca";
 
 /**
  * El ícono con el que queda instalada la app en el celular del socio.
@@ -105,7 +106,7 @@ export default function IconoApp() {
   if (cargando || !gymId) return null;
 
   const inicial = (nombre || "T").charAt(0).toUpperCase();
-  const corto = nombre.length <= 12 ? nombre : nombre.slice(0, 12).trim();
+  const corto = nombreCorto(nombre);
 
   return (
     <div className="card mb-4">

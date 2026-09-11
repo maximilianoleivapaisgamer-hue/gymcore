@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { nombreCorto } from "@/lib/marca";
 
 /**
  * Le pone al navegador la marca del gimnasio para cuando el socio instale la app.
@@ -53,7 +54,7 @@ export default function MarcaInstalable({
         document.head.appendChild(meta);
         puestos.push(meta);
       }
-      meta.setAttribute("content", nombre.slice(0, 12).trim());
+      meta.setAttribute("content", nombreCorto(nombre));
     }
 
     return () => { puestos.forEach((el) => el.remove()); };
