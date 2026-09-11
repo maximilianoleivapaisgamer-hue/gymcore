@@ -10,6 +10,7 @@ import type { RealPlan } from "@/types/db";
 import InstallAppButton from "@/components/InstallAppButton";
 import EliminarCuenta from "@/components/EliminarCuenta";
 import MarcaInstalable from "@/components/MarcaInstalable";
+import AvisosPush from "@/components/AvisosPush";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
 import AppBackground from "@/components/AppBackground";
@@ -533,8 +534,10 @@ export default function PortalPage() {
             <div className="mt-1 text-xs text-ink-2">Presentá este código en recepción</div>
           </div>
 
-          {/* Al final de "Mi perfil": recomendación de bajar la webapp */}
+          {/* Al final de "Mi perfil": instalar la app y prender los avisos.
+              En ese orden: en iPhone los avisos necesitan la app instalada. */}
           <InstallAppButton />
+          <AvisosPush />
 
           {/* Eliminar la cuenta: las tiendas lo exigen y tiene que estar donde
               el socio lo pueda encontrar, no escondido en un mail. */}

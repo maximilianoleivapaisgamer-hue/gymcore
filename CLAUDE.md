@@ -297,11 +297,38 @@ https://claude.ai/code/artifact/2bb10ade-3d55-4fc7-be0c-5281e203cff4
      deja borrar desde aca.
    - Verificado contra las 148 cuentas reales: cada una cae en un solo caso y no
      hay ninguna ambigua (nadie es dueño y socio a la vez).
-3. ⏳ **Service worker + notificaciones** — no hay service worker en todo el
-   proyecto. Sin eso la app no hace nada que la web no haga y se rechaza por
-   "funcionalidad minima". Efecto secundario que ya duele hoy: `InstallAppButton`
-   escucha `beforeinstallprompt`, que Chrome no dispara sin service worker, asi
-   que el boton "Instalar app" probablemente no anda en Android.
+3. ✅ **Service worker + notificaciones** — `public/sw.js` + `lib/push.ts` +
+   `app/api/push` (alta/baja) + `components/AvisosPush.tsx` (el boton en el
+   perfil del socio). `migration_052` crea `push_subscriptions` y la marca
+   `bookings.aviso_clase_at`.
+   - **Cada fila es UN NAVEGADOR, no un socio**: la misma persona puede tener el
+     celular y la compu. El `endpoint` es unico y al repetirse se pisa.
+   - La tabla tiene **RLS prendido y CERO politicas**: no se toca desde el
+     navegador, solo por `/api/push` con service role, que saca el socio de la
+     sesion.
+   - **El service worker NO cachea la app**, a proposito: servir codigo viejo
+     desde el cache hace que el socio use una version distinta a la publicada y
+     genera errores imposibles de reproducir. Solo se guarda
+     `public/sin-conexion.html`.
+   - Se usa la libreria `web-push` y no fetch a mano como el cliente de
+     Anthropic: hay que firmar un JWT y cifrar con ECDH + HKDF + AES-GCM
+     (RFC 8291), y eso escrito a mano se rompe en silencio.
+   - **404 y 410 del servicio de push = ese navegador ya no existe.** Esa fila
+     se borra; cualquier otro error se reintenta.
+   - ⚠️ **En iPhone los avisos SOLO andan con la app agregada a la pantalla de
+     inicio.** Desde Safari normal el navegador ni expone la API. El componente
+     lo detecta y lo explica en vez de ofrecer un boton que no va a andar.
+   - Aviso de clase: `app/api/cron/clases`, cada hora en `vercel.json`. La
+     ventana (3 horas) y la marca lo hacen **idempotente**: corriendo dos veces
+     no manda dos veces, y corriendo una sola vez al dia igual avisa de las
+     proximas horas. No depende de la frecuencia del plan.
+   - Efecto secundario que arregla: `InstallAppButton` escucha
+     `beforeinstallprompt`, que Chrome no dispara sin service worker. Ahora si.
+
+   ⏳ Falta el aviso de CUOTA por push. El de WhatsApp ya existe pero esta
+   gateado a Pro y atado a `wa_reminders`; el push no cuesta nada, asi que hay
+   que decidir si va para todos, y necesita su propia marca anti-duplicado
+   (`last_reminder_for` la usa WhatsApp).
 4. ✅ **Manifest por gimnasio** — `app/manifest/[slug]/route.ts` devuelve el
    manifest con el nombre, el icono y los colores de ese negocio. Es PUBLICO: el
    navegador lo pide sin sesion, por eso lee con service role acotado a 4
