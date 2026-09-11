@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import EliminarCuenta from "@/components/EliminarCuenta";
 import PasswordInput from "@/components/PasswordInput";
 
 export default function MiCuentaPage() {
@@ -97,6 +98,12 @@ export default function MiCuentaPage() {
         </div>
         {passMsg && <p className="mt-2 text-sm text-good">{passMsg}</p>}
         {passErr && <p className="mt-2 text-sm text-crit">{passErr}</p>}
+      </div>
+
+      {/* Eliminar la cuenta. Va al final y arranca cerrado: es definitivo y no
+          tiene que competir con lo que se usa todos los días. */}
+      <div className="mt-8 border-t border-white/10 pt-5">
+        <EliminarCuenta />
       </div>
     </div>
   );

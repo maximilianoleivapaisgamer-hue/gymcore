@@ -8,6 +8,7 @@ import { cicloDe, topeDelPlan, claseIncluida, planDelSocio } from "@/lib/cupo-cl
 import { lunesDe, sumarDias, fechaDeDia, rangoSemana, fechaLarga, inicialDe } from "@/lib/clases";
 import type { RealPlan } from "@/types/db";
 import InstallAppButton from "@/components/InstallAppButton";
+import EliminarCuenta from "@/components/EliminarCuenta";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
 import AppBackground from "@/components/AppBackground";
@@ -531,6 +532,12 @@ export default function PortalPage() {
 
           {/* Al final de "Mi perfil": recomendación de bajar la webapp */}
           <InstallAppButton />
+
+          {/* Eliminar la cuenta: las tiendas lo exigen y tiene que estar donde
+              el socio lo pueda encontrar, no escondido en un mail. */}
+          <div className="border-t border-white/10 pt-4 text-center">
+            <EliminarCuenta />
+          </div>
         </div>
       )}
 

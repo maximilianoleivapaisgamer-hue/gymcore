@@ -277,8 +277,21 @@ https://claude.ai/code/artifact/2bb10ade-3d55-4fc7-be0c-5281e203cff4
    > ⚠️ Si agregas una tabla con datos de personas, actualiza `/privacidad`. Y el
    > mail de `lib/legal.ts` **tiene que existir de verdad**: es el que va en la
    > ficha de la tienda y el revisor escribe ahi.
-2. ⏳ **Eliminar la cuenta desde la app** — Apple lo exige desde 2022 y Google
-   desde 2024 para toda app con registro. Hoy no existe en ningun lado.
+2. ✅ **Eliminar la cuenta desde la app** — `app/api/cuenta/eliminar` (GET
+   muestra que se pierde, POST borra) + `components/EliminarCuenta.tsx`, montado
+   en Mi cuenta y en el perfil del socio.
+   - **Siempre borra al que llama.** No recibe ningun id: el usuario sale de la
+     sesion, asi nadie borra la cuenta de otro. El caso se resuelve por lo que la
+     persona ES en la base, no por lo que mande.
+   - **Al socio se le borra la ficha, pero NO la plata del gimnasio.** Los FK
+     estan bien puestos: `cashflow_entries.member_id` y `attendances.member_id`
+     son SET NULL, asi que los cobros y las asistencias quedan con el socio en
+     blanco. Lo personal (reservas, peso, rutinas, dietas) cascadea.
+   - Al **dueño** se le borra el gimnasio entero y las cuentas de sus socios;
+     por eso pide escribir el nombre del negocio. Al **super admin** no se lo
+     deja borrar desde aca.
+   - Verificado contra las 148 cuentas reales: cada una cae en un solo caso y no
+     hay ninguna ambigua (nadie es dueño y socio a la vez).
 3. ⏳ **Service worker + notificaciones** — no hay service worker en todo el
    proyecto. Sin eso la app no hace nada que la web no haga y se rechaza por
    "funcionalidad minima". Efecto secundario que ya duele hoy: `InstallAppButton`
