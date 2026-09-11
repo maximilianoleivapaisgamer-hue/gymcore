@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { WA_TARGET, abrirWhatsapp } from "@/lib/wa-link";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 import PrimerosPasos from "@/components/PrimerosPasos";
+import AvisoAbono from "@/components/AvisoAbono";
 
 interface Member {
   id: string;
@@ -183,6 +184,8 @@ export default function DashboardHome() {
           Agregar socio
         </Link>
       </div>
+
+      <AvisoAbono />
 
       <PrimerosPasos />
 

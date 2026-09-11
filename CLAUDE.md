@@ -280,8 +280,21 @@ Ahora la tarjeta del plan actual mira **como paga** (`subscriptions.payment_meth
   que ya existian. No hizo falta backend: `/api/pagos/crear` y el flujo de
   transferencia ya aceptaban el plan actual.
 
-Ademas, si le toca pagar y faltan 7 dias o menos (o ya vencio), la tarjeta de
-estado muestra el aviso con los dos botones arriba de todo.
+**Donde vive cada cosa** (reacomodado el 2026-09-11):
+- **Abonar el mes del plan que YA tiene** -> abajo de la tarjeta "Estado de tu
+  cuenta", en `id="abonar"`. Siempre visible para el que paga a mano; cuando
+  faltan 7 dias o menos cambia el tono a ambar, y a rojo si vencio.
+- **"Planes disponibles"** -> solo para CAMBIAR de plan. La tarjeta del plan
+  actual volvio a ser un cartel sin botones. El que solo quiere pagar su mes no
+  tiene que ponerse a comparar planes para encontrar el boton.
+- **Aviso en el panel** (`components/AvisoAbono.tsx`): a 7 dias o menos del
+  vencimiento aparece arriba del dashboard con "Pagar ahora", que linkea a
+  `/dashboard/mi-plan#abonar`. No se le muestra al bonificado, al que tiene
+  debito automatico, ni a los empleados.
+
+Al ofrecer Mercado Pago hay que aclarar **"dinero en cuenta, tarjeta de debito
+o de credito"**: mucha gente cree que es solo para los que tienen saldo en la
+billetera y descarta la opcion.
 
 > ⚠️ **Los vencimientos NO se formatean con `new Date().toLocaleDateString()`.**
 > Vienen como timestamp a medianoche UTC, asi que en Argentina (UTC-3) se corren

@@ -199,8 +199,10 @@ export default function MiPlanPage() {
   const diasRestantes = diasPara(vence);
   /** Le toca poner plata: ni bonificado ni con débito automático. */
   const tienePagar = !!sub && !sinCargo && !debitoAutomatico;
-  /** Ya es momento de avisarle: faltan 7 días o menos, o ya venció. */
-  const avisarVence = tienePagar && diasRestantes !== null && diasRestantes <= 7;
+  /** Falta poco o ya venció: solo cambia el TONO, no si se muestra o no. */
+  const apura = diasRestantes !== null && diasRestantes <= 7;
+  const vencido = diasRestantes !== null && diasRestantes < 0;
+  const precioActual = plans.find((x) => x.key === sub?.plan)?.price ?? 0;
 
   return (
     <main className="p-5 md:p-7">
@@ -255,43 +257,12 @@ export default function MiPlanPage() {
                     {fdate(vence)}
                   </div>
                 </div>
-                {/* Cómo se renueva. Antes esto no se decía en ningún lado. */}
-                {sub.status === "active" && (
+                {/* Cómo se renueva, al lado del estado. */}
+                {sub.status === "active" && (sinCargo || debitoAutomatico) && (
                   <div className="mt-1 text-xs text-muted">
                     {sinCargo
                       ? "Tu plan está bonificado: no tenés que abonar nada."
-                      : debitoAutomatico
-                        ? "Se renueva solo con débito automático de Mercado Pago."
-                        : "Se renueva abonando vos: por Mercado Pago o transferencia."}
-                  </div>
-                )}
-
-                {/* Le toca pagar y el vencimiento está cerca (o ya pasó). */}
-                {avisarVence && !pendiente && (
-                  <div className={`w-full rounded-xl border px-4 py-3 ${
-                    (diasRestantes as number) < 0
-                      ? "border-crit/30 bg-[rgba(240,82,82,.08)]"
-                      : "border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)]"
-                  }`}>
-                    <div className={`text-sm font-semibold ${(diasRestantes as number) < 0 ? "text-crit" : "text-[#f5b13d]"}`}>
-                      {(diasRestantes as number) < 0
-                        ? `Tu abono venció el ${fdate(vence)}.`
-                        : (diasRestantes as number) === 0
-                          ? "Tu abono vence hoy."
-                          : `Tu abono vence en ${diasRestantes} ${diasRestantes === 1 ? "día" : "días"}, el ${fdate(vence)}.`}
-                    </div>
-                    <p className="mt-0.5 text-xs text-ink-2">
-                      Aboná el mes para que no se te corte el servicio.
-                    </p>
-                    <div className="mt-2.5 flex flex-wrap gap-2">
-                      <button className="btn btn-primary text-xs" disabled={changing === sub.plan}
-                        onClick={() => cambiar(sub.plan)}>
-                        {changing === sub.plan ? "Redirigiendo…" : "💳 Pagar con Mercado Pago"}
-                      </button>
-                      <button className="btn btn-ghost text-xs" onClick={() => openTransfer(sub.plan)}>
-                        🏦 Pagar por transferencia
-                      </button>
-                    </div>
+                      : "Se renueva solo con débito automático de Mercado Pago."}
                   </div>
                 )}
 
@@ -320,16 +291,67 @@ export default function MiPlanPage() {
                     </div>
                   </div>
                 )}
+
+                {/* ── Abonar el plan que ya tiene ──────────────────────
+                    Va acá abajo y no en "Planes disponibles": esa grilla es
+                    para CAMBIAR de plan. El que solo quiere pagar su mes no
+                    tiene que ponerse a comparar planes para encontrar el botón. */}
+                {tienePagar && !pendiente && (
+                  /* id="abonar": el aviso del dashboard linkea directo acá. */
+                  <div id="abonar" className="w-full scroll-mt-24 border-t border-white/10 pt-3">
+                    <div className="text-xs uppercase tracking-wide text-muted">
+                      {sub.status === "trial" ? "Activá tu plan" : "Abonar tu plan"}
+                    </div>
+
+                    <p className={`mt-1 text-sm ${vencido ? "font-semibold text-crit" : apura ? "font-semibold text-[#f5b13d]" : "text-ink-2"}`}>
+                      {sub.status === "trial"
+                        ? <>Tu prueba termina el <b>{fdate(vence)}</b>. Aboná para seguir sin cortes.</>
+                        : vencido
+                          ? <>Tu abono venció el <b>{fdate(vence)}</b>. Aboná para que no se te corte el servicio.</>
+                          : diasRestantes === 0
+                            ? <>Tu abono <b>vence hoy</b>. Aboná para que no se te corte el servicio.</>
+                            : <>
+                                {plans.find((x) => x.key === sub.plan)?.label || sub.plan} · <b className="text-ink">{money(precioActual)}</b> por mes
+                                {diasRestantes !== null && <> · vence en {diasRestantes} {diasRestantes === 1 ? "día" : "días"}</>}
+                              </>}
+                    </p>
+
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-white/10 bg-surface-2 p-3">
+                        <button className="btn btn-primary w-full" disabled={changing === sub.plan}
+                          onClick={() => cambiar(sub.plan)}>
+                          {changing === sub.plan ? "Redirigiendo…" : "💳 Pagar con Mercado Pago"}
+                        </button>
+                        <p className="mt-2 text-[11px] leading-snug text-muted">
+                          Con dinero en cuenta, tarjeta de débito o de crédito.
+                          Se activa al instante.
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-surface-2 p-3">
+                        <button className="btn btn-ghost w-full" onClick={() => openTransfer(sub.plan)}>
+                          🏦 Pagar por transferencia
+                        </button>
+                        <p className="mt-2 text-[11px] leading-snug text-muted">
+                          Te damos el alias, subís el comprobante y lo activamos
+                          en hasta 48hs hábiles.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-ink-2">Todavía no tenés una suscripción configurada. Escribinos para activarla.</p>
             )}
           </div>
 
-          <h2 className="mb-3 text-lg font-bold">Planes disponibles</h2>
+          <h2 className="mb-3 text-lg font-bold">
+            {sub ? "¿Querés cambiar de plan?" : "Planes disponibles"}
+          </h2>
           <p className="mb-4 text-sm text-muted">
-            Elegí tu plan y aboná con <b>Mercado Pago</b> (débito automático, se activa al instante) o por
-            <b> transferencia</b> (subís el comprobante y lo activamos en hasta 48hs).
+            {sub
+              ? "Mirá qué suma cada plan. Al contratarlo abonás con Mercado Pago (dinero en cuenta, débito o crédito) o por transferencia."
+              : "Elegí tu plan y aboná con Mercado Pago (dinero en cuenta, débito o crédito) o por transferencia."}
           </p>
           <div className="grid items-start gap-5 md:grid-cols-3">
             {plans.map((p) => {
@@ -403,27 +425,15 @@ export default function MiPlanPage() {
 
                   {p.promo_note && <p className="mt-3 text-[11px] text-muted">{p.promo_note}</p>}
 
-                  {isCurrent && sub?.status === "active" && (sinCargo || debitoAutomatico) ? (
-                    /* No hay nada que pagar: o está bonificado, o se debita solo. */
+                  {isCurrent && sub?.status === "active" ? (
+                    /* Esta grilla es para CAMBIAR de plan. Abonar el mes del plan
+                       que ya tiene vive arriba, en la tarjeta de estado. */
                     <div className="mt-4 rounded-lg border border-white/10 py-2 text-center text-xs font-semibold text-ink-2">
-                      {sinCargo ? "Tu plan, sin cargo" : `Se renueva solo el ${fdate(vence)}`}
-                    </div>
-                  ) : isCurrent && sub?.status === "active" ? (
-                    /* Tu plan, pero lo abonás vos: acá va el botón que faltaba. */
-                    <div className="mt-4 space-y-2">
-                      <p className="text-center text-[11px] font-semibold text-ink-2">
-                        Tu plan actual · vence el {fdate(vence)}
-                      </p>
-                      <button
-                        className="btn btn-primary w-full"
-                        disabled={changing === p.key}
-                        onClick={() => cambiar(p.key)}
-                      >
-                        {changing === p.key ? "Redirigiendo a Mercado Pago…" : "💳 Pagar mi mes con Mercado Pago"}
-                      </button>
-                      <button className="btn btn-ghost w-full" onClick={() => openTransfer(p.key)}>
-                        🏦 Pagar mi mes por transferencia
-                      </button>
+                      {sinCargo
+                        ? "Tu plan, sin cargo"
+                        : debitoAutomatico
+                          ? `Tu plan · se renueva solo el ${fdate(vence)}`
+                          : "Es tu plan actual"}
                     </div>
                   ) : (
                     <div className="mt-4 space-y-2">
