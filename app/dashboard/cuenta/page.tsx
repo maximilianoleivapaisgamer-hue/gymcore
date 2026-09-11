@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import EliminarCuenta from "@/components/EliminarCuenta";
+import IconoApp from "@/components/IconoApp";
 import PasswordInput from "@/components/PasswordInput";
 
 export default function MiCuentaPage() {
@@ -64,8 +65,12 @@ export default function MiCuentaPage() {
     <div className="mx-auto w-full max-w-2xl p-5 md:p-7">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Mi cuenta</h1>
-        <p className="mt-1 text-ink-2">Cambiá tu usuario de acceso y tu contraseña.</p>
+        <p className="mt-1 text-ink-2">Tu acceso al panel y la marca de la app de tus socios.</p>
       </div>
+
+      {/* El ícono va primero: es lo que más se mira y lo que el dueño quiere
+          dejar con su marca. Solo aparece si el usuario tiene un gimnasio. */}
+      <IconoApp />
 
       {/* Usuario */}
       {isSynthetic ? (

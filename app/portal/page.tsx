@@ -9,6 +9,7 @@ import { lunesDe, sumarDias, fechaDeDia, rangoSemana, fechaLarga, inicialDe } fr
 import type { RealPlan } from "@/types/db";
 import InstallAppButton from "@/components/InstallAppButton";
 import EliminarCuenta from "@/components/EliminarCuenta";
+import MarcaInstalable from "@/components/MarcaInstalable";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
 import AppBackground from "@/components/AppBackground";
@@ -79,7 +80,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null; reserva_semanas?: number | null; reserva_hasta_vencimiento?: boolean } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null; reserva_semanas?: number | null; reserva_hasta_vencimiento?: boolean; app_icon_url?: string | null } | null>(null);
   /** Cupo de clases del plan del socio. null = plan sin tope. */
   const [cupo, setCupo] = useState<{ limite: number; usadas: number } | null>(null);
   /** El plan del socio, para saber qué actividades tiene incluidas. */
@@ -116,7 +117,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null; reserva_semanas: number | null; reserva_hasta_vencimiento: boolean }>(),
+      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null; reserva_semanas: number | null; reserva_hasta_vencimiento: boolean; app_icon_url: string | null }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -428,6 +429,8 @@ export default function PortalPage() {
       <ThemeApply theme={gym?.theme} />
       {gym?.is_demo && member?.gym_id && <DemoVisitPing gymId={member.gym_id} kind="socio" />}
       <AppBackground style={gym?.bg_style} />
+      {/* Al instalar la app, el ícono y el nombre son los del gimnasio. */}
+      <MarcaInstalable slug={gym?.slug} iconUrl={gym?.app_icon_url} nombre={gym?.name} />
       {/* Barra de demo: volver al panel del dueño (solo en demos) */}
       {gym?.is_demo && gym?.slug && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/20 bg-[rgba(34,211,238,.06)] px-3 py-2 text-xs">

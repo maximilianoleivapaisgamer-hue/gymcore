@@ -75,6 +75,11 @@ de la sesion, NO dentro de turnogymapp) y arranca con
 > bundle del middleware queda compilado con los valores viejos y sigue fallando
 > aunque reinicies.
 
+> ⚠️ **No corras `npm run build` con el dev server levantado.** Los dos escriben
+> en `.next`: el build de produccion le pisa los chunks al dev y todo empieza a
+> tirar `Cannot find module './9161.js'` o parecidos. Si ya paso, reinicia el
+> dev server y listo.
+
 Las fuentes de Google no bajan en local (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, el
 antivirus intercepta el TLS). Next cae a la fuente del sistema y sigue andando:
 no es un problema de la app, pero en local la tipografia se ve distinta.
@@ -297,9 +302,18 @@ https://claude.ai/code/artifact/2bb10ade-3d55-4fc7-be0c-5281e203cff4
    "funcionalidad minima". Efecto secundario que ya duele hoy: `InstallAppButton`
    escucha `beforeinstallprompt`, que Chrome no dispara sin service worker, asi
    que el boton "Instalar app" probablemente no anda en Android.
-4. ⏳ **Manifest por gimnasio** — `public/manifest.json` es uno solo y escrito a
-   mano. Compilando asi, la app de cada cliente se instalaria con el nombre y el
-   icono de TurnoGym. `gyms.app_icon_url` existe en la base y no la usa nadie.
+4. ✅ **Manifest por gimnasio** — `app/manifest/[slug]/route.ts` devuelve el
+   manifest con el nombre, el icono y los colores de ese negocio. Es PUBLICO: el
+   navegador lo pide sin sesion, por eso lee con service role acotado a 4
+   columnas. `components/MarcaInstalable.tsx` lo enchufa en el portal del socio
+   reemplazando el `<link rel="manifest">` global.
+   - El **iPhone ignora el manifest** para el icono de la pantalla de inicio:
+     usa `apple-touch-icon`. Por eso se escriben los dos, mas
+     `apple-mobile-web-app-title` para el nombre.
+   - `components/IconoApp.tsx` (en Mi cuenta) es la subida. **Valida que sea
+     cuadrada y de 512 px o mas ANTES de subir**: si no, el telefono la deforma
+     o no la toma, y eso se descubre cuando el socio ya se instalo la app.
+   - Con esto `gyms.app_icon_url` deja de estar huerfana.
 
 El envoltorio nativo va a ser **Capacitor** (un solo codigo para iPhone y
 Android), no un TWA: el TWA es solo Android y la competencia esta en Apple.
