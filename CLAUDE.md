@@ -264,6 +264,35 @@ esos articulos; si algo no esta escrito, lo dice y manda a soporte.
 > Si agregas una funcion a la app, escribi el articulo en `lib/ayuda.ts`. Con eso
 > queda contestada en el buscador Y en el chat, que leen la misma fuente.
 
+## Cobrarle al dueno: renovar el mes
+
+**El que paga por transferencia no tenia como abonar.** La tarjeta de su plan
+en Mi plan decia "Es tu plan actual" y nada mas: los botones de pago solo
+aparecian para OTRO plan o si estaba en prueba. O sea que un cliente al dia
+dependia de que le cobraramos nosotros a mano. Arreglado el 2026-09-11.
+
+Ahora la tarjeta del plan actual mira **como paga** (`subscriptions.payment_method`
++ `mp_preapproval_id`):
+- `gratis` -> "Tu plan, sin cargo". No hay nada que cobrar.
+- `mercadopago` CON preapproval -> "Se renueva solo el DD/MM". Ofrecerle pagar
+  de nuevo crearia una segunda suscripcion.
+- `transferencia`, o sin metodo -> **botones para abonar el mes**, los mismos
+  que ya existian. No hizo falta backend: `/api/pagos/crear` y el flujo de
+  transferencia ya aceptaban el plan actual.
+
+Ademas, si le toca pagar y faltan 7 dias o menos (o ya vencio), la tarjeta de
+estado muestra el aviso con los dos botones arriba de todo.
+
+> ⚠️ **Los vencimientos NO se formatean con `new Date().toLocaleDateString()`.**
+> Vienen como timestamp a medianoche UTC, asi que en Argentina (UTC-3) se corren
+> un dia para atras: el 20/09 se mostraba 19/09, y un 01/01/2026 se mostraba
+> 31/12/2025 — corrido de dia, mes y ano. Esa fecha equivocada ademas viajaba en
+> el WhatsApp que le mandamos al cliente. `fdate()` (en `lib/admin.ts` y en
+> `mi-plan`) ahora corta los primeros 10 caracteres del texto y los da vuelta,
+> sin husos de por medio. Ojo: eso vale para FECHAS guardadas como timestamp a
+> medianoche; para un `created_at` de verdad (con hora) hay que seguir usando
+> la hora local — por eso `admin/cobros` y `portal/peso` tienen el suyo propio.
+
 ## Vencimientos y pruebas en el panel de admin
 
 `isProximoVence` / `isVencido` miran **solo los `active`**. La prueba gratis

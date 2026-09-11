@@ -12,12 +12,36 @@ interface Sub {
   status: "trial" | "active" | "past_due" | "canceled";
   trial_ends_at: string | null;
   current_period_end: string | null;
+  /** Cómo paga: define si tiene que abonar a mano o se le debita solo. */
+  payment_method: "transferencia" | "mercadopago" | "gratis" | null;
+  mp_preapproval_id: string | null;
 }
 interface TransferData { alias: string; cbu: string; titular: string; nota: string; whatsapp: string; }
 interface Pendiente { id: string; plan: string; amount: number | null; status: string; created_at: string; }
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
-const fdate = (s: string | null) => (s ? new Date(s).toLocaleDateString("es-AR") : "—");
+/**
+ * Los vencimientos vienen como timestamp a medianoche UTC. Pasarlos por
+ * `new Date().toLocaleDateString()` los corre un día para atrás en Argentina
+ * (UTC-3): el 20/09 se mostraba como 19/09, y el dueño creía que le vencía un
+ * día antes. Tomamos la parte de fecha del texto, sin husos de por medio.
+ */
+const fdate = (s: string | null) => {
+  if (!s) return "—";
+  const [a, m, d] = String(s).slice(0, 10).split("-");
+  return a && m && d ? `${d}/${m}/${a}` : "—";
+};
+
+/** Días que faltan para esa fecha. Negativo si ya pasó. */
+const diasPara = (s: string | null): number | null => {
+  if (!s) return null;
+  const [a, m, d] = String(s).slice(0, 10).split("-").map(Number);
+  if (!a || !m || !d) return null;
+  const hoy = new Date();
+  const objetivo = new Date(a, m - 1, d);
+  const base = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  return Math.round((objetivo.getTime() - base.getTime()) / 86400000);
+};
 
 function CopyChip({ label, value }: { label: string; value: string }) {
   const [ok, setOk] = useState(false);
@@ -105,7 +129,8 @@ export default function MiPlanPage() {
         .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
       if (profile?.gym_id) {
         const { data } = await supabase
-          .from("subscriptions").select("plan, status, trial_ends_at, current_period_end")
+          .from("subscriptions")
+          .select("plan, status, trial_ends_at, current_period_end, payment_method, mp_preapproval_id")
           .eq("gym_id", profile.gym_id).single<Sub>();
         setSub(data ?? null);
         setExtras(await loadGymExtras(supabase, profile.gym_id));
@@ -165,6 +190,18 @@ export default function MiPlanPage() {
   // con el plan no se listan acá: no son un regalo, son parte de lo que paga.
   const bonificadas = extras.filter((f) => isBonificada(plans, sub?.plan, f, extras));
 
+  // ── ¿Este dueño tiene que pagar a mano, o se le debita solo? ─────────
+  // Antes la tarjeta de su plan decía "Es tu plan actual" y nada más, así que
+  // el que paga por transferencia no tenía NINGÚN botón para abonar el mes:
+  // dependía de que le cobráramos nosotros.
+  const debitoAutomatico = sub?.payment_method === "mercadopago" && !!sub?.mp_preapproval_id;
+  const sinCargo = sub?.payment_method === "gratis";
+  const diasRestantes = diasPara(vence);
+  /** Le toca poner plata: ni bonificado ni con débito automático. */
+  const tienePagar = !!sub && !sinCargo && !debitoAutomatico;
+  /** Ya es momento de avisarle: faltan 7 días o menos, o ya venció. */
+  const avisarVence = tienePagar && diasRestantes !== null && diasRestantes <= 7;
+
   return (
     <main className="p-5 md:p-7">
       <div className="mb-6">
@@ -218,6 +255,46 @@ export default function MiPlanPage() {
                     {fdate(vence)}
                   </div>
                 </div>
+                {/* Cómo se renueva. Antes esto no se decía en ningún lado. */}
+                {sub.status === "active" && (
+                  <div className="mt-1 text-xs text-muted">
+                    {sinCargo
+                      ? "Tu plan está bonificado: no tenés que abonar nada."
+                      : debitoAutomatico
+                        ? "Se renueva solo con débito automático de Mercado Pago."
+                        : "Se renueva abonando vos: por Mercado Pago o transferencia."}
+                  </div>
+                )}
+
+                {/* Le toca pagar y el vencimiento está cerca (o ya pasó). */}
+                {avisarVence && !pendiente && (
+                  <div className={`w-full rounded-xl border px-4 py-3 ${
+                    (diasRestantes as number) < 0
+                      ? "border-crit/30 bg-[rgba(240,82,82,.08)]"
+                      : "border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)]"
+                  }`}>
+                    <div className={`text-sm font-semibold ${(diasRestantes as number) < 0 ? "text-crit" : "text-[#f5b13d]"}`}>
+                      {(diasRestantes as number) < 0
+                        ? `Tu abono venció el ${fdate(vence)}.`
+                        : (diasRestantes as number) === 0
+                          ? "Tu abono vence hoy."
+                          : `Tu abono vence en ${diasRestantes} ${diasRestantes === 1 ? "día" : "días"}, el ${fdate(vence)}.`}
+                    </div>
+                    <p className="mt-0.5 text-xs text-ink-2">
+                      Aboná el mes para que no se te corte el servicio.
+                    </p>
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      <button className="btn btn-primary text-xs" disabled={changing === sub.plan}
+                        onClick={() => cambiar(sub.plan)}>
+                        {changing === sub.plan ? "Redirigiendo…" : "💳 Pagar con Mercado Pago"}
+                      </button>
+                      <button className="btn btn-ghost text-xs" onClick={() => openTransfer(sub.plan)}>
+                        🏦 Pagar por transferencia
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {sub.status === "past_due" && (
                   <div className="rounded-lg border border-[#f5b13d]/30 bg-[rgba(245,177,61,.1)] px-4 py-3 text-sm text-[#f5b13d]">
                     Tenés un pago pendiente. Contactanos para regularizar tu cuenta.
@@ -326,9 +403,27 @@ export default function MiPlanPage() {
 
                   {p.promo_note && <p className="mt-3 text-[11px] text-muted">{p.promo_note}</p>}
 
-                  {isCurrent && sub?.status === "active" ? (
+                  {isCurrent && sub?.status === "active" && (sinCargo || debitoAutomatico) ? (
+                    /* No hay nada que pagar: o está bonificado, o se debita solo. */
                     <div className="mt-4 rounded-lg border border-white/10 py-2 text-center text-xs font-semibold text-ink-2">
-                      Es tu plan actual
+                      {sinCargo ? "Tu plan, sin cargo" : `Se renueva solo el ${fdate(vence)}`}
+                    </div>
+                  ) : isCurrent && sub?.status === "active" ? (
+                    /* Tu plan, pero lo abonás vos: acá va el botón que faltaba. */
+                    <div className="mt-4 space-y-2">
+                      <p className="text-center text-[11px] font-semibold text-ink-2">
+                        Tu plan actual · vence el {fdate(vence)}
+                      </p>
+                      <button
+                        className="btn btn-primary w-full"
+                        disabled={changing === p.key}
+                        onClick={() => cambiar(p.key)}
+                      >
+                        {changing === p.key ? "Redirigiendo a Mercado Pago…" : "💳 Pagar mi mes con Mercado Pago"}
+                      </button>
+                      <button className="btn btn-ghost w-full" onClick={() => openTransfer(p.key)}>
+                        🏦 Pagar mi mes por transferencia
+                      </button>
                     </div>
                   ) : (
                     <div className="mt-4 space-y-2">

@@ -22,7 +22,18 @@ export const METHOD_LABEL: Record<string, string> = {
 };
 
 export const money = (n: number) => "$" + Math.round(n || 0).toLocaleString("es-AR");
-export const fdate = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString("es-AR") : "—");
+/**
+ * Fecha de vencimiento, sin que se corra un día.
+ *
+ * Vienen como timestamp a medianoche UTC: pasarlas por `new Date()` las mueve
+ * al día anterior en Argentina (UTC-3). El 20/09 se mostraba 19/09 — y esa
+ * fecha equivocada viajaba en el WhatsApp que le mandamos al cliente.
+ */
+export const fdate = (s: string | null | undefined) => {
+  if (!s) return "—";
+  const [a, m, d] = String(s).slice(0, 10).split("-");
+  return a && m && d ? `${d}/${m}/${a}` : "—";
+};
 
 /** Fecha de vencimiento relevante según el estado (trial usa trial_ends_at). */
 export function venceOf(sub: { status: string; trial_ends_at: string | null; current_period_end: string | null } | undefined): string | null {
