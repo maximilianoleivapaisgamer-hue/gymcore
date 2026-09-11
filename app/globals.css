@@ -135,3 +135,27 @@ body {
   .app-bg-aurora::before,
   .app-bg-aurora::after { animation: none; }
 }
+
+/* ── Texto de las páginas legales (/privacidad, /terminos) ──────────────────
+   Se leen de corrido, no se escanean: ancho cómodo, más aire entre párrafos y
+   jerarquía clara. Van fuera de @layer components porque no son utilidades que
+   alguien vaya a pisar con una clase de Tailwind. */
+.legal { color: rgb(var(--ink-2-rgb)); font-size: 15.5px; line-height: 1.72; }
+.legal h2 {
+  color: rgb(var(--ink-rgb));
+  font-size: 20px; font-weight: 700; letter-spacing: -.01em;
+  margin: 2.4em 0 .6em; padding-top: 1.4em;
+  border-top: 1px solid rgb(255 255 255 / .08);
+}
+.legal > h2:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.legal h3 {
+  color: rgb(var(--ink-rgb));
+  font-size: 15.5px; font-weight: 600; margin: 1.6em 0 .5em;
+}
+.legal p { margin: 0 0 1em; }
+.legal ul { margin: 0 0 1.2em; padding-left: 1.3em; }
+.legal li { margin-bottom: .55em; }
+.legal li::marker { color: rgb(var(--muted-rgb)); }
+.legal b, .legal strong { color: rgb(var(--ink-rgb)); font-weight: 600; }
+.legal a { color: rgb(var(--brand-rgb)); text-decoration: underline; text-underline-offset: 2px; }
+.legal a:hover { text-decoration: none; }

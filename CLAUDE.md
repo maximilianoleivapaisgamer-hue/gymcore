@@ -257,6 +257,40 @@ Cada negocio elige **cómo cobra**, desde Configuración → Cobros
     vendieron una clase de algo que su plan no cubre, la anota el dueño desde
     Clases (donde puede pasarse).
 
+## Publicar en Google Play y App Store
+
+Decidido el 2026-09-11: **una app por gimnasio, todas bajo la cuenta de Maxi**,
+para replicar lo que hace la competencia (Gymapp / Mario Ceccon, 6 gimnasios en
+una sola cuenta de Apple). Se le advirtio el riesgo de la regla 4.2.6 de Apple
+—si dan de baja la cuenta se caen TODAS las apps juntas— y es su decision.
+Cuenta de Google Play ya aprobada; falta la de Apple.
+
+Plan completo, con costos y checklist:
+https://claude.ai/code/artifact/2bb10ade-3d55-4fc7-be0c-5281e203cff4
+
+**Los cuatro frenos que encontre en el codigo** (ninguna tienda aprueba sin esto):
+
+1. ✅ **Politica de privacidad y terminos** — `app/privacidad` y `app/terminos`,
+   PUBLICAS (el middleware solo protege `/dashboard`). El texto describe lo que
+   la app REALMENTE guarda, leido del esquema. Contacto y fechas en
+   `lib/legal.ts`, en un solo lugar.
+   > ⚠️ Si agregas una tabla con datos de personas, actualiza `/privacidad`. Y el
+   > mail de `lib/legal.ts` **tiene que existir de verdad**: es el que va en la
+   > ficha de la tienda y el revisor escribe ahi.
+2. ⏳ **Eliminar la cuenta desde la app** — Apple lo exige desde 2022 y Google
+   desde 2024 para toda app con registro. Hoy no existe en ningun lado.
+3. ⏳ **Service worker + notificaciones** — no hay service worker en todo el
+   proyecto. Sin eso la app no hace nada que la web no haga y se rechaza por
+   "funcionalidad minima". Efecto secundario que ya duele hoy: `InstallAppButton`
+   escucha `beforeinstallprompt`, que Chrome no dispara sin service worker, asi
+   que el boton "Instalar app" probablemente no anda en Android.
+4. ⏳ **Manifest por gimnasio** — `public/manifest.json` es uno solo y escrito a
+   mano. Compilando asi, la app de cada cliente se instalaria con el nombre y el
+   icono de TurnoGym. `gyms.app_icon_url` existe en la base y no la usa nadie.
+
+El envoltorio nativo va a ser **Capacitor** (un solo codigo para iPhone y
+Android), no un TWA: el TWA es solo Android y la competencia esta en Apple.
+
 ## Ayuda al cliente (para bajar la atencion por WhatsApp)
 
 Tres capas, de la mas barata a la mas cara. Se armaron juntas el 2026-09-02.

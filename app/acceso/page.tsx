@@ -86,6 +86,12 @@ export default function AccesoPage() {
             Registrá tu gimnasio
           </Link>
         </p>
+        {/* Las tiendas piden que estas dos esten a la vista, sin login. */}
+        <p className="mt-6 text-center text-xs text-muted">
+          <Link href="/privacidad" className="hover:text-brand">Privacidad</Link>
+          {" · "}
+          <Link href="/terminos" className="hover:text-brand">Términos</Link>
+        </p>
       </div>
     </main>
   );

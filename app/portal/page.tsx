@@ -971,7 +971,11 @@ export default function PortalPage() {
         </div>
       )}
 
-      <p className="mt-6 text-center text-xs text-muted">turnogym · <Link href="/acceso" className="hover:text-brand">Cerrar sesión</Link></p>
+      <p className="mt-6 text-center text-xs text-muted">
+        turnogym · <Link href="/acceso" className="hover:text-brand">Cerrar sesión</Link>
+        {" · "}<Link href="/privacidad" className="hover:text-brand">Privacidad</Link>
+        {" · "}<Link href="/terminos" className="hover:text-brand">Términos</Link>
+      </p>
     </main>
   );
 }
