@@ -52,6 +52,33 @@ sirviendo la app. Se deploya con el mismo push de siempre.
   gana. Si algún día la landing se muda a un proyecto aparte, se setea
   `LANDING_URL` en Vercel y esa gana sin tocar código.
 
+### Levantar la app en local (para probarla de verdad)
+
+`.claude/launch.json` esta en **`C:\Proyecto APP\TURNOGYM\.claude\`** (la raiz
+de la sesion, NO dentro de turnogymapp) y arranca con
+`cmd /c "cd turnogymapp && npm run dev"` en el puerto 3000.
+
+> ⚠️ **No uses `npm --prefix turnogymapp run dev`.** Compila igual, pero el
+> directorio de trabajo sigue siendo la carpeta de arriba, asi que Next busca el
+> `.env.local` donde no esta y toda la app falla con "Your project's URL and Key
+> are required". Hay que cambiar de carpeta de verdad.
+
+> ⚠️ **`vercel env pull` NO trae los valores.** Las variables estan marcadas
+> como Encrypted en Vercel y el pull las escribe como `""` (cadena vacia). Lo
+> parece que funciono — el archivo se crea con todos los nombres — pero los
+> valores son de largo 2. La URL y la clave anonima se sacan del MCP de Supabase
+> (`get_project_url` y `get_publishable_keys`); la `SUPABASE_SERVICE_ROLE_KEY`
+> no hay forma de recuperarla, asi que en local **no andan** la web publica ni
+> las rutas de `/api/admin/*` que la usan.
+
+> Si cambiaste el `.env.local` con el server ya levantado, **borra `.next`**: el
+> bundle del middleware queda compilado con los valores viejos y sigue fallando
+> aunque reinicies.
+
+Las fuentes de Google no bajan en local (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, el
+antivirus intercepta el TLS). Next cae a la fuente del sistema y sigue andando:
+no es un problema de la app, pero en local la tipografia se ve distinta.
+
 ### Verificar el build ANTES de pushear
 El typecheck (`npx tsc --noEmit`) no agarra todo: hay errores que solo aparecen
 al compilar (imports rotos, mezclar servidor con cliente, exports de ruta mal).
