@@ -318,7 +318,15 @@ https://claude.ai/code/artifact/2bb10ade-3d55-4fc7-be0c-5281e203cff4
    - ⚠️ **En iPhone los avisos SOLO andan con la app agregada a la pantalla de
      inicio.** Desde Safari normal el navegador ni expone la API. El componente
      lo detecta y lo explica en vez de ofrecer un boton que no va a andar.
-   - Aviso de clase: `app/api/cron/clases`, cada hora en `vercel.json`. La
+   - ⚠️ **La cuenta de Vercel es HOBBY: solo permite crons DIARIOS.** Un
+     `vercel.json` con `"0 * * * *"` **rechaza el deploy entero** con "Hobby
+     accounts are limited to daily cron jobs" — y el deploy por git falla en
+     silencio, sin aparecer en `vercel ls`. Por eso el aviso horario lo dispara
+     un workflow de GitHub Actions (`.github/workflows/avisos-clases.yml`) que
+     le pega al endpoint con el `CRON_SECRET` (guardado como secret del repo).
+     En `vercel.json` queda una corrida diaria como red de seguridad. El dia que
+     pasen a Pro, se borra el workflow y se vuelve a "0 * * * *".
+   - Aviso de clase: `app/api/cron/clases`. La
      ventana (3 horas) y la marca lo hacen **idempotente**: corriendo dos veces
      no manda dos veces, y corriendo una sola vez al dia igual avisa de las
      proximas horas. No depende de la frecuencia del plan.

@@ -1,0 +1,37 @@
+# Aviso "tu clase empieza pronto", cada hora.
+#
+# POR QUE ACA Y NO EN VERCEL: la cuenta es Hobby y Vercel solo permite crons
+# DIARIOS. Un deploy con "0 * * * *" se rechaza entero con
+# "Hobby accounts are limited to daily cron jobs".
+#
+# En vercel.json quedo igual una corrida diaria a las 11 (hora de Argentina)
+# como red de seguridad, por si este workflow se cae o se desactiva.
+#
+# GitHub puede demorar unos minutos en disparar la tarea. No importa: el
+# endpoint avisa de las clases de las proximas 3 horas y marca cada reserva,
+# asi que llegar tarde o correr de mas no manda nada dos veces.
+#
+# El dia que pasen a Vercel Pro, esto se borra y se vuelve a "0 * * * *".
+
+name: Avisos de clase
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  # Para poder dispararlo a mano desde la pestana Actions y probarlo.
+  workflow_dispatch:
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pegarle al cron de avisos
+        run: |
+          codigo=$(curl -s -o respuesta.txt -w "%{http_code}" \
+            -H "authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://www.turnogym.com/api/cron/clases")
+          echo "HTTP $codigo"
+          cat respuesta.txt
+          # Que el workflow falle si el endpoint no contesto bien, para
+          # enterarnos por el mail de GitHub en vez de en silencio.
+          test "$codigo" = "200"
