@@ -28,6 +28,12 @@ interface Routine { id: string; name: string | null; routine_exercises: RExercis
 interface MyBooking { id: string; class_id: string; class_date: string; classes: { name: string; start_time: string | null; instructor: string | null } | null; }
 interface Klass { id: string; sede_id: string | null; name: string; instructor: string | null; weekdays: string[]; start_time: string | null; duration: number | null; capacity: number | null; color: string | null; image_url: string | null; }
 interface BookingLite { id: string; class_id: string; member_id: string; class_date: string; }
+/**
+ * Un lugar que el socio está esperando en una clase llena.
+ * `vence_at` con valor = el lugar ya se liberó y está GUARDADO PARA ÉL hasta esa
+ * hora. Null = todavía está haciendo la fila.
+ */
+interface Espera { class_id: string; class_date: string; puesto: number; cuantos: number; vence_at: string | null; }
 interface WeightLog { date: string; weight_kg: number; }
 interface DMeal { id: string; day_number: number; meal_type: string; position: number; title: string | null; detail: string | null; photo_url: string | null; }
 interface Diet { id: string; name: string | null; diet_meals: DMeal[]; }
@@ -50,6 +56,12 @@ const fmtTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 function minutosDe(t: string | null): number {
   const [h, m] = fmtTime(t).split(":");
   return Number(h || 0) * 60 + Number(m || 0);
+}
+
+/** Cuántos minutos le quedan al socio para confirmar el lugar que se le guardó. */
+function minutosRestantes(vence: string | null): number {
+  if (!vence) return 0;
+  return Math.max(1, Math.ceil((new Date(vence).getTime() - Date.now()) / 60000));
 }
 
 /** Cuándo arranca una clase, como fecha real. Sin horario, a las 00:00. */
@@ -88,6 +100,11 @@ export default function PortalPage() {
   const [miPlan, setMiPlan] = useState<RealPlan | null>(null);
   /** Motivo por el que no se pudo reservar (lo tira el trigger de la base). */
   const [reservaErr, setReservaErr] = useState("");
+  /** Las clases llenas en las que está esperando un lugar. */
+  const [esperas, setEsperas] = useState<Espera[]>([]);
+  const [busyEspera, setBusyEspera] = useState<string | null>(null);
+  /** Marca de tiempo que avanza sola, para que el reloj del lugar guardado baje. */
+  const [tick, setTick] = useState(() => Date.now());
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [openDemo, setOpenDemo] = useState<Set<string>>(new Set());
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
@@ -150,8 +167,19 @@ export default function PortalPage() {
       setDietProgress((dp as DietProgressRow[]) || []);
     }
     setState("ok");
+    // Al final y sin await: la app ya se ve, y la lista de espera llega sola.
+    cargarEsperas();
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  // El reloj del lugar guardado. Corre solo mientras hay uno: sin esto, el
+  // socio vería "quedan 30 min" congelado hasta que recargue la página.
+  const hayGuardado = esperas.some((e) => e.vence_at);
+  useEffect(() => {
+    if (!hayGuardado) return;
+    const t = setInterval(() => setTick(Date.now()), 20000);
+    return () => clearInterval(t);
+  }, [hayGuardado]);
 
   async function logout() {
     await supabase.auth.signOut();
@@ -248,10 +276,63 @@ export default function PortalPage() {
       setAllBookings((bs) => [...bs, data]);
       setMyBookings((mb) => [...mb, { id: data.id, class_id: c.id, class_date: date, classes: { name: c.name, start_time: c.start_time, instructor: c.instructor } }]);
       if (cupo) setCupo({ ...cupo, usadas: cupo.usadas + 1 });
+      // Al reservar sale solo de la lista de espera (lo hace el trigger
+      // `limpiar_lista_de_espera`): acá se refleja en pantalla.
+      setEsperas((es) => es.filter((e) => !(e.class_id === c.id && e.class_date === date)));
     }
     setBusyClassKey(null);
   }
-  async function cancelar(bookingId: string) {
+  /**
+   * En qué listas de espera está el socio y en qué puesto.
+   *
+   * La tabla tiene RLS sin políticas, así que no se lee desde el navegador: va
+   * por el endpoint. Pedirla además HACE MOVER la fila, así abrir la app
+   * alcanza para que el lugar pase al siguiente cuando al de adelante se le
+   * venció el turno.
+   */
+  async function cargarEsperas() {
+    try {
+      const r = await fetch("/api/clases/espera");
+      const j = await r.json();
+      if (j.ok) setEsperas((j.esperas as Espera[]) || []);
+    } catch { /* sin lista de espera la app funciona igual */ }
+  }
+
+  async function anotarmeEnEspera(c: Klass, date: string) {
+    const key = c.id + date;
+    setBusyEspera(key); setReservaErr("");
+    try {
+      const r = await fetch("/api/clases/espera", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ class_id: c.id, class_date: date }),
+      });
+      const j = await r.json();
+      if (!j.ok) setReservaErr(j.error || "No pudimos anotarte en la lista.");
+      else await cargarEsperas();
+    } catch {
+      setReservaErr("No pudimos anotarte en la lista. Probá de nuevo.");
+    }
+    setBusyEspera(null);
+  }
+
+  async function salirDeEspera(c: Klass, date: string) {
+    const key = c.id + date;
+    setBusyEspera(key); setReservaErr("");
+    try {
+      await fetch("/api/clases/espera", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ class_id: c.id, class_date: date }),
+      });
+      setEsperas((es) => es.filter((e) => !(e.class_id === c.id && e.class_date === date)));
+    } catch {
+      setReservaErr("No pudimos sacarte de la lista. Probá de nuevo.");
+    }
+    setBusyEspera(null);
+  }
+
+  async function cancelar(bookingId: string, classId?: string, date?: string) {
     setBusyClassKey(bookingId);
     setReservaErr("");
     // Si el plazo ya pasó, el trigger de la base la frena y devuelve el motivo
@@ -267,6 +348,16 @@ export default function PortalPage() {
     setMyBookings((mb) => mb.filter((b) => b.id !== bookingId));
     // Cancelar le devuelve el lugar, pero solo si la clase caía en este ciclo.
     if (member) await recalcularCupo(member, (gym as { real_plans?: RealPlan[] | null } | null)?.real_plans ?? null);
+    // El lugar que dejó libre pasa al primero de la lista de espera, y le llega
+    // el aviso al celular EN EL MOMENTO. Si esto fallara, el cron lo levanta más
+    // tarde: por eso no se le avisa nada al que canceló.
+    if (classId && date) {
+      fetch("/api/clases/espera/avanzar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ class_id: classId, class_date: date }),
+      }).catch(() => {});
+    }
     setBusyClassKey(null);
   }
 
@@ -361,6 +452,27 @@ export default function PortalPage() {
         .sort((a, b) => fmtTime(a.start_time).localeCompare(fmtTime(b.start_time)))
       : []),
     [classes, diaSel],
+  );
+
+  /**
+   * Los lugares que se liberaron y están guardados para el socio AHORA.
+   *
+   * Se filtra por `tick` y no por Date.now() directo para que, cuando el reloj
+   * llega a cero, el aviso desaparezca solo en vez de quedar prometiendo un
+   * lugar que ya pasó al siguiente de la fila.
+   */
+  const lugaresGuardados = useMemo(
+    () => esperas
+      .filter((e) => e.vence_at && new Date(e.vence_at).getTime() > tick)
+      .map((e) => {
+        const k = classes.find((c) => c.id === e.class_id);
+        return {
+          ...e,
+          nombre: (k?.name || "tu clase").trim(),
+          cuando: `${fechaLarga(e.class_date)}${k?.start_time ? ` · ${fmtTime(k.start_time)}` : ""}`,
+        };
+      }),
+    [esperas, classes, tick],
   );
 
   const ahoraMin = new Date().getHours() * 60 + new Date().getMinutes();
@@ -745,6 +857,27 @@ export default function PortalPage() {
 
       {effTab === "clases" && (
         <div className="flex flex-col gap-4">
+          {/* Se liberó un lugar que estaba esperando. Va primero de todo y fuera
+              de la grilla: puede ser de otro día del que está mirando, y es lo
+              más urgente que tiene para hacer. */}
+          {lugaresGuardados.map((g) => (
+            <div key={g.class_id + g.class_date}
+              className="rounded-xl border border-[#4ade80]/35 bg-[rgba(74,222,128,.1)] p-4">
+              <div className="text-sm font-semibold text-[#4ade80]">
+                ¡Se liberó un lugar en {g.nombre}!
+              </div>
+              <p className="mt-0.5 text-xs leading-snug text-ink-2">
+                {g.cuando} · Te lo guardamos <b>{minutosRestantes(g.vence_at)} minutos</b> más.
+                Si no lo confirmás, pasa al que sigue en la lista.
+              </p>
+              <button className="btn btn-primary mt-3 text-xs"
+                disabled={busyClassKey === g.class_id + g.class_date}
+                onClick={() => { const k = classes.find((c) => c.id === g.class_id); if (k) reservar(k, g.class_date); }}>
+                Confirmar mi lugar
+              </button>
+            </div>
+          ))}
+
           <div className="card p-0">
             <div className="border-b border-white/10 p-4">
               <h2 className="font-semibold">Mis próximas clases</h2>
@@ -768,7 +901,7 @@ export default function PortalPage() {
                         <button
                           className="text-xs text-ink-2 hover:text-crit"
                           disabled={busyClassKey === b.id}
-                          onClick={() => cancelar(b.id)}
+                          onClick={() => cancelar(b.id, b.class_id, b.class_date)}
                         >
                           Cancelar
                         </button>
@@ -910,6 +1043,13 @@ export default function PortalPage() {
                     // Clase posterior al vencimiento de su cuota.
                     const sinCuota = fueraDeCuota(date);
                     const color = c.color || "#22d3ee";
+                    // Lista de espera: en qué puesto está, y si el lugar ya es suyo.
+                    const miEspera = esperas.find((e) => e.class_id === c.id && e.class_date === date);
+                    const guardado = !!miEspera?.vence_at && new Date(miEspera.vence_at).getTime() > tick;
+                    // No tiene sentido hacer la fila de algo a lo que igual no
+                    // podría entrar: clase que ya arrancó, fuera de su plan, sin
+                    // cuota paga o sin clases disponibles en el mes.
+                    const puedeEsperar = incluida && !yaPaso && !sinCuota && !sinCupo;
                     return (
                       <li key={key} className="flex gap-3 px-4 py-3">
                         <div className="w-[42px] shrink-0 pt-0.5 text-sm font-bold tabular-nums text-brand">
@@ -944,7 +1084,7 @@ export default function PortalPage() {
                             {mine ? (
                               puedeCancelar(date, c.start_time) ? (
                                 <button className="btn btn-ghost px-3 py-1 text-[11.5px]"
-                                  disabled={busyClassKey === mine.id} onClick={() => cancelar(mine.id)}>
+                                  disabled={busyClassKey === mine.id} onClick={() => cancelar(mine.id, c.id, date)}>
                                   Cancelar
                                 </button>
                               ) : (
@@ -952,6 +1092,40 @@ export default function PortalPage() {
                                   Anotada · ya no se cancela
                                 </span>
                               )
+                            ) : guardado ? (
+                              /* Se liberó un lugar y es SUYO por un rato. Es lo único que
+                                 tiene que ver en esa fila, así que va destacado. */
+                              <>
+                                <span className="rounded-full bg-[rgba(74,222,128,.16)] px-2 py-0.5 text-[10.5px] font-semibold text-[#4ade80]">
+                                  Tu lugar · {minutosRestantes(miEspera!.vence_at)} min
+                                </span>
+                                <button className="btn btn-primary px-3 py-1 text-[11.5px]"
+                                  disabled={busyClassKey === key} onClick={() => reservar(c, date)}>
+                                  Confirmar
+                                </button>
+                              </>
+                            ) : miEspera && full ? (
+                              /* Está en la fila Y la clase sigue llena. Si mientras
+                                 tanto quedó un lugar libre, no se le muestra la fila:
+                                 se le muestra el botón de reservar, que es lo que
+                                 tiene que hacer. */
+                              <>
+                                <span className="rounded-full bg-white/[.06] px-2 py-0.5 text-[10.5px] font-semibold tabular-nums text-ink-2">
+                                  En la lista · {miEspera.puesto}º de {miEspera.cuantos}
+                                </span>
+                                <button className="btn btn-ghost px-3 py-1 text-[11.5px]"
+                                  disabled={busyEspera === key} onClick={() => salirDeEspera(c, date)}>
+                                  {busyEspera === key ? "…" : "Salir"}
+                                </button>
+                              </>
+                            ) : full && puedeEsperar ? (
+                              /* Clase llena: en vez de un botón muerto, la fila. */
+                              <button className="btn btn-ghost px-3 py-1 text-[11.5px]"
+                                disabled={busyEspera === key}
+                                title="Si alguien cancela, te avisamos y te guardamos el lugar un rato"
+                                onClick={() => anotarmeEnEspera(c, date)}>
+                                {busyEspera === key ? "Anotándote…" : "Avisame si se libera"}
+                              </button>
                             ) : (
                               <button
                                 className="btn btn-primary px-3 py-1 text-[11.5px]"

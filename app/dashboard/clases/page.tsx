@@ -192,6 +192,8 @@ export default function ClasesPage() {
   const [fotoErr, setFotoErr] = useState("");
   // reservas
   const [resFor, setResFor] = useState<Klass | null>(null);
+  /** La lista de espera de la clase que está abierta en el modal de reservas. */
+  const [espera, setEspera] = useState<{ id: string; nombre: string; puesto: number; esperando_confirmar: boolean }[]>([]);
   const [resDate, setResDate] = useState<string | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [addMember, setAddMember] = useState("");
@@ -305,13 +307,24 @@ export default function ClasesPage() {
   // ---- reservas ----
   async function openReservas(c: Klass) {
     const date = nextOccurrence(c.weekdays);
-    setResFor(c); setResDate(date); setAddMember(""); setBookings([]);
+    setResFor(c); setResDate(date); setAddMember(""); setBookings([]); setEspera([]);
     if (date) {
       const { data } = await supabase
         .from("bookings").select("id, member_id, class_date, members(full_name)")
         .eq("class_id", c.id).eq("class_date", date);
       setBookings((data as Booking[]) || []);
+      cargarEspera(c.id, date);
     }
+  }
+
+  /** Quiénes están esperando un lugar en esta clase. Va por endpoint porque la
+   *  tabla tiene RLS sin políticas y el navegador no la puede leer. */
+  async function cargarEspera(claseId: string, date: string) {
+    try {
+      const r = await fetch(`/api/clases/espera/clase?class_id=${claseId}&class_date=${date}`);
+      const j = await r.json();
+      setEspera(j.ok ? j.fila : []);
+    } catch { setEspera([]); }
   }
   async function addBooking() {
     if (!gymId || !resFor || !resDate || !addMember) return;
@@ -345,6 +358,16 @@ export default function ClasesPage() {
   async function removeBooking(id: string) {
     await supabase.from("bookings").delete().eq("id", id);
     setBookings((bs) => bs.filter((b) => b.id !== id));
+    // El lugar que quedó libre pasa al primero de la lista de espera, y le
+    // llega el aviso al celular en el momento.
+    if (resFor && resDate) {
+      await fetch("/api/clases/espera/avanzar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ class_id: resFor.id, class_date: resDate }),
+      }).catch(() => {});
+      cargarEspera(resFor.id, resDate);
+    }
   }
 
   const availableToAdd = members.filter((m) => !bookings.some((b) => b.member_id === m.id));
@@ -589,6 +612,34 @@ export default function ClasesPage() {
                     </ul>
                   )}
                 </div>
+
+                {espera.length > 0 && (
+                  <div className="mt-4 border-t border-white/10 pt-3">
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="font-semibold">Lista de espera</span>
+                      <span className="text-ink-2">{espera.length}</span>
+                    </div>
+                    <p className="mb-2 text-[11px] leading-snug text-muted">
+                      Si alguien cancela, al primero le llega el aviso al celular y el lugar
+                      le queda guardado media hora. No tenés que hacer nada.
+                    </p>
+                    <ul className="divide-y divide-white/5">
+                      {espera.map((e) => (
+                        <li key={e.id} className="flex items-center justify-between py-2">
+                          <span className="text-sm">
+                            <span className="mr-2 text-xs tabular-nums text-muted">{e.puesto}º</span>
+                            {e.nombre}
+                          </span>
+                          {e.esperando_confirmar && (
+                            <span className="rounded-full bg-[rgba(74,222,128,.14)] px-2 py-0.5 text-[10.5px] font-semibold text-[#4ade80]">
+                              Tiene el lugar guardado
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </>
             ) : (
               <p className="py-4 text-center text-sm text-ink-2">Esta clase no tiene días asignados.</p>

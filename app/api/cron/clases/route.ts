@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { enviarAviso, pushConfigurado, type Suscripcion } from "@/lib/push";
+import { moverFila, limpiarViejas, type Admin } from "@/lib/espera";
 
 /**
  * Aviso "tu clase empieza pronto".
@@ -56,6 +57,26 @@ function ahoraEnArgentina() {
   };
 }
 
+/**
+ * Destraba las listas de espera: a cada clase con gente esperando se le da la
+ * chance de mover la fila. `moverFila` es idempotente, así que si el lugar ya
+ * está guardado para alguien en tiempo, no hace nada.
+ */
+async function moverEsperas(sb: Admin, hoy: string): Promise<number> {
+  await limpiarViejas(sb, hoy);
+  const { data } = await sb
+    .from("class_waitlist").select("class_id, class_date").gte("class_date", hoy).limit(1000);
+  const filas = (data as { class_id: string; class_date: string }[]) || [];
+  const claves = [...new Set(filas.map((f) => `${f.class_id}|${f.class_date}`))].slice(0, 200);
+  let movidas = 0;
+  for (const k of claves) {
+    const [claseId, fecha] = k.split("|");
+    const r = await moverFila(sb, claseId, fecha);
+    if (r.estado === "ofrecido") movidas++;
+  }
+  return movidas;
+}
+
 export async function GET(req: Request) {
   const secreto = process.env.CRON_SECRET;
   if (!secreto) {
@@ -78,6 +99,15 @@ export async function GET(req: Request) {
   const { fecha, minutos } = ahoraEnArgentina();
   const hasta = minutos + HORAS_ANTES * 60;
 
+  // 0) Las listas de espera trabadas.
+  //
+  //    El aviso de "se liberó un lugar" NO sale de acá: sale en el momento en
+  //    que alguien cancela, porque enterarse cuatro horas después no sirve.
+  //    Esto es la red de seguridad: si al primero de la fila se le venció el
+  //    turno y nadie abrió la app desde entonces, acá el lugar pasa al que
+  //    sigue en vez de quedar trabado.
+  const esperasMovidas = await moverEsperas(sb, fecha);
+
   // 1) Reservas de hoy sin avisar. El índice parcial de migration_052 hace que
   //    esto no recorra la tabla entera.
   const { data: reservas } = await sb
@@ -85,7 +115,7 @@ export async function GET(req: Request) {
     .eq("class_date", fecha).is("aviso_clase_at", null).limit(2000);
   const filas = (reservas as { id: string; class_id: string; member_id: string; gym_id: string }[]) || [];
   if (filas.length === 0) {
-    return NextResponse.json({ ok: true, fecha, revisadas: 0, avisos: 0 });
+    return NextResponse.json({ ok: true, fecha, revisadas: 0, avisos: 0, esperas_movidas: esperasMovidas });
   }
 
   // 2) Las clases de esas reservas, para saber a qué hora arrancan.
@@ -108,7 +138,7 @@ export async function GET(req: Request) {
   }).slice(0, MAX_ENVIOS);
 
   if (aAvisar.length === 0) {
-    return NextResponse.json({ ok: true, fecha, revisadas: filas.length, avisos: 0 });
+    return NextResponse.json({ ok: true, fecha, revisadas: filas.length, avisos: 0, esperas_movidas: esperasMovidas });
   }
 
   // 4) A quién le mandamos: las suscripciones de esos socios.
@@ -209,5 +239,6 @@ export async function GET(req: Request) {
     enviados,
     fallados,
     suscripciones_limpiadas: caducadas.length,
+    esperas_movidas: esperasMovidas,
   });
 }

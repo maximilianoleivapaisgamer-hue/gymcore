@@ -165,12 +165,20 @@ export const ARTICULOS: Articulo[] = [
       "Panel → Clases, arriba a la derecha, el interruptor Tarjetas / Semana.\n\nLa vista Semana pone cada clase en su lugar según la hora y la duración, así los espacios libres se ven en blanco y de una sabés dónde te entra una clase nueva. Tocando un bloque se abre el panel de reservas de esa clase.",
   },
   {
+    id: "lista-de-espera",
+    categoria: "Clases y reservas",
+    titulo: "Lista de espera: cuando la clase está llena",
+    claves: ["lista de espera", "espera", "llena", "completa", "sin lugar", "cupo lleno", "avisame", "se libero", "cancelo alguien"],
+    cuerpo:
+      "No tenés que hacer nada: ya viene prendida en todas las clases que tengan cupo cargado.\n\nCuando una clase está completa, a tus socios les aparece \"Avisame si se libera\" en vez de un botón muerto. Si después alguien cancela, al PRIMERO de la fila le llega un aviso al celular y el lugar le queda guardado 30 minutos para que confirme. Nadie más lo puede tomar en ese rato.\n\nSi no lo confirma, pasa al final de la fila y el lugar se le ofrece al que sigue. Así no se te queda una clase con un lugar vacío porque el que esperaba no miró el teléfono.\n\nNo se lo anotamos directo a propósito: si tenés la regla de cancelación prendida, anotar a alguien sin que se entere le podría hacer perder una clase del pack por no llegar a cancelar.\n\nVos la ves en Panel → Clases → tocás la clase: abajo de los anotados aparece la lista de espera con el orden y quién tiene el lugar guardado en ese momento.",
+  },
+  {
     id: "anotar-socio",
     categoria: "Clases y reservas",
     titulo: "Anotar vos a un socio en una clase",
     claves: ["anotar", "reservar por el socio", "inscribir", "lista", "quien viene"],
     cuerpo:
-      "Panel → Clases → tocás la clase. Ahí ves quién está anotado para la próxima fecha y tenés el desplegable \"Anotar socio\".\n\nA vos ninguna regla te frena: podés pasarte del tope del plan, anotar a alguien vencido o sacar una reserva fuera del plazo de cancelación. Los topes son solo para lo que el socio hace desde su app.",
+      "Panel → Clases → tocás la clase. Ahí ves quién está anotado para la próxima fecha y tenés el desplegable \"Anotar socio\".\n\nA vos ninguna regla te frena: podés pasarte del cupo de la sala o del tope del plan, anotar a alguien vencido o sacar una reserva fuera del plazo de cancelación. Los topes son solo para lo que el socio hace desde su app.",
   },
 
   // ── Tu página web ─────────────────────────────────────────────────────
