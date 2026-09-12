@@ -9,10 +9,15 @@ import { enviarAviso, pushConfigurado, type Suscripcion } from "@/lib/push";
  * arranca dentro de las próximas horas, y le manda el aviso al celular del
  * socio. Se marca `bookings.aviso_clase_at` para no repetir.
  *
- * PENSADO PARA CORRER SEGUIDO (cada hora). Pero la ventana y la marca lo hacen
- * idempotente: si se corre dos veces en el mismo rato no manda nada dos veces,
- * y si se corre una sola vez al día igual avisa de las clases de las próximas
- * horas. Así no depende de la frecuencia que permita el plan de Vercel.
+ * PENSADO PARA CORRER SEGUIDO, pero sin depender de que así sea. La ventana y
+ * la marca lo hacen idempotente: corriendo dos veces en el mismo rato no manda
+ * nada dos veces, y corriendo una sola vez al día igual avisa de las clases de
+ * las próximas horas.
+ *
+ * ⚠️ El disparador real es un workflow de GitHub Actions, y GitHub estrangula
+ * las tareas programadas: medido sobre un día entero corrió cada 2 a 5 horas,
+ * no cada hora. Por eso la ventana es de 5 horas y no de 2 — si fuera corta,
+ * una clase podría caer en un hueco entre corridas y quedarse sin aviso.
  *
  * Protegido con CRON_SECRET, igual que el cron de WhatsApp: si falta, no corre
  * (falla cerrado, no manda nada).
@@ -20,8 +25,18 @@ import { enviarAviso, pushConfigurado, type Suscripcion } from "@/lib/push";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** Con cuánta anticipación avisamos. Una clase más lejos que esto, todavía no. */
-const HORAS_ANTES = 3;
+/**
+  * Con cuánta anticipación avisamos.
+  *
+  * Son 5 y no 2 a propósito. El disparador es un workflow de GitHub Actions, y
+  * GitHub estrangula las tareas programadas: medido sobre un día real, corrió
+  * cada 2 a 5 horas en vez de cada hora. Con una ventana de 3 horas, una clase
+  * podía caer justo en un hueco entre corridas y quedarse SIN aviso.
+  *
+  * Con 5 horas el aviso a veces llega más temprano de lo ideal, pero llega. El
+  * texto dice las horas reales que faltan, así que se entiende igual.
+  */
+const HORAS_ANTES = 5;
 /** Tope por corrida, para que una tanda rara no se vaya de las manos. */
 const MAX_ENVIOS = 500;
 
@@ -120,6 +135,11 @@ export async function GET(req: Request) {
   let fallados = 0;
   const caducadas: string[] = [];
   const avisadas: string[] = [];
+  // Para dejar rastro en `push_subscriptions`: sin esto no hay forma de saber
+  // si los avisos estan llegando, que es exactamente la falla silenciosa que
+  // queremos evitar.
+  const anduvieron: string[] = [];
+  const falladas: string[] = [];
 
   for (const r of aAvisar) {
     const clase = porClase.get(r.class_id);
@@ -146,10 +166,11 @@ export async function GET(req: Request) {
     let alguno = false;
     for (const sub of lista) {
       const res = await enviarAviso(sub, aviso);
-      if (res.ok) { enviados++; alguno = true; }
+      if (res.ok) { enviados++; alguno = true; anduvieron.push(res.id); }
       else {
         fallados++;
         if (res.caduca) caducadas.push(res.id);
+        else falladas.push(res.id);
       }
     }
     // Se marca aunque haya fallado en algún dispositivo: ya se intentó, y
@@ -161,6 +182,20 @@ export async function GET(req: Request) {
   //    reintentarlos toda la vida.
   if (caducadas.length) {
     await sb.from("push_subscriptions").delete().in("id", caducadas);
+  }
+  if (anduvieron.length) {
+    // Ultimo envio bueno, y el contador de fallos vuelve a cero.
+    await sb.from("push_subscriptions")
+      .update({ last_ok_at: new Date().toISOString(), fallos: 0 })
+      .in("id", anduvieron);
+  }
+  for (const id of falladas) {
+    // Fallo pasajero (no un 404/410): sumamos uno para poder ver cual esta
+    // fallando siempre sin borrarla por un problema de un rato.
+    const { data: actual } = await sb.from("push_subscriptions")
+      .select("fallos").eq("id", id).maybeSingle<{ fallos: number }>();
+    await sb.from("push_subscriptions")
+      .update({ fallos: (actual?.fallos ?? 0) + 1 }).eq("id", id);
   }
   if (avisadas.length) {
     await sb.from("bookings").update({ aviso_clase_at: new Date().toISOString() }).in("id", avisadas);

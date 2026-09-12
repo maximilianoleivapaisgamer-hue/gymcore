@@ -17,7 +17,9 @@ name: Avisos de clase
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    # A los :23 y no a los :00 a proposito: GitHub estrangula las tareas
+    # programadas y el minuto en punto es el mas congestionado de todos.
+    - cron: "23 * * * *"
   # Para poder dispararlo a mano desde la pestana Actions y probarlo.
   workflow_dispatch:
 

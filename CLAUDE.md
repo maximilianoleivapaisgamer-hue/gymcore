@@ -112,7 +112,7 @@ localmente de verdad hay que poner los valores reales en `.env.local`
 el SQL real leído de la base. La `035` recupera dos columnas más que estaban
 aplicadas a mano y sin versionar (`cashflow_entries.method`, `gyms.app_icon_url`).
 El `001` sí no existe: la serie arranca en `002`.
-La numeración siguiente arranca en **047**.
+La numeración siguiente arranca en **054**.
 
 > Las migraciones marcadas "⚠️ RECONSTRUIDA" ya están aplicadas en producción;
 > son idempotentes y sirven para levantar un entorno nuevo desde cero. La `028`
@@ -326,10 +326,16 @@ https://claude.ai/code/artifact/2bb10ade-3d55-4fc7-be0c-5281e203cff4
      le pega al endpoint con el `CRON_SECRET` (guardado como secret del repo).
      En `vercel.json` queda una corrida diaria como red de seguridad. El dia que
      pasen a Pro, se borra el workflow y se vuelve a "0 * * * *".
-   - Aviso de clase: `app/api/cron/clases`. La
-     ventana (3 horas) y la marca lo hacen **idempotente**: corriendo dos veces
-     no manda dos veces, y corriendo una sola vez al dia igual avisa de las
-     proximas horas. No depende de la frecuencia del plan.
+   - Aviso de clase: `app/api/cron/clases`. La ventana y la marca lo hacen
+     **idempotente**: corriendo dos veces no manda dos veces.
+     ⚠️ **La ventana es de 5 horas, no de 2.** Medido sobre un dia entero,
+     GitHub Actions corrio cada 2 a 5 horas en vez de cada hora (estrangula las
+     tareas programadas, y el minuto `:00` es el mas congestionado — por eso
+     ahora corre a los `:23`). Con una ventana corta, una clase podia caer en un
+     hueco entre corridas y quedarse SIN aviso.
+     - `push_subscriptions.last_ok_at` y `fallos` se escriben en cada corrida.
+       La primera version no los llenaba, asi que no habia forma de saber si los
+       avisos llegaban: la unica evidencia era el log del workflow.
    - Efecto secundario que arregla: `InstallAppButton` escucha
      `beforeinstallprompt`, que Chrome no dispara sin service worker. Ahora si.
 
@@ -578,11 +584,11 @@ en `/dashboard/planes`, campo "Clases".
 La "app" del socio: rutina, dieta, clases/reservas, peso, progreso, carnet QR.
 Se **instala como PWA** (web a pantalla de inicio) con `components/InstallAppButton.tsx`.
 
-> ⚠️ Corregido el 2026-08-21: el manifest es **global** (`public/manifest.json`),
-> NO por gimnasio. `app/manifest/[slug]/route.ts` y `components/PwaBranding.tsx`
-> **no existen** (nunca estuvieron en el repo, verificado contra el historial de
-> git). La columna `gyms.app_icon_url` existe en la base pero no la lee ni la
-> escribe ninguna parte del código.
+> Desde el 2026-09-11 el manifest **SÍ es por gimnasio**:
+> `app/manifest/[slug]/route.ts` lo arma con el nombre, el ícono y los colores
+> del negocio, y `components/MarcaInstalable.tsx` lo enchufa en el portal.
+> `public/manifest.json` sigue existiendo como respaldo para quien entra sin
+> gimnasio resuelto. (`components/PwaBranding.tsx` nunca existió.)
 
 ### Sincronizar la grilla de clases con la web
 `landing_config.clases_sync` (bool, por defecto **false**). Con eso prendido, la
@@ -787,8 +793,17 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
 - `CRON_SECRET` (string largo al azar). Protege `/api/cron/whatsapp`: Vercel Cron
   lo manda solo como `authorization: Bearer <secreto>`. **Si falta, el cron no
   corre** (falla cerrado, no manda nada).
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` — los
+  avisos al celular. La publica va al navegador (por eso `NEXT_PUBLIC_`). Se
+  generan con `webpush.generateVAPIDKeys()`. **Si se cambian, todas las
+  suscripciones existentes dejan de servir** y cada socio tiene que volver a
+  activarlas.
 - Tokens de Apify / Google Places: se cargan desde el panel (guardados en
   `app_config` / `platform_settings`), no siempre por env.
+
+> El `CRON_SECRET` está además como **secret del repo en GitHub**, porque el
+> aviso horario lo dispara un workflow de Actions. Si lo rotás, cambialo en los
+> dos lados.
 
 ---
 
@@ -796,9 +811,10 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
 
 - ✅ Gateo de WhatsApp a Pro (menú con candado + página + API). Requiere haber
   corrido `migration_032_whatsapp_pro.sql`.
-- ⏳ **Ícono de la app por gimnasio**: NO está hecho, aunque este archivo decía
-  que sí. La columna `gyms.app_icon_url` existe pero está huérfana: falta la
-  subida en "Mi cuenta", el manifest por gimnasio y el componente que lo inyecte.
+- ✅ **Ícono y nombre de la app por gimnasio** (2026-09-11). `gyms.app_icon_url`
+  ya no está huérfana: se sube en Mi cuenta (`components/IconoApp.tsx`) y la
+  sirve `app/manifest/[slug]/route.ts`, que enchufa `MarcaInstalable` en el
+  portal. Ver "Publicar en Google Play y App Store".
 - ✅ Secciones configurables (`hidden_sections`).
 - ✅ Botón **Accesos** en el admin para ver/reiniciar usuario y clave de cualquier
   gimnasio (demo o cliente real). Endpoints `admin/demo/acceso` y
