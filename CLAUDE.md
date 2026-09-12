@@ -485,6 +485,46 @@ tiene hasta 2 hs antes; y si estaba anotada y no fue, perdió una clase"*.
 - La hora de corte se calcula en `America/Argentina/Buenos_Aires`. Una clase sin
   `start_time` cuenta como que arranca a las 00:00 de ese día.
 
+## Lista de espera de clases
+
+`class_waitlist` (`migration_054`). Cuando la clase está completa, el socio se
+anota en la fila en vez de encontrarse un botón muerto.
+
+- **Se le GUARDA el lugar, no se lo anota.** Al cancelar alguien, al primero de
+  la fila le llega el aviso al celular y el lugar queda suyo 30 minutos
+  (`ESPERA_MINUTOS` en `lib/espera.ts`). Si no confirma, pasa al **final** de la
+  fila y se le ofrece al que sigue: nadie desaparece de la lista sin enterarse y
+  la fila no se traba con alguien que no contesta.
+- ⚠️ **Por qué no se lo anota directo**: con `cancelacion_activa` prendida,
+  anotar a alguien sin que se entere le puede hacer **perder una clase del
+  pack** por no llegar a cancelar. Un lugar guardado que no toma no le cuesta
+  nada. No cambiar esto sin pensar en esa interacción.
+- **El aviso sale en el momento de la cancelación, no del cron.** Lo dispara
+  `/api/clases/espera/avanzar`, que llaman los dos lugares donde se borra una
+  reserva: `cancelar()` en el portal y `removeBooking()` en Clases. Enterarte de
+  que se liberó un lugar 4 horas después no sirve, y el cron corre cada 2 a 5
+  horas (ver el tropiezo de GitHub Actions más abajo). El cron **igual** barre
+  las filas trabadas, como red de seguridad.
+- La tabla tiene **RLS sin políticas**, como `push_subscriptions`: el navegador
+  no la lee ni la escribe. Todo pasa por `/api/clases/espera` (socio) y
+  `/api/clases/espera/clase` (dueño), con service role.
+- Si la clase arranca dentro de menos de 20 minutos no se le guarda a nadie: se
+  avisa igual y entra el que llega primero.
+
+### El cupo de la sala, ahora sí, en la base
+
+Hasta `migration_054` **`classes.capacity` se respetaba SOLO en la pantalla**.
+Como el socio reserva directo contra Supabase desde el navegador, una clase
+llena se podía reservar igual salteando la interfaz. Mismo patrón que el tope
+del plan y la ventana de cancelación: lo frena el trigger
+`enforce_class_capacity` (before insert on `bookings`).
+
+- **Solo frena al socio.** El dueño y los profes anotan de más cuando quieran.
+- Cuenta las reservas **más los lugares guardados para otro** de la lista de
+  espera. Eso es lo que hace que el lugar guardado signifique algo.
+- Un turno vencido no cuenta: se libera solo, sin que nadie limpie nada.
+- Si la clase no tiene `capacity` cargado, no hay tope que aplicar.
+
 ## La grilla de clases
 
 **El socio la ve por día, no por horario.** La tabla `classes` guarda una fila
