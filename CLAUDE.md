@@ -856,6 +856,14 @@ supabase/     schema.sql + migration_0XX_*.sql (correr a mano)
   En Postgres las funciones nacen con EXECUTE para el rol **PUBLIC**, y
   anon/authenticated heredan de ahí. Hay que hacer
   `revoke execute on function ... from public` y después `grant ... to service_role`.
+  **Y TAMPOCO alcanza solo con PUBLIC**: Supabase tiene default privileges que
+  le dan EXECUTE a `anon` y `authenticated` sobre toda función nueva de
+  `public`, y sacárselo a PUBLIC no toca esos permisos explícitos. Hay que
+  revocar de los **tres**: `from public, anon, authenticated`. Mordió otra vez
+  con `enforce_cancel_window` y `enforce_booking_expiry` (arreglado en
+  `migration_053`); las dos migraciones revocaban solo de PUBLIC y el linter
+  las siguió marcando. Revocar NO rompe el trigger: Postgres lo ejecuta como
+  dueño de la tabla y no le chequea EXECUTE a quien dispara la operación.
   Esto ya mordió una vez: las funciones `admin_list_super_admins` y
   `admin_find_user_id_by_email` quedaron llamables por cualquiera desde
   `/rest/v1/rpc/...` durante un mes (arreglado en `migration_036`). Un
