@@ -1,98 +1,29 @@
-"use client";
+import { cookies } from "next/headers";
+import { marcaPorSlug } from "@/lib/gimnasio-publico";
+import { COOKIE_APP } from "@/lib/app-nativa";
+import FormularioAcceso from "./FormularioAcceso";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { createClient } from "@/lib/supabase-browser";
-import { redirectForRole } from "@/lib/roles";
-import type { UserRole } from "@/types/db";
-import AppBackground from "@/components/AppBackground";
-import { BrandMark } from "@/components/BrandMark";
-import PasswordInput from "@/components/PasswordInput";
-
-/** Login. Tras autenticar, redirige según el rol del usuario. */
-export default function AccesoPage() {
-  const supabase = createClient();
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function login(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    // Los dueños/empleados entran con email; los socios con su DNI (que se
-    // convierte al email sintético con el que se creó su cuenta).
-    const id = email.trim();
-    const loginId = id.includes("@") ? id : `${id}@socios.gymcore.app`;
-
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: loginId,
-      password,
-    });
-    if (authError || !data.user) {
-      setLoading(false);
-      return setError("Usuario/email o contraseña incorrectos.");
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single<{ role: UserRole }>();
-
-    window.location.href = redirectForRole(profile?.role);
-  }
-
-  return (
-    <main className="grid min-h-screen place-items-center px-6">
-      <AppBackground style="aurora" />
-      <div className="relative z-10 w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <BrandMark size={52} className="mx-auto mb-3 rounded-2xl" />
-          <h1 className="text-2xl font-bold">Iniciá sesión</h1>
-          <p className="text-sm text-ink-2">Accedé a tu panel de turnogym</p>
-        </div>
-        <form onSubmit={login} className="card flex flex-col gap-3">
-          <input
-            className="input"
-            type="text"
-            placeholder="Email o DNI"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <PasswordInput
-            value={password}
-            onChange={setPassword}
-            placeholder="Contraseña"
-            autoComplete="current-password"
-            required
-          />
-          {error && <p className="text-sm text-crit">{error}</p>}
-          <button className="btn btn-primary" disabled={loading}>
-            {loading ? "Entrando…" : "Entrar"}
-          </button>
-          <Link href="/recuperar" className="text-center text-xs text-ink-2 hover:text-brand">
-            ¿Olvidaste tu contraseña?
-          </Link>
-        </form>
-        <p className="mt-4 text-center text-sm text-ink-2">
-          ¿No tenés cuenta?{" "}
-          <Link href="/registro" className="text-brand font-semibold">
-            Registrá tu gimnasio
-          </Link>
-        </p>
-        {/* Las tiendas piden que estas dos esten a la vista, sin login. */}
-        <p className="mt-6 text-center text-xs text-muted">
-          <Link href="/privacidad" className="hover:text-brand">Privacidad</Link>
-          {" · "}
-          <Link href="/terminos" className="hover:text-brand">Términos</Link>
-        </p>
-      </div>
-    </main>
-  );
+/**
+ * Login. Tras autenticar, redirige según el rol del usuario.
+ *
+ * La marca se resuelve ACÁ, en el servidor, para que la pantalla salga ya
+ * pintada con los colores del gimnasio en el primer dibujo. Si esto se hiciera
+ * en el navegador, el socio vería un parpadeo genérico de turnogym antes de ver
+ * su estudio — y esa media pantalla es justo lo que hace que la app no se
+ * sienta propia.
+ *
+ * De dónde sale el gimnasio, en orden:
+ *   1. `?app=<slug>` en la URL, que es lo que mandan las apps de tienda.
+ *   2. La cookie que dejó el middleware la primera vez que pasó por ahí, para
+ *      que siga andando cuando el socio cierra sesión y vuelve a entrar.
+ *   3. Nada: la pantalla de siempre, que es la que ve el dueño desde la web.
+ */
+export default async function AccesoPage({
+  searchParams,
+}: {
+  searchParams?: { app?: string };
+}) {
+  const slug = searchParams?.app || cookies().get(COOKIE_APP)?.value || null;
+  const marca = await marcaPorSlug(slug);
+  return <FormularioAcceso marca={marca} />;
 }
