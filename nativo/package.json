@@ -1,0 +1,26 @@
+{
+  "name": "turnogym-nativo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "El envoltorio nativo: una app de Play Store y App Store por cada gimnasio.",
+  "type": "module",
+  "scripts": {
+    "preparar": "node scripts/preparar.mjs",
+    "android": "node scripts/preparar.mjs --abrir android",
+    "ios": "node scripts/preparar.mjs --abrir ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/browser": "^6.0.4",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0",
+    "@capacitor/push-notifications": "^6.0.4",
+    "@capacitor/splash-screen": "^6.0.3",
+    "@capacitor/status-bar": "^6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "sharp": "^0.33.5"
+  }
+}

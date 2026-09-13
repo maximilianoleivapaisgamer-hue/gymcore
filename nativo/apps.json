@@ -1,0 +1,39 @@
+{
+  "_comentario": [
+    "Las apps de tienda, una por gimnasio.",
+    "",
+    "Cada entrada genera UNA app distinta en Play Store y App Store: su nombre,",
+    "su icono, su id y su color. `npm run preparar -- <clave>` deja el proyecto",
+    "nativo listo para compilar esa.",
+    "",
+    "REGLAS QUE NO SE ROMPEN:",
+    " - `idApp` es para siempre. Una vez publicada, cambiarlo es una app nueva y",
+    "   los socios que ya la tenian quedan con una app muerta.",
+    " - `nombre` va como maximo 30 caracteres (Apple corta ahi).",
+    " - `icono` tiene que ser 1024x1024 PNG, cuadrado y SIN transparencia (Apple",
+    "   rechaza los PNG con canal alfa).",
+    " - Dos apps con el mismo icono y la misma pantalla de inicio son, para Apple,",
+    "   la misma app repetida (regla 4.3). Cada gimnasio tiene que verse distinto."
+  ],
+
+  "apps": [
+    {
+      "clave": "danzarte",
+      "slug": "demo-danzarte-esgg",
+      "idApp": "com.turnogym.danzarte",
+      "nombre": "DanzArte",
+      "nombreCompleto": "DanzArte Estudio Fitness",
+      "icono": "iconos/danzarte-1024.png",
+      "colorFondo": "#0a0d12"
+    },
+    {
+      "clave": "megacenter",
+      "slug": "MEGACENTERGYM",
+      "idApp": "com.turnogym.megacenter",
+      "nombre": "MEGACENTER GYM",
+      "nombreCompleto": "MEGACENTER GYM",
+      "icono": "iconos/megacenter-1024.png",
+      "colorFondo": "#0a0d12"
+    }
+  ]
+}

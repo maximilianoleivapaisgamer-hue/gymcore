@@ -1,0 +1,21 @@
+# Todo lo de acá abajo lo REHACE `npm run preparar`. No se versiona a propósito:
+# si se guardara, el repo quedaría "congelado" en la app del último gimnasio que
+# alguien preparó, que no significa nada.
+node_modules/
+android/
+ios/
+www/
+assets/
+capacitor.config.json
+
+# Lo que SÍ se versiona: apps.json (la lista de gimnasios), scripts/ (cómo se
+# arma cada app) e iconos/ (el material de cada marca).
+
+# Las llaves de firma NUNCA van al repo. Si se filtra la de Android, cualquiera
+# puede publicar una actualización falsa de la app de tu cliente; y si se pierde,
+# no hay forma de volver a actualizar esa app NUNCA MÁS. Van en los secretos de
+# GitHub y con una copia guardada aparte.
+*.keystore
+*.jks
+*.p12
+*.mobileprovision

@@ -1,0 +1,4 @@
+# El envoltorio nativo (las apps de Play Store y App Store) no tiene nada que
+# hacer en el build de la web. Vive en el mismo repo para que la version de la
+# app y la del sitio no se separen nunca, pero Vercel no lo necesita.
+nativo/
