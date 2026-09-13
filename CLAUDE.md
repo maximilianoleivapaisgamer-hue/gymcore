@@ -359,6 +359,50 @@ https://claude.ai/code/artifact/2bb10ade-3d55-4fc7-be0c-5281e203cff4
 El envoltorio nativo va a ser **Capacitor** (un solo codigo para iPhone y
 Android), no un TWA: el TWA es solo Android y la competencia esta en Apple.
 
+## Las apps de tienda (una por gimnasio)
+
+`nativo/` (2026-09-13). **Capacitor**, un solo codigo para iPhone y Android, no
+un TWA: el TWA es solo Android y la competencia esta en Apple. Leer
+`nativo/README.md` antes de tocar nada ahi.
+
+- `npm run preparar -- <clave>` arma la app de UN gimnasio desde `apps.json` y
+  un PNG de 1024. El proyecto nativo es **descartable**: se borra y se rehace
+  entero en cada corrida, porque el id de la app queda cocido en media docena de
+  archivos al crearse y retocarlo a mano es lo que te hace publicar la app de un
+  gimnasio con el id de otro. Probado: preparar `danzarte` y despues
+  `megacenter` deja identidad completa del segundo y cero rastros del primero.
+- **La app carga el sitio de verdad**, no una copia congelada adentro del
+  paquete: una correccion sale publicada al toque en vez de esperar la revision
+  de las tiendas. El precio es que necesita señal, y por eso el `webDir` es la
+  misma pantalla de "te quedaste sin señal".
+- Los iconos se generan a mano con `sharp` (`nativo/scripts/iconos.mjs`) y no
+  con `@capacitor/assets`, que es lo oficial pero arrastra un `sharp` viejo que
+  se baja binarios de GitHub y no termina de instalarse. **Se aplana el canal
+  alfa a proposito: Apple RECHAZA los iconos con transparencia.**
+- **iOS no se puede armar en Windows** (Xcode + CocoaPods). Los iconos igual se
+  generan en `nativo/assets/ios/` para que los levante la Mac o el runner.
+
+### La pantalla de acceso lleva la marca del gimnasio
+
+Las apps abren en `/portal?app=<slug>`. Si el socio no tiene sesion, cae en
+`/acceso`, que muestra **el logo, el nombre y los colores de SU estudio**.
+
+- No es solo estetica: seis apps que abren todas en la misma pantalla identica
+  son, para la revision de Apple, **la misma app repetida (regla 4.3)**.
+- La marca se resuelve en el **servidor** (`app/acceso/page.tsx` +
+  `lib/gimnasio-publico.ts`, con service role porque quien mira todavia no tiene
+  sesion). Hacerlo en el navegador dejaba medio segundo de turnogym generico
+  antes del estudio, que es justo lo que hace que la app no se sienta propia.
+- El gimnasio sale del parametro o de la cookie `tg_app`, que **escribe el
+  middleware**. Va ahi y no en la pagina porque un componente de servidor no
+  puede escribir cookies mientras dibuja, y sin la cookie la marca se perderia
+  apenas el socio cierra sesion.
+- `slugValido()` (`lib/app-nativa.ts`) filtra la basura antes de que toque la
+  base o la cookie. Verificado en produccion: slug inventado y `<img onerror>`
+  caen los dos a la pantalla generica, sin reflejarse.
+- Con marca **no se ofrece "Registra tu gimnasio"**: el socio no viene a eso, y
+  ofrecerle dar de alta un negocio hace ruido en la revision.
+
 ## Ayuda al cliente (para bajar la atencion por WhatsApp)
 
 Tres capas, de la mas barata a la mas cara. Se armaron juntas el 2026-09-02.

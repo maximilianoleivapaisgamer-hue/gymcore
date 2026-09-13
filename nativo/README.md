@@ -71,7 +71,13 @@ rechazan las dos. Por eso el ícono es obligatorio y no tiene valor por defecto.
 - **Los íconos de `iconos/` son PROVISORIOS**: dicen "PROVISORIO" arriba a
   propósito, para que no se publiquen sin querer. Hay que reemplazarlos por el
   logo real de cada gimnasio.
-- **La pantalla de acceso todavía no tiene la marca del gimnasio.** Hoy las seis
-  apps abren en la misma pantalla genérica de turnogym, que es la señal más clara
-  posible de "apps repetidas" para la revisión de Apple. La app ya manda el
-  gimnasio en la URL (`/portal?app=<slug>`); falta que el sitio la use.
+## La pantalla de acceso ya sale con la marca
+
+La app abre en `/portal?app=<slug>`. Si el socio no tiene sesión, cae en
+`/acceso` y ve **su estudio**: el logo, el nombre y los colores. No es solo
+estética — seis apps que abren en la misma pantalla idéntica son, para la
+revisión de Apple, la misma app repetida (regla 4.3).
+
+Funciona aunque la URL no traiga nada: el gimnasio queda guardado en una cookie
+la primera vez, así sigue andando cuando el socio cierra sesión y vuelve a
+entrar.
