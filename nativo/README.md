@@ -71,6 +71,7 @@ rechazan las dos. Por eso el ícono es obligatorio y no tiene valor por defecto.
 - **Los íconos de `iconos/` son PROVISORIOS**: dicen "PROVISORIO" arriba a
   propósito, para que no se publiquen sin querer. Hay que reemplazarlos por el
   logo real de cada gimnasio.
+
 ## La pantalla de acceso ya sale con la marca
 
 La app abre en `/portal?app=<slug>`. Si el socio no tiene sesión, cae en
