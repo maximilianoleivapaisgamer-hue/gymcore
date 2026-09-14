@@ -269,7 +269,11 @@ export async function POST(req: Request) {
     const email = `${ownerUser}@socios.gymcore.app`;
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email, password: ownerUser, email_confirm: true,
-      user_metadata: { account_type: "owner", full_name: nombre, is_demo: true },
+      // skip_gym: el gimnasio lo crea este endpoint unas lineas mas abajo. Sin
+      // esto, el trigger handle_new_user le armaba ADEMAS un "Mi Gimnasio"
+      // vacio con su propia suscripcion de prueba, y quedaba un gimnasio
+      // fantasma por cada demo generado ensuciando la lista de clientes.
+      user_metadata: { account_type: "owner", full_name: nombre, is_demo: true, skip_gym: "true" },
     });
     if (!cErr && created?.user?.id) { ownerId = created.user.id; break; }
     if (cErr && /already|exists|duplicate|registered/i.test(cErr.message || "")) { ownerUser = `${userBase}${attempt + 2}`; continue; }
