@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase-browser";
 import { WA_TARGET, abrirWhatsapp } from "@/lib/wa-link";
-import { resolveActiveSede, type Sede } from "@/lib/sede";
+import { sedeParaPedir, recordarGym, setActiveSedeId } from "@/lib/sede";
 import PrimerosPasos from "@/components/PrimerosPasos";
 import AvisoAbono from "@/components/AvisoAbono";
 
@@ -56,7 +55,6 @@ function WhatsAppLogo({ className = "h-[18px] w-[18px]" }: { className?: string 
 }
 
 export default function DashboardHome() {
-  const supabase = createClient();
   const [members, setMembers] = useState<Member[]>([]);
   const [cash, setCash] = useState<CashRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,46 +65,30 @@ export default function DashboardHome() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from("profiles").select("full_name, role, gym_id, permissions").eq("id", user.id)
-        .single<{ full_name: string | null; role: string; gym_id: string | null; permissions: string[] | null }>();
-      setName((profile?.full_name || "").split(" ")[0] || "");
-      // Los empleados ven los ingresos solo si tienen habilitada la sección Finanzas.
-      if (profile?.role === "empleado") setCanSeeIncome((profile?.permissions || []).includes("finanzas"));
-      if (profile?.gym_id) {
-        const { data: g } = await supabase.from("gyms").select("name")
-          .eq("id", profile.gym_id).maybeSingle<{ name: string }>();
-        setGymName(g?.name || "");
+      // Un solo pedido con TODO. Antes eran cinco viajes a la base encadenados
+      // — sesión, perfil, gimnasio, sedes y recién ahí los datos — saliendo de
+      // Argentina hasta Canadá, que es donde vive la base. Ver `lib/panel.ts`.
+      const pedir = sedeParaPedir();
+      try {
+        const r = await fetch(`/api/panel/inicio${pedir ? `?sede=${encodeURIComponent(pedir)}` : ""}`);
+        const j = await r.json();
+        if (!j.ok) { setLoading(false); return; }
+
+        setName((j.perfil?.full_name || "").split(" ")[0] || "");
+        // Los empleados ven los ingresos solo si tienen habilitada la sección Finanzas.
+        if (j.perfil?.role === "empleado") setCanSeeIncome((j.perfil?.permissions || []).includes("finanzas"));
+        setGymName(j.gimnasio || "");
+
+        const gym = j.perfil?.gym_id ?? null;
+        recordarGym(gym);
+        if (gym && j.sede_id) setActiveSedeId(gym, j.sede_id);
+
+        setMembers((j.socios as Member[]) || []);
+        setCash((j.caja as CashRow[]) || []);
+        setAsistenciasHoy(j.asistencias_hoy ?? 0);
+      } catch {
+        /* sin datos, el panel muestra su estado vacío en vez de colgarse */
       }
-      // Sucursal activa: la caja (ingresos/gastos) se divide por sede. Los socios son compartidos.
-      let activeSede: string | null = null;
-      if (profile?.gym_id) {
-        const { data: sedeList } = await supabase.from("sedes")
-          .select("id, gym_id, name, address, created_at").eq("gym_id", profile.gym_id)
-          .order("created_at", { ascending: true });
-        activeSede = resolveActiveSede(profile.gym_id, (sedeList as Sede[]) || []);
-      }
-      const now = new Date();
-      const start6 = iso(new Date(now.getFullYear(), now.getMonth() - 5, 1));
-      let qCash = supabase.from("cashflow_entries").select("date, type, amount").gte("date", start6);
-      // Incluimos los que no tienen sucursal: si alguno se guardó sin sede,
-      // mejor que se vea a que la plata desaparezca del panel.
-      if (activeSede) qCash = qCash.or(`sede_id.eq.${activeSede},sede_id.is.null`);
-      // Asistencias de hoy (control de acceso) de la sucursal activa.
-      const startDay = new Date(); startDay.setHours(0, 0, 0, 0);
-      let qAtt = supabase.from("attendances").select("id", { count: "exact", head: true })
-        .gte("entered_at", startDay.toISOString());
-      if (activeSede) qAtt = qAtt.eq("sede_id", activeSede);
-      const [{ data: mem }, { data: cf }, { count: attCount }] = await Promise.all([
-        supabase.from("members").select("id, full_name, whatsapp, plan_name, plan_price, membership_expiry, created_at"),
-        qCash,
-        qAtt,
-      ]);
-      setMembers((mem as Member[]) || []);
-      setCash((cf as CashRow[]) || []);
-      setAsistenciasHoy(attCount ?? 0);
       setLoading(false);
     })();
     /* eslint-disable-next-line */

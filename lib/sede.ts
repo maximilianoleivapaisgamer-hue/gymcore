@@ -38,11 +38,43 @@ export function sedeLimitLabel(plan: string | null | undefined): string {
 }
 
 const KEY_PREFIX = "turnogym.sede.";
+/** El último gimnasio que se vio en este navegador. */
+const KEY_GYM = "turnogym.gym";
 /** Evento que se dispara cuando cambia la sede activa (para recargar vistas). */
 export const SEDE_EVENT = "turnogym:sede-changed";
 
 function storageKey(gymId: string) {
   return KEY_PREFIX + gymId;
+}
+
+/**
+ * Recordar de qué gimnasio es este navegador.
+ *
+ * Hace falta por un huevo y gallina: la sede activa se guarda POR gimnasio,
+ * pero al abrir una pantalla todavía no sabemos cuál es el gimnasio — eso lo
+ * dice el servidor. Sin este dato habría que ir a preguntarlo primero, que es
+ * justo el viaje de más que estamos sacando.
+ *
+ * Es solo una pista para pedir la sede correcta de entrada: el servidor igual
+ * valida que esa sede sea del gimnasio de quien pregunta.
+ */
+export function recordarGym(gymId: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (gymId) window.localStorage.setItem(KEY_GYM, gymId);
+    else window.localStorage.removeItem(KEY_GYM);
+  } catch { /* modo incógnito */ }
+}
+
+export function ultimoGym(): string | null {
+  if (typeof window === "undefined") return null;
+  try { return window.localStorage.getItem(KEY_GYM); } catch { return null; }
+}
+
+/** La sede que hay que pedirle al servidor al abrir una pantalla, si se sabe. */
+export function sedeParaPedir(): string | null {
+  const gym = ultimoGym();
+  return gym ? getActiveSedeId(gym) : null;
 }
 
 /** Sede activa guardada para este gym (o null si no hay). */

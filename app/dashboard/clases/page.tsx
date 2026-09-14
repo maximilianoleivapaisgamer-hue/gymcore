@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
 import { DAYS, dayLabels, fmtTime, inicialDe } from "@/lib/clases";
 import type { RealPlan } from "@/types/db";
-import { resolveActiveSede, type Sede } from "@/lib/sede";
+import { sedeParaPedir, recordarGym, setActiveSedeId, type Sede } from "@/lib/sede";
 
 interface Klass {
   id: string;
@@ -199,39 +199,41 @@ export default function ClasesPage() {
   const [addMember, setAddMember] = useState("");
   const [allBookings, setAllBookings] = useState<{ class_id: string; class_date: string }[]>([]);
 
+  /**
+   * Un solo pedido al servidor con TODO lo de esta pantalla.
+   *
+   * Antes eran cinco viajes a la base encadenados — sesión, perfil, sedes,
+   * gimnasio y recién ahí los datos — y cada uno sale de Argentina hasta
+   * Canadá, que es donde vive la base. Ahora esa cadena pasa entre el servidor
+   * y la base, que se hablan en milisegundos. Ver `lib/panel.ts`.
+   */
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase
-      .from("profiles").select("gym_id").eq("id", user.id).single<{ gym_id: string }>();
-    setGymId(profile?.gym_id ?? null);
-    // Sucursal activa: las clases y sus reservas se dividen por sede.
-    let activeSede: string | null = null;
-    if (profile?.gym_id) {
-      const { data: sedeList } = await supabase.from("sedes")
-        .select("id, gym_id, name, address, created_at").eq("gym_id", profile.gym_id)
-        .order("created_at", { ascending: true });
-      const arr = (sedeList as Sede[]) || [];
-      activeSede = resolveActiveSede(profile.gym_id, arr);
-      setSedeId(activeSede);
-      setSedeName(arr.find((s) => s.id === activeSede)?.name || "");
-      const { data: g } = await supabase.from("gyms").select("real_plans").eq("id", profile.gym_id)
-        .maybeSingle<{ real_plans: RealPlan[] | null }>();
-      setRealPlans(g?.real_plans || []);
+    // La sede guardada se manda de entrada para no tener que preguntarla antes.
+    // El servidor igual valida que sea de este gimnasio.
+    const pedir = sedeParaPedir();
+    try {
+      const r = await fetch(`/api/panel/clases${pedir ? `?sede=${encodeURIComponent(pedir)}` : ""}`);
+      const j = await r.json();
+      if (!j.ok) { setLoading(false); return; }
+
+      const gym = j.perfil?.gym_id ?? null;
+      setGymId(gym);
+      recordarGym(gym);
+
+      const arr = (j.sedes as Sede[]) || [];
+      setSedeId(j.sede_id ?? null);
+      setSedeName(arr.find((s) => s.id === j.sede_id)?.name || "");
+      // Dejamos guardada la que el servidor resolvió, por si la de este
+      // navegador ya no existía.
+      if (gym && j.sede_id) setActiveSedeId(gym, j.sede_id);
+
+      setRealPlans((j.planes as RealPlan[]) || []);
+      setClasses((j.clases as Klass[]) || []);
+      setMembers((j.socios as Member[]) || []);
+      setAllBookings((j.reservas as { class_id: string; class_date: string }[]) || []);
+    } catch {
+      /* sin datos, la pantalla muestra su estado vacío en vez de colgarse */
     }
-    // Filtro explícito por gimnasio: no dejar que el aislamiento dependa solo
-    // de las políticas de la base (ver el comentario en app/portal/page.tsx).
-    let qClasses = supabase.from("classes").select("*").eq("gym_id", profile?.gym_id ?? "").order("start_time");
-    let qBookings = supabase.from("bookings").select("class_id, class_date").eq("gym_id", profile?.gym_id ?? "").gte("class_date", iso(new Date()));
-    if (activeSede) { qClasses = qClasses.eq("sede_id", activeSede); qBookings = qBookings.eq("sede_id", activeSede); }
-    const [{ data: cl }, { data: mem }, { data: bk }] = await Promise.all([
-      qClasses,
-      supabase.from("members").select("id, full_name, plan_name, membership_expiry").order("full_name"),
-      qBookings,
-    ]);
-    setClasses((cl as Klass[]) || []);
-    setMembers((mem as Member[]) || []);
-    setAllBookings((bk as { class_id: string; class_date: string }[]) || []);
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);

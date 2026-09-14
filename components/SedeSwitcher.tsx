@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase-browser";
 import {
   getActiveSedeId,
   resolveActiveSede,
   setActiveSedeId,
   SEDE_EVENT,
+  recordarGym,
   type Sede,
 } from "@/lib/sede";
 
@@ -17,7 +17,6 @@ import {
  * no se muestra nada (no molesta a quien no usa multi-sede).
  */
 export default function SedeSwitcher({ role }: { role: string }) {
-  const supabase = createClient();
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [gymId, setGymId] = useState<string | null>(null);
@@ -26,19 +25,19 @@ export default function SedeSwitcher({ role }: { role: string }) {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from("profiles").select("gym_id").eq("id", user.id)
-        .single<{ gym_id: string | null }>();
-      if (!profile?.gym_id) return;
-      setGymId(profile.gym_id);
-      const { data } = await supabase
-        .from("sedes").select("id, gym_id, name, address, created_at")
-        .eq("gym_id", profile.gym_id).order("created_at", { ascending: true });
-      const list = (data as Sede[]) || [];
-      setSedes(list);
-      setActiveId(resolveActiveSede(profile.gym_id, list));
+      // Un pedido en vez de tres. Este componente esta en la barra de TODAS las
+      // pantallas del panel, asi que sus viajes se pagan en cada una — incluso
+      // cuando termina sin mostrar nada porque el gimnasio tiene una sola sede.
+      try {
+        const r = await fetch("/api/panel/sedes");
+        const j = await r.json();
+        if (!j.ok || !j.gym_id) return;
+        setGymId(j.gym_id);
+        recordarGym(j.gym_id);
+        const list = (j.sedes as Sede[]) || [];
+        setSedes(list);
+        setActiveId(resolveActiveSede(j.gym_id, list));
+      } catch { /* sin sucursales el panel anda igual */ }
     })();
     /* eslint-disable-next-line */
   }, []);
