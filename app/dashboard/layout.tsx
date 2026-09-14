@@ -37,6 +37,7 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/finanzas", label: "Finanzas", icon: "chart", section: "finanzas" },
       { href: "/dashboard/clases", label: "Clases", icon: "calendar", section: "clases" },
       { href: "/dashboard/equipo", label: "Equipo", icon: "staff", section: "equipo" },
+      { href: "/dashboard/comisiones", label: "Comisiones", icon: "chart", feature: "comisiones", section: "comisiones" },
       { href: "/dashboard/sedes", label: "Sucursales", icon: "building", section: "sedes" },
       { href: "/dashboard/control-acceso", label: "Control de acceso", icon: "acceso", feature: "control_acceso", section: "control-acceso" },
       { href: "/dashboard/planes", label: "Planes", icon: "layers", section: "planes" },

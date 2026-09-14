@@ -101,6 +101,15 @@ export const ARTICULOS: Articulo[] = [
       "Se prende en Configuración → Cobros → Vender clases sueltas, con un precio sugerido que después podés pisar en cada venta.\n\nAparece el botón \"Vender clase suelta\" en la ficha del socio. No le mueve el vencimiento de la cuota: es una clase extra, no un mes.\n\nAl venderla elegís si le suma un cupo (para que la reserve desde su app) o si solo registrás la plata, para cuando la clase es hoy y ya está en la puerta. Los cupos extra se acumulan y no se pierden al renovar.",
   },
 
+  {
+    id: "comisiones-profes",
+    categoria: "Socios y cobros",
+    titulo: "Cuánto le toca a cada profe (comisiones)",
+    claves: ["comision", "comisiones", "profe", "profesor", "profesora", "porcentaje", "liquidacion", "pagarle al profe", "sueldo", "reparto"],
+    cuerpo:
+      "Panel → Comisiones. Elegís el mes y te muestra cuánto le corresponde a cada profe. Está en los planes Pro y Elite.\n\nCómo lo calcula: lo que pagó CADA socio se reparte entre las profes según cuántas clases hizo con cada una. Si hizo 8 clases con Karina y 4 con Priscila, Karina se lleva dos tercios de esa cuota y Priscila un tercio — no mitad y mitad. Después cada profe cobra su porcentaje de esa parte.\n\nEl porcentaje lo cambiás ahí mismo, en la columna \"Su %\": la que recién entra suele ir al 40% y el resto al 50%. Se guarda solo. La profe que no tocaste va con 50%.\n\nLas profes salen de lo que cargaste en cada clase, en Clases → Editar clase → Profesor. La clase sin profe cargada no se le atribuye a nadie.\n\nSe cuentan las RESERVAS del mes, no las asistencias. Si tenés prendida la regla de cancelación, una clase reservada y no cancelada a tiempo ya se le descontó al socio, así que cuenta como clase dada.\n\nSi te aparece \"plata sin profe asignada\", son socios que pagaron y no reservaron ninguna clase ese mes. Esa plata no se le da a nadie, y te conviene mirar la lista: alguien que paga y no viene es alguien que se te está por ir.",
+  },
+
   // ── Clases y reservas ─────────────────────────────────────────────────
   {
     id: "tope-clases-plan",

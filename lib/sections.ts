@@ -19,6 +19,7 @@ export const TOGGLEABLE_SECTIONS: PanelSection[] = [
   { key: "finanzas", label: "Finanzas", hint: "Ingresos, egresos y caja del negocio." },
   { key: "clases", label: "Clases y reservas", hint: "Agenda de clases y cupos para los socios." },
   { key: "equipo", label: "Equipo", hint: "Sumar profes o staff con permisos." },
+  { key: "comisiones", label: "Comisiones", hint: "Cuanto le toca a cada profe a fin de mes." },
   { key: "sedes", label: "Sucursales", hint: "Manejar más de una sede." },
   { key: "control-acceso", label: "Control de acceso", hint: "Ingreso de socios por QR / DNI." },
   { key: "planes", label: "Planes de socio", hint: "Los planes que les cobrás a tus socios." },
