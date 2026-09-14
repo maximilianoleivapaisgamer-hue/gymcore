@@ -412,8 +412,11 @@ Checklist que LEE LA BASE: planes, clases, socios, primer cobro, logo y web.
 No es un tour ni un cartel de bienvenida — muestra el dato real al lado ("16
 clases cargadas") y desaparece solo cuando esta completo. Los pasos de una
 seccion apagada en `hidden_sections` no aparecen, asi un personal trainer no ve
-"carga tus clases" para siempre. Se puede ocultar a mano (`localStorage`:
-`tg_primeros_pasos_oculto`). A los empleados no se les muestra.
+"carga tus clases" para siempre. Se puede ocultar a mano, y la clave es **POR GIMNASIO**
+(`localStorage`: `tg_primeros_pasos_oculto.<gymId>`). Antes era una sola para
+todo el navegador: apenas alguien la cerraba, quedaba oculta para TODAS las
+cuentas que se abrieran despues en esa computadora — incluidos los clientes
+nuevos que se miran entrando como ellos, que son a quienes mas les sirve. A los empleados no se les muestra.
 
 **2. Centro de ayuda** (`lib/ayuda.ts` + `components/AyudaPanel.tsx`, en el
 signo de pregunta de la barra). 27 articulos con buscador propio, sin IA y sin

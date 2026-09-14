@@ -26,21 +26,29 @@ interface Paso {
   detalle: string;
 }
 
-const OCULTO = "tg_primeros_pasos_oculto";
+/**
+ * Dónde se recuerda que este negocio cerró la lista. **Una clave POR GIMNASIO.**
+ *
+ * ⚠️ Antes era una sola clave para todo el navegador. Eso hacía que, apenas
+ * alguien la cerraba una vez, quedara oculta para TODAS las cuentas que se
+ * abrieran después en esa computadora — incluidas las de los clientes nuevos
+ * que se mira entrando como ellos. Justo a quien más le sirve la lista.
+ */
+const claveOculto = (gymId: string) => `tg_primeros_pasos_oculto.${gymId}`;
+/** La clave global de antes. Solo se usa para borrarla. */
+const OCULTO_VIEJO = "tg_primeros_pasos_oculto";
 
 export default function PrimerosPasos() {
   const supabase = createClient();
   const [pasos, setPasos] = useState<Paso[] | null>(null);
   const [oculto, setOculto] = useState(true); // hasta saber, no parpadea
+  const [gymId, setGymId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      try {
-        if (localStorage.getItem(OCULTO) === "1") return;
-      } catch {
-        /* navegador sin storage: lo mostramos igual */
-      }
-      setOculto(false);
+      // La clave global vieja se borra al pasar. Si no, el que la cerró una vez
+      // se queda sin la lista para siempre y en todas las cuentas.
+      try { localStorage.removeItem(OCULTO_VIEJO); } catch { /* sin storage */ }
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -50,6 +58,16 @@ export default function PrimerosPasos() {
       // A los empleados no les corresponde configurar el negocio.
       if (!perfil?.gym_id || perfil.role === "empleado") return;
       const gymId = perfil.gym_id;
+      setGymId(gymId);
+
+      // Recién acá sabemos de qué gimnasio es, así que recién acá se puede
+      // saber si ESTE negocio la cerró.
+      try {
+        if (localStorage.getItem(claveOculto(gymId)) === "1") return;
+      } catch {
+        /* navegador sin storage: la mostramos igual */
+      }
+      setOculto(false);
 
       // select("*") para que no explote si falta correr alguna migración.
       const { data: gym } = await supabase.from("gyms").select("*").eq("id", gymId).maybeSingle();
@@ -106,7 +124,11 @@ export default function PrimerosPasos() {
   }, []);
 
   function cerrar() {
-    try { localStorage.setItem(OCULTO, "1"); } catch { /* da igual */ }
+    // Se guarda para ESTE gimnasio nada más: cerrarla en un negocio no se la
+    // esconde a los demás.
+    if (gymId) {
+      try { localStorage.setItem(claveOculto(gymId), "1"); } catch { /* da igual */ }
+    }
     setOculto(true);
   }
 
