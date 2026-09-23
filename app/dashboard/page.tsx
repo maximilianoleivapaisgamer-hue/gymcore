@@ -5,7 +5,6 @@ import Link from "next/link";
 import { WA_TARGET, abrirWhatsapp } from "@/lib/wa-link";
 import { sedeParaPedir, recordarGym, setActiveSedeId } from "@/lib/sede";
 import PrimerosPasos from "@/components/PrimerosPasos";
-import AvisoAbono from "@/components/AvisoAbono";
 
 interface Member {
   id: string;
@@ -166,8 +165,6 @@ export default function DashboardHome() {
           Agregar socio
         </Link>
       </div>
-
-      <AvisoAbono />
 
       <PrimerosPasos />
 

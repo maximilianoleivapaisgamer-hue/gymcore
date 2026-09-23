@@ -15,6 +15,10 @@ interface Sub {
   gym_id: string;
   plan: "basico" | "pro" | "elite";
   status: "trial" | "active" | "past_due" | "canceled";
+  /** Dias de tolerancia de ESTE cliente. null = el general de la plataforma. */
+  dias_gracia?: number | null;
+  /** Cuando se le corto el panel por falta de pago. */
+  cortado_at?: string | null;
   trial_ends_at: string | null;
   current_period_end: string | null;
   payment_method: string | null;
@@ -265,7 +269,7 @@ export default function AdminDashboard() {
     (async () => {
       const [{ data: g }, { data: s }, { data: p }, { data: mem }, { data: demoG }] = await Promise.all([
         supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp, archived, is_test").eq("is_demo", false),
-        supabase.from("subscriptions").select("gym_id, plan, status, trial_ends_at, current_period_end, payment_method"),
+        supabase.from("subscriptions").select("gym_id, plan, status, trial_ends_at, current_period_end, payment_method, dias_gracia, cortado_at"),
         supabase.from("profiles").select("id, full_name"),
         supabase.from("members").select("gym_id"),
         supabase.from("gyms").select("owner_id").eq("is_demo", true),
@@ -371,6 +375,52 @@ export default function AdminDashboard() {
       g.name.toLowerCase().includes(t) || g.slug.toLowerCase().includes(t) || ownerName(g.owner_id).toLowerCase().includes(t));
     /* eslint-disable-next-line */
   }, [activeGyms, subByGym, q, owners, demoOwnerIds]);
+
+  /**
+   * "Me entro la plata": deja el abono al dia de un toque.
+   *
+   * Antes habia que cambiar el estado y escribir la fecha a mano, y una fecha
+   * mal tipeada es justo lo que le corta el sistema a un cliente que pago.
+   * El vencimiento se corre desde el anterior, asi el dia de cobro no se
+   * desplaza mes a mes.
+   */
+  async function registrarPago(gymId: string, nombre: string) {
+    if (!confirm(`¿Registrar el pago del mes de "${nombre}"?
+
+Le queda el abono al dia y, si estaba cortado, se le destapa el panel.`)) return;
+    setSavingId(gymId);
+    try {
+      const r = await fetch("/api/admin/abono", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gym_id: gymId, accion: "registrar_pago" }),
+      });
+      const j = await r.json();
+      if (!j.ok) { alert(j.error || "No se pudo registrar el pago."); }
+      else {
+        setSubs((ss) => ss.map((x) => x.gym_id === gymId
+          ? { ...x, status: "active", current_period_end: `${j.vence}T03:00:00.000Z`,
+              payment_method: x.payment_method ?? "transferencia", cortado_at: null }
+          : x));
+      }
+    } catch { alert("No se pudo registrar el pago."); }
+    setSavingId(null);
+  }
+
+  /** Los dias de gracia de ESTE cliente. Vacio = usa el general. */
+  async function guardarGracia(gymId: string, valor: string) {
+    const dias = valor.trim() === "" ? null : Number(valor);
+    setSavingId(gymId);
+    try {
+      const r = await fetch("/api/admin/abono", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gym_id: gymId, accion: "dias_gracia", dias }),
+      });
+      const j = await r.json();
+      if (!j.ok) alert(j.error || "No se pudieron guardar los días.");
+      else setSubs((ss) => ss.map((x) => (x.gym_id === gymId ? { ...x, dias_gracia: dias } : x)));
+    } catch { alert("No se pudieron guardar los días."); }
+    setSavingId(null);
+  }
 
   async function saveSub(gymId: string, patch: Partial<Sub>) {
     setSavingId(gymId);
@@ -567,6 +617,12 @@ export default function AdminDashboard() {
                               {vencido ? "Vencido" : "Próximo a vencer"}
                             </span>
                           )}
+                          {s?.cortado_at && (
+                            <span className="inline-flex w-fit rounded-full bg-crit px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0a0d12]"
+                              title="Tiene el panel bloqueado por falta de pago. Se le destapa solo al registrarle el cobro.">
+                              Cortado
+                            </span>
+                          )}
                           {(pruebaTermina || pruebaTerminada) && (
                             <span className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${pruebaTerminada ? "bg-white/10 text-ink-2" : "bg-brand/15 text-brand"}`}>
                               {pruebaTerminada ? "Prueba terminada" : "Prueba por terminar"}
@@ -595,11 +651,33 @@ export default function AdminDashboard() {
                               : { current_period_end: e.target.value || null })
                           }
                         />
+                        <div className="mt-1 flex items-center gap-1">
+                          <span className="text-[10px] text-muted" title="Días de tolerancia después del vencimiento antes de cortarle el panel. Vacío = el general (5). Un número grande, por ejemplo 3650, es 'a este no lo cortes nunca'.">
+                            Gracia:
+                          </span>
+                          <input
+                            type="number" min={0} max={3650}
+                            className="input w-[64px] py-1 text-[11px] tabular-nums"
+                            placeholder="5"
+                            defaultValue={s?.dias_gracia ?? ""}
+                            onBlur={(e) => {
+                              const v = e.target.value;
+                              if (v !== String(s?.dias_gracia ?? "")) guardarGracia(g.id, v);
+                            }}
+                          />
+                        </div>
                         {savingId === g.id && <span className="ml-1 text-[11px] text-muted">Guardando…</span>}
                       </td>
                       <td className="px-4 py-3 text-right text-ink-2">{counts[g.id] || 0}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-3">
+                          {(vencido || porVencer || s?.cortado_at) && (
+                            <button onClick={() => registrarPago(g.id, g.name)} disabled={savingId === g.id}
+                              className="inline-flex items-center gap-1 rounded-lg border border-good/40 px-2.5 py-1 text-xs font-semibold text-good hover:bg-[rgba(34,197,94,.12)] disabled:opacity-50"
+                              title="Le entró la plata: le deja el abono al día y le destapa el panel si estaba cortado">
+                              <span aria-hidden>✓</span> Cobré
+                            </button>
+                          )}
                           {(() => {
                             const link = waLink(g, s, (ownerName(g.owner_id).split(" ")[0] || ""));
                             return link ? (

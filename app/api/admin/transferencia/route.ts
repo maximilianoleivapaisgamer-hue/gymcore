@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient as createServer } from "@/lib/supabase-server";
 import { promoteDemo } from "@/lib/demo-convert";
+import { proximoVencimiento } from "@/lib/abono";
 
 /**
  * Verificación de transferencias (solo super admin):
@@ -26,11 +27,6 @@ async function guard() {
   return { admin };
 }
 
-function nextMonthIso(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1);
-  return d.toISOString();
-}
 
 export async function GET() {
   const g = await guard();
@@ -79,12 +75,22 @@ export async function POST(req: Request) {
     const { data: st } = await g.admin.from("platform_settings").select("convert_clear_sample").eq("id", 1).maybeSingle<{ convert_clear_sample: boolean }>();
     try { await promoteDemo(g.admin, tp.gym_id, st?.convert_clear_sample ?? true); } catch { /* seguimos igual */ }
 
+    // El vencimiento se estira desde el ANTERIOR, no desde hoy: si no, cada
+    // demora del cliente le corre el dia de cobro y en un año termina pagando
+    // once meses en vez de doce. Misma cuenta que el boton del panel.
+    const { data: actual } = await g.admin.from("subscriptions")
+      .select("current_period_end").eq("gym_id", tp.gym_id)
+      .maybeSingle<{ current_period_end: string | null }>();
+    const hasta = proximoVencimiento(actual?.current_period_end);
+
     await g.admin.from("subscriptions").upsert({
       gym_id: tp.gym_id,
       plan: tp.plan,
       status: "active",
       payment_method: "transferencia",
-      current_period_end: nextMonthIso(),
+      current_period_end: `${hasta}T03:00:00.000Z`,
+      // Si estaba cortado por falta de pago, se le destapa el panel.
+      cortado_at: null,
     }, { onConflict: "gym_id" });
 
     await g.admin.from("transfer_payments").update({ status: "aprobado", reviewed_at: new Date().toISOString() }).eq("id", id);

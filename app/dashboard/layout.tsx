@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, isBonificada, minPlanLabel, loadPlans, loadGymExtras, DEFAULT_PLANS, type PlanFeature, type PlanConfig } from "@/lib/plans";
 import { staffCanAccess } from "@/lib/staff";
+import EstadoAbono from "@/components/EstadoAbono";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
 import ViendoComo from "@/components/ViendoComo";
@@ -405,7 +406,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
-        <div className="flex-1">{children}</div>
+        <div className="flex-1">
+          {/* Tapa el panel si el abono quedo cortado, y avisa antes. */}
+          <EstadoAbono />
+          {children}
+        </div>
         <AyudaPanel abierto={ayuda} onCerrar={() => setAyuda(false)} />
       </div>
     </div>
