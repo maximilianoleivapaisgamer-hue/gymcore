@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { WA_TARGET, waHrefBase, abrirWhatsapp } from "@/lib/wa-link";
-import { SUB_STATUS_LABEL } from "@/types/db";
+import { estadoDeAbono } from "@/lib/admin";
 import { loadPlans, loadGymExtras, isBonificada, featureLabel, DEFAULT_PLANS, type PlanConfig, type SubPlanKey, type PlanFeature } from "@/lib/plans";
 
 interface Sub {
@@ -184,7 +184,10 @@ export default function MiPlanPage() {
     return { href: waHrefBase(phone, msg) as string, phone, msg };
   }
 
-  const st = sub ? SUB_STATUS_LABEL[sub.status] : null;
+  // Mira el estado Y la fecha. `status` sola decia "Al dia" tres lineas arriba
+  // de un cartel rojo que decia "tu abono vencio": el que paga por
+  // transferencia nunca genera el webhook que moveria esa columna.
+  const st = estadoDeAbono(sub ?? undefined);
   const vence = sub ? (sub.status === "trial" ? sub.trial_ends_at : sub.current_period_end) : null;
   // Funciones que le habilitamos a mano y que su plan NO trae. Las que ya vienen
   // con el plan no se listan acá: no son un regalo, son parte de lo que paga.

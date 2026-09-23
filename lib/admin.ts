@@ -3,6 +3,8 @@
  * (Sin "use client": son constantes y funciones puras que usan las páginas.)
  */
 
+import { SUB_STATUS_LABEL } from "@/types/db";
+
 export const PLAN_LABEL: Record<string, string> = { basico: "Básico", pro: "Pro", elite: "Elite" };
 
 /** Respaldo de precios si un plan no tuviera precio configurado en la base. */
@@ -72,6 +74,38 @@ export function isVencido(
   if (!sub || sub.status !== "active") return false;
   const d = daysUntil(venceOf(sub));
   return d !== null && d < 0;
+}
+
+/**
+ * El estado REAL del abono, mirando también la fecha.
+ *
+ * ⚠️ `subscriptions.status` es una columna guardada, y lo único que la mueve a
+ * "past_due" es el webhook de Mercado Pago. El que paga por TRANSFERENCIA no
+ * genera ningún webhook, así que se queda en "active" para siempre por más que
+ * el vencimiento haya pasado hace meses.
+ *
+ * Eso hacía que en "Mi plan" el cliente viera el cartel verde **"Al día"** y
+ * tres líneas más abajo, en rojo, **"Tu abono venció el 20/09"**. Las dos cosas
+ * juntas, en la misma pantalla. Pasó con DanzArte.
+ *
+ * Devuelve la etiqueta que hay que mostrar. No toca nada ni corta nada: es solo
+ * lo que se ve.
+ */
+export function estadoDeAbono(
+  sub: { status: string; trial_ends_at: string | null; current_period_end: string | null } | undefined,
+): { label: string; cls: string } | null {
+  if (!sub) return null;
+
+  const d = daysUntil(venceOf(sub));
+  const paso = d !== null && d < 0;
+
+  if (sub.status === "active" && paso) {
+    return { label: "Vencido", cls: "bg-[rgba(240,82,82,.14)] text-crit" };
+  }
+  if (sub.status === "trial" && paso) {
+    return { label: "Prueba terminada", cls: "bg-[rgba(245,177,61,.14)] text-warn" };
+  }
+  return SUB_STATUS_LABEL[sub.status] ?? null;
 }
 
 /**

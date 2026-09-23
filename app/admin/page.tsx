@@ -37,6 +37,11 @@ function waLink(gym: Gym, sub: Sub | undefined, ownerFirst: string): { href: str
     msg = `${hola} Te escribo de turnogym. Nos figura un pago pendiente de tu plan ${plan}. ¿Coordinamos para regularizarlo y que no se te corte el servicio?`;
   } else if (sub?.status === "canceled") {
     msg = `${hola} Te escribo de turnogym. Vimos que tu plan quedó dado de baja; si querés reactivarlo, te lo dejo andando en un toque.`;
+  } else if (isVencido(sub)) {
+    // Sin esta rama, al cliente que YA vencio le caia el mensaje generico de
+    // "¿necesitas una mano?" en vez del reclamo: `isProximoVence` da falso
+    // apenas la fecha pasa.
+    msg = `${hola} Te escribo de turnogym. Tu abono ${plan} venció el ${vence}. ¿Te paso los datos para que lo regularices y no se te corte el servicio?`;
   } else if (isProximoVence(sub)) {
     msg = `${hola} Te escribo de turnogym. Tu abono ${plan} vence el ${vence}. ¿Coordinamos la renovación así no se te corta?`;
   } else {
