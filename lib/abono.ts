@@ -39,6 +39,7 @@ export type EtapaAbono =
   | "vencido"       // ya pasó, todavía lejos del corte
   | "aviso-corte"   // faltan 2 días: se le avisa la fecha
   | "ultimo-aviso"  // falta 1: mañana se corta
+  | "comprobante"   // subio el comprobante: se le levanta la pausa mientras se revisa
   | "cortado";      // se acabó
 
 export interface EstadoAbono {
@@ -99,6 +100,17 @@ export function estadoAbono(
   sub: AbonoSub | null | undefined,
   graciaGeneral = DIAS_GRACIA_POR_DEFECTO,
   hoy = hoyArg(),
+  /**
+   * Tiene una transferencia esperando revisión, con el comprobante subido.
+   *
+   * Cuando la hay NO se pausa y se dejan de mandar avisos, aunque la fecha ya
+   * haya pasado. La persona hizo lo que tenía que hacer; que se quede sin
+   * sistema mientras nosotros revisamos sería cobrarle nuestra demora.
+   *
+   * Se auto-corrige solo: si la transferencia se rechaza deja de estar
+   * pendiente, y la pausa vuelve sin que nadie tenga que hacer nada.
+   */
+  comprobantePendiente = false,
 ): EstadoAbono {
   const gracia = sub?.dias_gracia ?? graciaGeneral;
   const base: EstadoAbono = {
@@ -115,6 +127,14 @@ export function estadoAbono(
 
   const diasVencido = diasEntre(vence, hoy);
   const fechaCorte = sumarDias(vence, gracia);
+
+  // Mandó el comprobante: se le levanta la pausa y se le deja de insistir. Va
+  // antes que todo lo demás porque también vale para el que paga adelantado:
+  // pedirle que abone cuando ya mandó el comprobante es pedirle que pague dos
+  // veces.
+  if (comprobantePendiente) {
+    return { ...base, etapa: "comprobante", diasVencido, fechaCorte };
+  }
 
   if (diasVencido < 0) {
     // El aviso amable de la semana previa. Es el que ya existia arriba del
@@ -216,6 +236,11 @@ export function textoAbono(e: EstadoAbono, vence: string | null): { titulo: stri
       return {
         titulo: "Mañana se te pausa el sistema.",
         detalle: `Tu abono venció el ${dv}. Aboná hoy y seguimos derecho. Si no llegás, escribinos y lo arreglamos.`,
+      };
+    case "comprobante":
+      return {
+        titulo: "Recibimos tu comprobante. ¡Gracias!",
+        detalle: "Ya te sacamos la pausa así seguís trabajando tranquilo. Lo vamos a revisar igual y, si vemos algo raro, te escribimos.",
       };
     case "cortado":
       return {

@@ -63,6 +63,15 @@ export default function AdminDashboard() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [planCfgs, setPlanCfgs] = useState<PlanConfig[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
+  /**
+   * Comprobantes esperando que los revises.
+   *
+   * Vive en la pantalla principal y no solo en Cobros porque ahora un
+   * comprobante pendiente le LEVANTA LA PAUSA al cliente mientras tanto. Si se
+   * te traspapela, queda alguien usando el sistema sin que le hayas visto la
+   * plata entrar.
+   */
+  const [pendientes, setPendientes] = useState(0);
   const [q, setQ] = useState("");
   const [busyGym, setBusyGym] = useState<string | null>(null);
   const [convertId, setConvertId] = useState<string | null>(null);
@@ -266,6 +275,13 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
+    fetch("/api/admin/transferencia")
+      .then((r) => r.json())
+      .then((j) => { if (j.ok) setPendientes((j.pendientes || []).length); })
+      .catch(() => { /* si no se puede saber, no se muestra nada */ });
+  }, []);
+
+  useEffect(() => {
     (async () => {
       const [{ data: g }, { data: s }, { data: p }, { data: mem }, { data: demoG }] = await Promise.all([
         supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp, archived, is_test").eq("is_demo", false),
@@ -458,6 +474,21 @@ Le queda el abono al dia y, si estaba cortado, se le destapa el panel.`)) return
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="mt-1 text-ink-2">Todos los gimnasios clientes, su suscripción y cómo pagan.</p>
       </div>
+
+      {pendientes > 0 && (
+        <a href="/admin/cobros"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#f5b13d]/40 bg-[rgba(245,177,61,.12)] px-4 py-3 hover:bg-[rgba(245,177,61,.18)]">
+          <div>
+            <div className="text-sm font-bold text-[#f5b13d]">
+              {pendientes} {pendientes === 1 ? "comprobante esperando" : "comprobantes esperando"} que los revises
+            </div>
+            <p className="mt-0.5 text-xs text-ink-2">
+              Mientras tanto siguen usando el sistema sin pausa. Revisalos para confirmar que la plata entró.
+            </p>
+          </div>
+          <span className="btn btn-primary shrink-0 text-xs">Revisar</span>
+        </a>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

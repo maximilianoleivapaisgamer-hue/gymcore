@@ -24,6 +24,8 @@ import { WA_TARGET } from "@/lib/wa-link";
 
 interface Estado {
   cortar: boolean;
+  /** Mando el comprobante y esta esperando revision. */
+  comprobante_pendiente: boolean;
   /** Link de WhatsApp a soporte, si esta cargado. */
   soporte: string | null;
   etapa: EtapaAbono;
@@ -45,6 +47,8 @@ const TONOS: Record<string, string> = {
   "vencido": "border-[#f5b13d]/40 bg-[rgba(245,177,61,.12)] text-[#f5b13d]",
   "aviso-corte": "border-[#f5b13d]/50 bg-[rgba(245,177,61,.16)] text-[#f5b13d]",
   "ultimo-aviso": "border-crit/50 bg-[rgba(240,82,82,.16)] text-crit",
+  // Este es el unico en verde: mando el comprobante, esta todo bien.
+  "comprobante": "border-good/40 bg-[rgba(34,197,94,.12)] text-good",
 };
 
 export default function EstadoAbono() {
@@ -107,7 +111,9 @@ export default function EstadoAbono() {
         <div className={`text-sm ${urgente ? "font-bold" : "font-semibold"}`}>{e.aviso.titulo}</div>
         <p className="mt-0.5 text-xs leading-snug text-ink-2">{e.aviso.detalle}</p>
       </div>
-      {e.es_dueno && (
+      {/* Con el comprobante mandado no va ningun boton: ya hizo lo suyo.
+          Ofrecerle "Abonar" seria pedirle que pague dos veces. */}
+      {e.es_dueno && e.etapa !== "comprobante" && (
         <div className="flex shrink-0 items-center gap-2">
           {/* La salida a mano aparece recien cuando la cosa aprieta: antes de
               eso es solo un recordatorio y no hace falta ofrecer nada. */}

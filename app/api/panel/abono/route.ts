@@ -44,15 +44,26 @@ export async function GET() {
     return NextResponse.json({ ok: true, cortar: false, etapa: "al-dia", aviso: null });
   }
 
-  const [{ data: sub }, { data: cfg }] = await Promise.all([
+  const [{ data: sub }, { data: cfg }, { data: pend }] = await Promise.all([
     admin.from("subscriptions")
       .select("status, trial_ends_at, current_period_end, payment_method, dias_gracia, cortado_at")
       .eq("gym_id", perfil.gym_id).maybeSingle<AbonoSub>(),
     admin.from("platform_settings").select("dias_gracia_default, support_whatsapp").eq("id", 1)
       .maybeSingle<{ dias_gracia_default: number; support_whatsapp: string | null }>(),
+    // ¿Mando el comprobante y esta esperando que lo revisemos? El alta exige
+    // el archivo, asi que una pendiente SIEMPRE tiene comprobante; igual se
+    // pide la columna y se chequea, por si queda alguna fila vieja sin el.
+    admin.from("transfer_payments").select("receipt_url")
+      .eq("gym_id", perfil.gym_id).eq("status", "pendiente")
+      .order("created_at", { ascending: false }).limit(1),
   ]);
 
-  const estado = estadoAbono(sub, cfg?.dias_gracia_default ?? DIAS_GRACIA_POR_DEFECTO);
+  const comprobantePendiente = ((pend as { receipt_url: string | null }[]) || [])
+    .some((t) => !!(t.receipt_url || "").trim());
+
+  const estado = estadoAbono(
+    sub, cfg?.dias_gracia_default ?? DIAS_GRACIA_POR_DEFECTO, undefined, comprobantePendiente,
+  );
   const aviso = textoAbono(estado, sub?.current_period_end ?? null);
 
   // Queda registrado el día que se corta, para saber desde cuándo está afuera.
@@ -60,6 +71,13 @@ export async function GET() {
   if (estado.cortar && sub && !sub.cortado_at) {
     await admin.from("subscriptions")
       .update({ cortado_at: new Date().toISOString() }).eq("gym_id", perfil.gym_id);
+  }
+
+  // Se levanto la pausa (mando el comprobante, o le registraron el pago):
+  // se limpia el sello para que el panel de admin no lo siga mostrando cortado.
+  if (!estado.cortar && sub?.cortado_at) {
+    await admin.from("subscriptions")
+      .update({ cortado_at: null }).eq("gym_id", perfil.gym_id);
   }
 
   // El "escribinos" del aviso tiene que ser un boton de verdad. Un cliente que
@@ -74,6 +92,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     soporte,
+    comprobante_pendiente: comprobantePendiente,
     cortar: estado.cortar,
     etapa: estado.etapa,
     dias_vencido: estado.diasVencido,
