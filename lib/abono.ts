@@ -164,7 +164,25 @@ export function fechaLinda(iso: string | null): string {
   return `${dia} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 }
 
-/** El texto que le toca ver al dueño, según el momento. */
+/**
+ * El texto que le toca ver al dueño, según el momento.
+ *
+ * ── Cómo está escrito y por qué ─────────────────────────────────────────
+ *
+ * Del otro lado hay una persona que probablemente está en un mes complicado,
+ * no un deudor. Así que:
+ *
+ *  - Se dice **"pausar"**, no "cortar". Además de sonar menos a carta
+ *    documento, es lo que de verdad pasa: no se borra nada y vuelve entero en
+ *    el momento en que paga.
+ *  - Nada de "se va a proceder a" ni "regularizar su situación". Se le habla
+ *    como le hablarías por teléfono.
+ *  - Siempre hay una salida a mano: si no llega, que escriba y se arregla.
+ *    Un cliente que avisa que se le complicó vale mucho más que uno que se va
+ *    en silencio porque le dio vergüenza.
+ *
+ * El tono se endurece solo sobre el final, que es cuando hace falta.
+ */
 export function textoAbono(e: EstadoAbono, vence: string | null): { titulo: string; detalle: string } | null {
   const v = (vence || "").slice(0, 10);
   const dv = `${v.slice(8, 10)}/${v.slice(5, 7)}`;
@@ -173,34 +191,36 @@ export function textoAbono(e: EstadoAbono, vence: string | null): { titulo: stri
     case "por-vencer": {
       const faltan = -e.diasVencido;
       return {
-        titulo: `Tu abono vence en ${faltan} ${faltan === 1 ? "día" : "días"}, el ${dv}.`,
-        detalle: "Aboná para seguir usando el sistema sin cortes.",
+        titulo: faltan === 1
+          ? "Mañana vence tu abono."
+          : `Se viene el vencimiento de tu abono: el ${dv}.`,
+        detalle: "Podés abonarlo cuando te quede cómodo y seguís sin interrupciones.",
       };
     }
     case "vence-hoy":
       return {
-        titulo: "Tu abono vence hoy.",
-        detalle: "Aboná para que no se te corte el servicio.",
+        titulo: "Hoy vence tu abono.",
+        detalle: "Aboná cuando puedas y seguimos como si nada.",
       };
     case "vencido":
       return {
-        titulo: `Tu abono venció el ${dv}.`,
-        detalle: `Tenés hasta el ${fechaLinda(e.fechaCorte)} para regularizarlo.`,
+        titulo: `Se te pasó el vencimiento del ${dv}.`,
+        detalle: `No pasa nada: tenés tiempo hasta el ${fechaLinda(e.fechaCorte)}.`,
       };
     case "aviso-corte":
       return {
-        titulo: `Tu abono venció el ${dv}.`,
-        detalle: `Si no recibimos el pago, el ${fechaLinda(e.fechaCorte)} se va a proceder a cortar el servicio.`,
+        titulo: `Se te pasó el vencimiento del ${dv}.`,
+        detalle: `Si el ${fechaLinda(e.fechaCorte)} no llegamos a recibirlo, te vamos a tener que pausar el sistema. Si necesitás unos días más, escribinos y lo vemos.`,
       };
     case "ultimo-aviso":
       return {
-        titulo: "Mañana se corta tu servicio.",
-        detalle: `Tu abono venció el ${dv}. Aboná hoy para no quedarte afuera.`,
+        titulo: "Mañana se te pausa el sistema.",
+        detalle: `Tu abono venció el ${dv}. Aboná hoy y seguimos derecho. Si no llegás, escribinos y lo arreglamos.`,
       };
     case "cortado":
       return {
-        titulo: "Tu servicio está cortado por falta de pago.",
-        detalle: `Tu abono venció el ${dv}. Aboná y se reactiva al instante.`,
+        titulo: "Tu sistema está en pausa.",
+        detalle: "Aboná y vuelve todo al instante. No perdiste nada: tus socios, tus cobros y tus clases están intactos.",
       };
     default:
       return null;

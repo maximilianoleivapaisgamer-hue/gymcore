@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient as createServer } from "@/lib/supabase-server";
 import { estadoAbono, textoAbono, DIAS_GRACIA_POR_DEFECTO, type AbonoSub } from "@/lib/abono";
+import { waHrefBase } from "@/lib/wa-link";
 
 /**
  * En qué momento está el abono de este gimnasio con turnogym.
@@ -47,8 +48,8 @@ export async function GET() {
     admin.from("subscriptions")
       .select("status, trial_ends_at, current_period_end, payment_method, dias_gracia, cortado_at")
       .eq("gym_id", perfil.gym_id).maybeSingle<AbonoSub>(),
-    admin.from("platform_settings").select("dias_gracia_default").eq("id", 1)
-      .maybeSingle<{ dias_gracia_default: number }>(),
+    admin.from("platform_settings").select("dias_gracia_default, support_whatsapp").eq("id", 1)
+      .maybeSingle<{ dias_gracia_default: number; support_whatsapp: string | null }>(),
   ]);
 
   const estado = estadoAbono(sub, cfg?.dias_gracia_default ?? DIAS_GRACIA_POR_DEFECTO);
@@ -61,8 +62,18 @@ export async function GET() {
       .update({ cortado_at: new Date().toISOString() }).eq("gym_id", perfil.gym_id);
   }
 
+  // El "escribinos" del aviso tiene que ser un boton de verdad. Un cliente que
+  // avisa que se le complico vale mucho mas que uno que se va en silencio.
+  const { data: gym } = await admin
+    .from("gyms").select("name").eq("id", perfil.gym_id).maybeSingle<{ name: string }>();
+  const soporte = cfg?.support_whatsapp
+    ? waHrefBase(cfg.support_whatsapp,
+        `¡Hola! Te escribo de ${gym?.name || "mi gimnasio"} por el abono de turnogym.`)
+    : null;
+
   return NextResponse.json({
     ok: true,
+    soporte,
     cortar: estado.cortar,
     etapa: estado.etapa,
     dias_vencido: estado.diasVencido,
