@@ -102,6 +102,14 @@ export const ARTICULOS: Articulo[] = [
   },
 
   {
+    id: "abono-vencido",
+    categoria: "Tu cuenta",
+    titulo: "Se me venció el abono: ¿qué pasa?",
+    claves: ["vencio", "vencido", "corte", "cortar", "se corta", "me cortaron", "abono", "deuda", "gracia", "dias de gracia", "no puedo entrar", "bloqueado"],
+    cuerpo:
+      "Tenés 5 días de tolerancia desde el vencimiento. En ese tiempo el sistema anda igual, con un aviso arriba del panel.\n\nCómo va:\n• El día del vencimiento: \"tu abono vence hoy\".\n• Los dos días siguientes: te avisa hasta cuándo tenés.\n• A los 3 días: te decimos la fecha exacta en que se corta.\n• A los 4 días: \"mañana se corta tu servicio\".\n• A los 5 días: se bloquea el panel.\n\nSi se bloquea, NO se pierde nada: tus datos, tus socios y tus cobros quedan todos guardados, y tus socios siguen usando su app normalmente. Se destapa solo apenas registramos el pago.\n\nPara abonar: Panel → Mi plan → Abonar. Con Mercado Pago se activa al instante; por transferencia subís el comprobante y lo activamos a mano.\n\nSi pagaste y te aparece igual, escribinos: puede ser que la transferencia todavía no esté revisada.",
+  },
+  {
     id: "comisiones-profes",
     categoria: "Socios y cobros",
     titulo: "Cuánto le toca a cada profe (comisiones)",
