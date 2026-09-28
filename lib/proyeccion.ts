@@ -65,17 +65,20 @@ export interface Proyeccion {
 const RITMO_SUGERIDO_MENSUAL = 0.03;
 
 /**
- * El techo de lo que el entrenador puede pedir, por mes.
+ * ⚠️ NO hay tope por plazo: decision del dueño del producto. Si el entrenador
+ * quiere pedir 15 kilos en 3 meses, los pide. Conoce a la persona y es su
+ * negocio el que responde por el numero.
  *
- * 4% mensual es el borde superior de lo sostenible (1% semanal). Existe porque
- * el entrenador puede editar los kilos, y sin freno alguien va a escribir "20
- * kilos en 3 meses": ahi la imagen deja de ser una proyeccion y pasa a ser una
- * promesa que nadie puede cumplir, que es justo de lo que nos cuidamos.
+ * Queda UN solo freno, y es de otra naturaleza: no proyectar a nadie por
+ * debajo del peso saludable. No limita la ambicion, evita que salga la imagen
+ * de una persona enferma — que ademas nadie quiere mostrar ni vender.
  */
-const TOPE_MENSUAL = 0.04;
 
-/** Nunca se proyecta por debajo de esto. IMC 21 es "en forma", no "flaco". */
-const IMC_PISO = 21;
+/**
+ * El piso. 18,5 es el borde medico entre peso normal y bajo peso: es lo mas
+ * permisivo que se puede ser sin generar la imagen de alguien desnutrido.
+ */
+const IMC_PISO = 18.5;
 /** Ni por encima, cuando alguien tiene que subir. */
 const IMC_TECHO = 24;
 
@@ -149,15 +152,9 @@ export function proyectar(
 
   // El maximo que se puede pedir para este plazo, sin pasar el piso de IMC.
   const pesoPisoAbs = IMC_PISO * ((alturaCm / 100) ** 2);
-  // El tope se frena mes a mes igual que la sugerencia. Lineal daba 22,8 kg a
-  // 6 meses para alguien de 95: matematicamente posible, pero no es algo que
-  // un gimnasio pueda poner en una imagen y sostener.
-  let topeCrudo = pesoKg;
-  for (let m = 0; m < meses; m++) {
-    topeCrudo -= topeCrudo * TOPE_MENSUAL * Math.pow(FRENO_POR_MES, m);
-  }
+  // Lo unico que acota: no bajar del peso saludable. No hay limite por plazo.
   const topeKilos = enfoque === "bajar"
-    ? redondear(Math.min(pesoKg - topeCrudo, Math.max(0, pesoKg - pesoPisoAbs)))
+    ? redondear(Math.max(0, pesoKg - pesoPisoAbs))
     : enfoque === "subir"
       ? redondear(Math.max(0, IMC_TECHO * ((alturaCm / 100) ** 2) - pesoKg))
       : redondear(Math.max(0, pesoKg - pesoPisoAbs));
@@ -165,7 +162,8 @@ export function proyectar(
   // El entrenador manda, pero acotado.
   let aMano = false;
   if (kilosAMano != null && Number.isFinite(kilosAMano) && kilosAMano > 0) {
-    const pedidos = Math.min(Math.abs(kilosAMano), topeKilos);
+    const limite = enfoque === "subir" ? topeKilos : Math.max(0, pesoKg - pesoPisoAbs);
+    const pedidos = Math.min(Math.abs(kilosAMano), limite);
     pesoObjetivo = enfoque === "subir" ? pesoKg + pedidos : pesoKg - pedidos;
     aMano = true;
   }

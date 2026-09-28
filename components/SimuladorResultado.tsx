@@ -181,7 +181,7 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
                 <span className="text-xs text-ink-2">
                   {sug.enfoque === "subir" ? "Va a subir" : "Va a bajar"}
                 </span>
-                <input type="number" min={0} max={sug.tope} step={0.5}
+                <input type="number" min={0} step={0.5}
                   className="input w-[84px] py-1 text-sm tabular-nums"
                   placeholder={String(sug.kilos)}
                   value={kilos}
@@ -196,13 +196,14 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
               </div>
               <p className="mt-1.5 text-[11px] leading-snug text-muted">
                 Sugerido: <b className="text-ink-2">{sug.kilos} kg</b> en {meses} meses.
-                Si conocés a la persona y esperás otro resultado, cambialo.
-                {" "}El máximo para este plazo es {sug.tope} kg.
+                Si conocés a la persona y esperás otro resultado, poné el número que quieras.
               </p>
+              {/* Lo unico que se avisa: que no va a dibujar a alguien por debajo
+                  del peso saludable. No es un limite de ambicion. */}
               {Number(kilos) > sug.tope && (
                 <p className="mt-1 text-[11px] text-[#f5b13d]">
-                  Se va a usar {sug.tope} kg: más que eso en {meses} meses no es
-                  sostenible y la imagen dejaría de ser realista.
+                  Con {kilos} kg quedaría por debajo del peso saludable, así que se va
+                  a usar {sug.tope} kg.
                 </p>
               )}
             </div>
