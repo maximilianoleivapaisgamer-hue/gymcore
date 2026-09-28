@@ -67,6 +67,8 @@ function prompt(p: Proyeccion, meses: number): string {
     "- The same face, identical facial features, same identity. Do not beautify or change the face.",
     "- The same hair, same skin tone, same age.",
     "- The same clothes, same pose, same background, same lighting, same camera angle.",
+    "- The SAME FRAMING: identical crop, identical camera distance, the person occupying",
+    "  exactly the same portion of the frame. Do NOT zoom in or out, do not reframe.",
     "",
     `CHANGE ONLY the body composition, showing ${p.descripcionFisica}`,
     "",
@@ -135,10 +137,31 @@ export async function generarSimulacion(
   }
 
   try {
-    return { ok: true, imagen: await conLeyenda(Buffer.from(b64, "base64")) };
+    // El modelo suele devolver la imagen con otro encuadre, un poco mas lejos.
+    // Eso NO es cosmetico: puesta al lado de la original, la diferencia de zoom
+    // hace que la persona parezca mas flaca de lo que el cambio real da, y
+    // termina prometiendo de mas. Se la vuelve al tamaño y recorte exactos de
+    // la foto que saco el gimnasio, asi la comparacion es pareja.
+    const igualada = await mismoEncuadre(Buffer.from(b64, "base64"), foto);
+    return { ok: true, imagen: await conLeyenda(igualada) };
   } catch {
     return { ok: false, error: "No pudimos terminar de armar la imagen." };
   }
+}
+
+/**
+ * Deja la imagen generada con el MISMO tamaño y encuadre que la original.
+ *
+ * `cover` recorta los bordes para llegar a la proporcion original, que es
+ * justamente lo que compensa cuando el modelo se aleja: vuelve a acercar.
+ */
+async function mismoEncuadre(generada: Buffer, original: Buffer): Promise<Buffer> {
+  const m = await sharp(original).metadata();
+  if (!m.width || !m.height) return generada;
+  return sharp(generada)
+    .resize(m.width, m.height, { fit: "cover", position: "centre" })
+    .jpeg({ quality: 92 })
+    .toBuffer();
 }
 
 /**
