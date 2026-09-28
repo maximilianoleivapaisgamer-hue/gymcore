@@ -11,6 +11,7 @@ import InstallAppButton from "@/components/InstallAppButton";
 import EliminarCuenta from "@/components/EliminarCuenta";
 import MarcaInstalable from "@/components/MarcaInstalable";
 import AvisosPush from "@/components/AvisosPush";
+import SimuladorResultado from "@/components/SimuladorResultado";
 import ThemeApply from "@/components/ThemeApply";
 import DemoVisitPing from "@/components/DemoVisitPing";
 import AppBackground from "@/components/AppBackground";
@@ -648,6 +649,10 @@ export default function PortalPage() {
 
           {/* Al final de "Mi perfil": instalar la app y prender los avisos.
               En ese orden: en iPhone los avisos necesitan la app instalada. */}
+          {/* Antes de lo tecnico: la foto de a dónde puede llegar es lo que
+              lo hace volver a abrir la app. */}
+          <SimuladorResultado />
+
           <InstallAppButton />
           <AvisosPush />
 

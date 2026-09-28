@@ -37,17 +37,63 @@ function admin() {
 }
 type Admin = NonNullable<ReturnType<typeof admin>>;
 
-/** Quién pide y de qué gimnasio. El socio NO puede generar: solo el negocio. */
+/**
+ * Quién pide, de qué gimnasio y para quién puede generar.
+ *
+ * Hay dos caminos y sirven para momentos distintos:
+ *
+ *   EL GIMNASIO (dueño o empleado) → el momento de la VENTA. La persona está
+ *     parada en el mostrador y todavía no tiene la app. Puede generar para
+ *     cualquier socio SUYO.
+ *
+ *   EL SOCIO desde su app → la MOTIVACIÓN, y el camino que se comparte. Solo
+ *     puede generar para sí mismo: el `member_id` sale de su sesión y se ignora
+ *     lo que mande el pedido.
+ */
 async function quien(sb: Admin) {
   const { data: { user } } = await createServer().auth.getUser();
   if (!user) return { error: "No autenticado.", status: 401 as const };
+
   const { data: p } = await sb.from("profiles").select("id, role, gym_id").eq("id", user.id)
     .maybeSingle<{ id: string; role: string; gym_id: string | null }>();
-  if (!p?.gym_id) return { error: "Tu cuenta no está vinculada a un gimnasio.", status: 403 as const };
-  if (p.role !== "owner" && p.role !== "empleado" && p.role !== "super_admin") {
-    return { error: "Esto lo hace el gimnasio, no el socio.", status: 403 as const };
+  if (!p) return { error: "Tu cuenta no tiene perfil.", status: 403 as const };
+
+  if (p.role === "member") {
+    const { data: m } = await sb.from("members").select("id, gym_id")
+      .eq("linked_user_id", user.id).maybeSingle<{ id: string; gym_id: string }>();
+    if (!m) return { error: "Tu cuenta no está vinculada a un socio.", status: 403 as const };
+    // `soloPara` es el candado: el socio no puede pedir la de otro.
+    return { perfil: p, gymId: m.gym_id, soloPara: m.id };
   }
-  return { perfil: p, gymId: p.gym_id };
+
+  if (!p.gym_id) return { error: "Tu cuenta no está vinculada a un gimnasio.", status: 403 as const };
+  if (p.role !== "owner" && p.role !== "empleado" && p.role !== "super_admin") {
+    return { error: "No tenés permiso para esto.", status: 403 as const };
+  }
+  return { perfil: p, gymId: p.gym_id, soloPara: null as string | null };
+}
+
+/**
+ * Cuándo puede volver a generar ESTE socio, para este plazo.
+ *
+ * Existe porque ahora el socio puede generar desde su app: sin esto, uno
+ * entusiasmado se lleva puesto el tope del mes del gimnasio él solo. Una cada
+ * 30 días por plazo alcanza para tenerla y compartirla, y no la convierte en
+ * un juguete.
+ */
+const DIAS_ENTRE_SIMULACIONES = 30;
+
+async function puedeDeNuevo(sb: Admin, memberId: string, meses: number) {
+  const desde = new Date(Date.now() - DIAS_ENTRE_SIMULACIONES * 86400000).toISOString();
+  const { data } = await sb.from("member_simulaciones").select("created_at")
+    .eq("member_id", memberId).eq("meses", meses).is("error", null)
+    .gte("created_at", desde).order("created_at", { ascending: false }).limit(1);
+  const ultima = (data || [])[0];
+  if (!ultima) return { puede: true, dias: 0 };
+  const dias = Math.ceil(
+    (new Date(ultima.created_at).getTime() + DIAS_ENTRE_SIMULACIONES * 86400000 - Date.now()) / 86400000,
+  );
+  return { puede: false, dias: Math.max(1, dias) };
 }
 
 /** ¿El plan de este gimnasio incluye simulaciones? */
@@ -83,8 +129,12 @@ export async function GET(req: Request) {
   const q = await quien(sb);
   if ("error" in q) return NextResponse.json({ ok: false, error: q.error }, { status: q.status });
 
-  const memberId = new URL(req.url).searchParams.get("member_id") || "";
+  // El socio siempre ve las suyas; el gimnasio, las del socio que abrio.
+  const memberId = q.soloPara || new URL(req.url).searchParams.get("member_id") || "";
   const [hab, c] = await Promise.all([habilitado(sb, q.gymId), cupo(sb, q.gymId)]);
+  const espera = memberId
+    ? { tres: await puedeDeNuevo(sb, memberId, 3), seis: await puedeDeNuevo(sb, memberId, 6) }
+    : null;
 
   let hechas: unknown[] = [];
   if (memberId) {
@@ -100,6 +150,9 @@ export async function GET(req: Request) {
     habilitado: hab,
     disponible: simulacionConfigurada(),
     consentimiento: TEXTO_CONSENTIMIENTO,
+    es_socio: !!q.soloPara,
+    member_id: memberId || null,
+    espera,
     ...c,
     hechas,
   });
@@ -134,7 +187,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Falta que la persona acepte." }, { status: 400 });
   }
 
-  const memberId = String(body.member_id || "").trim();
+  // Si pide un socio, el id sale de su sesion: se ignora lo que haya mandado.
+  const memberId = q.soloPara || String(body.member_id || "").trim();
   const meses = Number(body.meses);
   if (!memberId || ![3, 6].includes(meses)) {
     return NextResponse.json({ ok: false, error: "Faltan datos." }, { status: 400 });
@@ -146,6 +200,14 @@ export async function POST(req: Request) {
     .maybeSingle<{ id: string; gym_id: string; full_name: string; height_cm: number | null }>();
   if (!socio || socio.gym_id !== q.gymId) {
     return NextResponse.json({ ok: false, error: "Ese socio no existe." }, { status: 404 });
+  }
+
+  const otraVez = await puedeDeNuevo(sb, memberId, meses);
+  if (!otraVez.puede) {
+    return NextResponse.json({
+      ok: false,
+      error: `Ya hay una simulación de ${meses} meses hecha hace poco. Se puede hacer otra en ${otraVez.dias} ${otraVez.dias === 1 ? "día" : "días"}.`,
+    }, { status: 429 });
   }
 
   const foto = Buffer.from(String(body.foto || "").replace(/^data:[^,]+,/, ""), "base64");

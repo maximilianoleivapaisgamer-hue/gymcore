@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import SimuladorResultado from "@/components/SimuladorResultado";
 import { createClient } from "@/lib/supabase-browser";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 import { nuevoVencimiento, fechaCorta, hoyISO, recargoDe, mesesOpciones, mesQueCubre, nombreMes, type CobroConfig } from "@/lib/fechas";
@@ -543,6 +544,13 @@ export default function SocioDetallePage() {
           </div>
         </div>
       )}
+
+      {/* El simulador de resultados. Acá es el momento de la VENTA: la persona
+          está en el mostrador y el dueño le muestra a dónde puede llegar.
+          No se dibuja nada si el plan no lo incluye. */}
+      <div className="mt-6">
+        <SimuladorResultado memberId={id} />
+      </div>
     </main>
   );
 }
