@@ -62,7 +62,7 @@ function prompt(p: Proyeccion, meses: number): string {
   // El cierre también tiene que escalar con la magnitud. "Keep it modest" con
   // 15 kilos pedidos es una contradicción, y el modelo le hace caso al freno:
   // devuelve un cambio de 5 o 6. Probado con una foto real.
-  const grande = p.pesoActual > 0 && Math.abs(p.cambio) / p.pesoActual >= 0.12;
+  const grande = p.pesoActual > 0 && Math.abs(p.cambio) / p.pesoActual >= 0.07;
   const cierre = grande
     ? [
         "The result must look like the same ordinary person photographed after a real,",

@@ -228,10 +228,19 @@ function describir(enfoque: Enfoque, kilos: number, pesoActual: number): string 
   }
 
   // Bajar. Tres escalones segun cuanto pesa la bajada sobre el cuerpo.
-  if (parte >= 0.12) {
+  //
+  // ⚠️ LOS CORTES ESTAN CALIBRADOS CONTRA EL MODELO, no contra la biologia.
+  // Medido con la misma foto: pidiendo 15 kg con lenguaje suave devolvio unos
+  // 5; con lenguaje fuerte devolvio unos 12. O sea que SIEMPRE entrega menos
+  // de lo que se le pide, y mucho menos si el texto es tibio.
+  //
+  // Por eso el escalon fuerte entra en 7% y no en 12%: una bajada del 8% con
+  // lenguaje moderado sale dibujada como un 3%, que es MENOS de lo prometido.
+  // Empujar el texto no exagera la promesa: la hace cumplir.
+  if (parte >= 0.07) {
     return `a SUBSTANTIALLY slimmer body, having lost ${kilos} kg of body fat. This is a major, immediately obvious transformation: a clearly narrower waist and midsection, visibly slimmer hips and thighs, noticeably thinner arms, and a distinctly slimmer face and neck. The difference must be unmistakable at a glance. Still an ordinary person with a natural body, not an athlete and not a fitness model.`;
   }
-  if (parte >= 0.05) {
+  if (parte >= 0.035) {
     return `a clearly and noticeably slimmer body, having lost ${kilos} kg of body fat: a distinctly narrower waist and midsection, slimmer arms and thighs, a slimmer face. The change should be obvious when compared side by side, like a real person after several months of gym and diet. Not a fitness model, no visible abs.`;
   }
   return `a slightly slimmer build, having lost about ${kilos} kg of body fat: a somewhat slimmer waist and midsection, a slightly less full face. A subtle, natural change. Not a fitness model, no visible abs.`;
