@@ -25,8 +25,20 @@ import type { Proyeccion } from "@/lib/proyeccion";
  *     reenvío y lo que circula es una promesa pelada.
  */
 
-const MODELO = "gemini-2.5-flash-image";
-const URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent`;
+/**
+ * El modelo de imagen. Se puede cambiar con GEMINI_IMAGE_MODEL sin tocar
+ * codigo ni redesplegar: Google saca uno nuevo cada pocos meses y la calidad
+ * de "mantener la misma cara" cambia bastante entre versiones. Al 2026-09 los
+ * disponibles son gemini-2.5-flash-image, gemini-3.1-flash-image,
+ * gemini-3.1-flash-lite-image y gemini-3-pro-image.
+ *
+ * ⚠️ NINGUNO anda con el plan gratuito de Gemini: la generacion de imagenes
+ * devuelve `limit: 0` hasta que el proyecto de Google tenga facturacion
+ * habilitada. La clave autentica igual, asi que el sintoma es un 429 y no un
+ * error de permisos.
+ */
+const MODELO = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const url = () => `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent`;
 
 export const simulacionConfigurada = () => !!process.env.GEMINI_API_KEY;
 
@@ -89,7 +101,7 @@ export async function generarSimulacion(
 
   let r: Response;
   try {
-    r = await fetch(`${URL}?key=${encodeURIComponent(key)}`, {
+    r = await fetch(`${url()}?key=${encodeURIComponent(key)}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
