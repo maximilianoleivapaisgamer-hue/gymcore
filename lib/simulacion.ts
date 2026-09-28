@@ -59,6 +59,23 @@ export const TEXTO_CONSENTIMIENTO =
   "pedir que se borre en cualquier momento.";
 
 function prompt(p: Proyeccion, meses: number): string {
+  // El cierre también tiene que escalar con la magnitud. "Keep it modest" con
+  // 15 kilos pedidos es una contradicción, y el modelo le hace caso al freno:
+  // devuelve un cambio de 5 o 6. Probado con una foto real.
+  const grande = p.pesoActual > 0 && Math.abs(p.cambio) / p.pesoActual >= 0.12;
+  const cierre = grande
+    ? [
+        "The result must look like the same ordinary person photographed after a real,",
+        "significant transformation. The difference has to be clearly visible at a glance —",
+        "an under-stated result makes this useless. Keep it photorealistic and natural:",
+        "a real person who lost weight, not an athlete and not a retouched magazine photo.",
+      ]
+    : [
+        "The result must look like an ordinary real person photographed a few months later,",
+        "NOT a fitness model and NOT a retouched magazine photo. Keep it believable and modest:",
+        "an exaggerated result makes this useless. Photorealistic, same photographic quality as the original.",
+      ];
+
   return [
     "Edit this photograph of a real person to show a realistic projection of how they could look",
     `after ${meses} months of consistent gym training and a nutrition plan.`,
@@ -71,10 +88,10 @@ function prompt(p: Proyeccion, meses: number): string {
     "  exactly the same portion of the frame. Do NOT zoom in or out, do not reframe.",
     "",
     `CHANGE ONLY the body composition, showing ${p.descripcionFisica}`,
+    // El peso concreto ancla mucho mejor que solo los kilos de diferencia.
+    `For reference, this person goes from about ${p.pesoActual} kg to about ${p.pesoObjetivo} kg.`,
     "",
-    "The result must look like an ordinary real person photographed a few months later,",
-    "NOT a fitness model and NOT a retouched magazine photo. Keep it believable and modest:",
-    "an exaggerated result makes this useless. Photorealistic, same photographic quality as the original.",
+    ...cierre,
   ].join("\n");
 }
 

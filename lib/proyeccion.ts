@@ -185,6 +185,7 @@ export function proyectar(
     descripcionFisica: describir(
       aMano && cambio < 0 ? "bajar" : aMano && cambio > 0 ? "subir" : enfoque,
       Math.abs(cambio),
+      pesoKg,
     ),
     topeKilos,
     aMano,
@@ -205,19 +206,35 @@ function explicar(enfoque: Enfoque, cambio: number, meses: number, objetivo: num
 /**
  * Lo que se le pide al modelo de imagen.
  *
- * Deliberadamente moderado. El modelo, librado a su criterio, devuelve un
- * físico de competencia; la instrucción tiene que empujar en la otra dirección
- * para que la imagen se parezca a lo que esa persona realmente va a ver en el
- * espejo.
+ * ⚠️ LA INTENSIDAD DEL TEXTO TIENE QUE ESCALAR CON LOS KILOS. Esto se
+ * descubrio probando: pidiendole "having lost about 15 kg" pero diciendole en
+ * la misma frase "moderately slimmer" y "keep it modest", el modelo devolvia
+ * un cambio de 5 o 6 kilos. El numero sube y las palabras lo frenan.
+ *
+ * Por eso el adjetivo sale de cuanto representa la bajada sobre el peso de la
+ * persona, no de un texto fijo. Bajar 5 kilos no es lo mismo para alguien de
+ * 60 que para alguien de 120.
  */
-function describir(enfoque: Enfoque, kilos: number): string {
+function describir(enfoque: Enfoque, kilos: number, pesoActual: number): string {
+  const parte = pesoActual > 0 ? kilos / pesoActual : 0;
+
   if (enfoque === "recomposicion") {
     return "the same body weight but a slightly more toned and firm appearance: marginally more defined arms and shoulders, a slightly flatter midsection. The change must be subtle and natural, the kind of difference a few months of consistent training produces. NOT an athletic or fitness-model physique.";
   }
+
   if (enfoque === "subir") {
-    return `a slightly fuller and healthier build, having gained about ${kilos} kg, mostly as muscle on the shoulders, chest and arms. Subtle and natural, not muscular or athletic.`;
+    const cuanto = parte > 0.08 ? "noticeably fuller and stronger" : "slightly fuller and healthier";
+    return `a ${cuanto} build, having gained about ${kilos} kg, mostly as muscle on the shoulders, chest and arms. Natural looking, not a bodybuilder physique.`;
   }
-  return `a moderately slimmer build, having lost about ${kilos} kg of body fat: a slimmer waist and midsection, slightly more defined arms, a less full face. The change must look like a REAL, ordinary person after a few months of gym and diet. NOT a fitness model, NOT visible abs, NOT an athletic physique.`;
+
+  // Bajar. Tres escalones segun cuanto pesa la bajada sobre el cuerpo.
+  if (parte >= 0.12) {
+    return `a SUBSTANTIALLY slimmer body, having lost ${kilos} kg of body fat. This is a major, immediately obvious transformation: a clearly narrower waist and midsection, visibly slimmer hips and thighs, noticeably thinner arms, and a distinctly slimmer face and neck. The difference must be unmistakable at a glance. Still an ordinary person with a natural body, not an athlete and not a fitness model.`;
+  }
+  if (parte >= 0.05) {
+    return `a clearly and noticeably slimmer body, having lost ${kilos} kg of body fat: a distinctly narrower waist and midsection, slimmer arms and thighs, a slimmer face. The change should be obvious when compared side by side, like a real person after several months of gym and diet. Not a fitness model, no visible abs.`;
+  }
+  return `a slightly slimmer build, having lost about ${kilos} kg of body fat: a somewhat slimmer waist and midsection, a slightly less full face. A subtle, natural change. Not a fitness model, no visible abs.`;
 }
 
 /**
