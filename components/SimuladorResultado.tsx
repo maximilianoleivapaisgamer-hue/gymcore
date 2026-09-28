@@ -23,8 +23,11 @@ interface Hecha {
   id: string; meses: number; foto_url: string; imagen_url: string | null;
   peso_desde: number | null; peso_hasta: number | null; enfoque: string | null; created_at: string;
 }
+interface Sugerido { kilos: number; tope: number; enfoque: string }
 interface Estado {
   habilitado: boolean; disponible: boolean; consentimiento: string;
+  /** Cuantos kilos sugiere el sistema y cual es el techo sano. */
+  sugerencia: { peso: number; tres: Sugerido | null; seis: Sugerido | null } | null;
   es_socio: boolean; member_id: string | null;
   espera: { tres: { puede: boolean; dias: number }; seis: { puede: boolean; dias: number } } | null;
   usadas: number; tope: number; quedan: number;
@@ -49,6 +52,8 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
   const [meses, setMeses] = useState<3 | 6>(3);
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState("");
+  /** Los kilos que puso el entrenador. "" = usa la sugerencia del sistema. */
+  const [kilos, setKilos] = useState("");
   const input = useRef<HTMLInputElement>(null);
 
   async function cargar() {
@@ -77,11 +82,14 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
       const r = await fetch("/api/panel/simulacion", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ member_id: memberId, meses, foto: foto.data, tipo: foto.tipo, acepta: true }),
+        body: JSON.stringify({
+          member_id: memberId, meses, foto: foto.data, tipo: foto.tipo, acepta: true,
+          kilos: kilos.trim() === "" ? undefined : Number(kilos),
+        }),
       });
       const j = await r.json();
       if (!j.ok) setError(j.error || "No se pudo generar.");
-      else { setFoto(null); setAcepta(false); await cargar(); }
+      else { setFoto(null); setAcepta(false); setKilos(""); await cargar(); }
     } catch {
       setError("No se pudo generar. Probá de nuevo.");
     }
@@ -91,6 +99,7 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
   if (!e || !e.habilitado) return null;
 
   const plazos = e.es_socio ? PLAZOS_SOCIO : PLAZOS_GIMNASIO;
+  const sug = meses === 3 ? e.sugerencia?.tres : e.sugerencia?.seis;
   const espera = meses === 3 ? e.espera?.tres : e.espera?.seis;
   const bloqueadoPorEspera = espera && !espera.puede;
   const sinCupo = e.quedan <= 0;
@@ -162,6 +171,41 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
             <button type="button" className="btn btn-ghost text-sm" onClick={() => input.current?.click()}>
               📷 {e.es_socio ? "Sacarme una foto" : "Sacar la foto"}
             </button>
+          )}
+
+          {/* Los kilos. Solo el gimnasio los toca: el entrenador conoce a la
+              persona mejor que el sistema. El tope lo pone la app, no el. */}
+          {foto && !e.es_socio && sug && (
+            <div className="mt-4 rounded-lg border border-white/10 bg-white/[.03] p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-ink-2">
+                  {sug.enfoque === "subir" ? "Va a subir" : "Va a bajar"}
+                </span>
+                <input type="number" min={0} max={sug.tope} step={0.5}
+                  className="input w-[84px] py-1 text-sm tabular-nums"
+                  placeholder={String(sug.kilos)}
+                  value={kilos}
+                  onChange={(ev) => setKilos(ev.target.value)} />
+                <span className="text-xs text-ink-2">kg</span>
+                {kilos.trim() !== "" && (
+                  <button type="button" className="text-[11px] text-brand hover:underline"
+                    onClick={() => setKilos("")}>
+                    usar el sugerido ({sug.kilos})
+                  </button>
+                )}
+              </div>
+              <p className="mt-1.5 text-[11px] leading-snug text-muted">
+                Sugerido: <b className="text-ink-2">{sug.kilos} kg</b> en {meses} meses.
+                Si conocés a la persona y esperás otro resultado, cambialo.
+                {" "}El máximo para este plazo es {sug.tope} kg.
+              </p>
+              {Number(kilos) > sug.tope && (
+                <p className="mt-1 text-[11px] text-[#f5b13d]">
+                  Se va a usar {sug.tope} kg: más que eso en {meses} meses no es
+                  sostenible y la imagen dejaría de ser realista.
+                </p>
+              )}
+            </div>
           )}
 
           {foto && (

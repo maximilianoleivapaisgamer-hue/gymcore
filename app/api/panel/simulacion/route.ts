@@ -157,9 +157,29 @@ export async function GET(req: Request) {
     hechas = data || [];
   }
 
+  // Lo que se va a sugerir, para poder mostrarlo antes de sacar la foto.
+  let sugerencia = null;
+  if (memberId) {
+    const { data: m } = await sb.from("members").select("height_cm").eq("id", memberId)
+      .maybeSingle<{ height_cm: number | null }>();
+    const { data: w } = await sb.from("weight_logs").select("date, weight_kg")
+      .eq("member_id", memberId).order("date", { ascending: false }).limit(12);
+    const hist = (w as { date: string; weight_kg: number }[]) || [];
+    if (m?.height_cm && hist[0]?.weight_kg) {
+      const datos = { pesoKg: hist[0].weight_kg, alturaCm: m.height_cm, ritmoRealMensual: ritmoReal(hist) };
+      const t3 = proyectar(datos, 3), t6 = proyectar(datos, 6);
+      sugerencia = {
+        peso: hist[0].weight_kg,
+        tres: t3 && { kilos: Math.abs(t3.cambio), tope: t3.topeKilos, enfoque: t3.enfoque },
+        seis: t6 && { kilos: Math.abs(t6.cambio), tope: t6.topeKilos, enfoque: t6.enfoque },
+      };
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     habilitado: hab,
+    sugerencia,
     disponible: simulacionConfigurada(),
     consentimiento: TEXTO_CONSENTIMIENTO,
     es_socio: !!q.soloPara,
@@ -191,7 +211,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { member_id?: string; meses?: number; foto?: string; tipo?: string; acepta?: boolean };
+  let body: { member_id?: string; meses?: number; foto?: string; tipo?: string; acepta?: boolean; kilos?: number };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Body inválido." }, { status: 400 }); }
 
   // Sin consentimiento no se genera. Es una foto del cuerpo de una persona.
@@ -241,9 +261,14 @@ export async function POST(req: Request) {
     }, { status: 400 });
   }
 
+  // El entrenador puede cambiar los kilos: conoce a la persona mejor que
+  // nosotros. `proyectar` lo acota al tope sano, asi que un numero de mas no
+  // se convierte en una promesa imposible.
   const p = proyectar(
     { pesoKg: pesoActual, alturaCm: socio.height_cm, ritmoRealMensual: ritmoReal(historial) },
     meses,
+    // El socio, desde su app, no elige los kilos: solo el gimnasio.
+    q.soloPara ? null : (Number.isFinite(Number(body.kilos)) ? Number(body.kilos) : null),
   );
   if (!p) return NextResponse.json({ ok: false, error: "El peso o la altura cargados no parecen correctos." }, { status: 400 });
 

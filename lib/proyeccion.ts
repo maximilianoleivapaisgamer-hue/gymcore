@@ -46,16 +46,33 @@ export interface Proyeccion {
   explicacion: string;
   /** Lo que se le pide al modelo de imagen. */
   descripcionFisica: string;
+  /** El maximo de kilos que el entrenador puede pedir para este plazo. */
+  topeKilos: number;
+  /** True si el entrenador escribio un numero distinto al sugerido. */
+  aMano: boolean;
 }
 
 /**
- * Ritmo máximo de bajada, como porcentaje del peso corporal POR MES.
+ * Ritmo de bajada SUGERIDO, como porcentaje del peso corporal por mes.
  *
- * 2% mensual es el techo de lo sostenible con entrenamiento y plan de comidas.
- * Se usa como TOPE, no como promesa: si el ritmo real de la persona es menor,
- * manda el real.
+ * Lo aceptado para alguien con sobrepeso es 0,5 a 1% del peso corporal por
+ * SEMANA, o sea 2 a 4% mensual. Arrancamos en 2% y quedaba demasiado tibio:
+ * a los 3 meses el cambio casi no se notaba en la imagen y la herramienta
+ * perdia la gracia. 3% queda en el medio de la banda sana.
+ *
+ * Es una SUGERENCIA: el entrenador la puede cambiar, acotado por TOPE_MENSUAL.
  */
-const RITMO_MAX_MENSUAL = 0.02;
+const RITMO_SUGERIDO_MENSUAL = 0.03;
+
+/**
+ * El techo de lo que el entrenador puede pedir, por mes.
+ *
+ * 4% mensual es el borde superior de lo sostenible (1% semanal). Existe porque
+ * el entrenador puede editar los kilos, y sin freno alguien va a escribir "20
+ * kilos en 3 meses": ahi la imagen deja de ser una proyeccion y pasa a ser una
+ * promesa que nadie puede cumplir, que es justo de lo que nos cuidamos.
+ */
+const TOPE_MENSUAL = 0.04;
 
 /** Nunca se proyecta por debajo de esto. IMC 21 es "en forma", no "flaco". */
 const IMC_PISO = 21;
@@ -82,7 +99,16 @@ export interface DatosSocio {
   ritmoRealMensual?: number | null;
 }
 
-export function proyectar(d: DatosSocio, meses: number): Proyeccion | null {
+export function proyectar(
+  d: DatosSocio,
+  meses: number,
+  /**
+   * Kilos que pide el entrenador, si quiere cambiar la sugerencia. Siempre en
+   * positivo (los que baja o sube). Se acota al tope sano: el entrenador
+   * conoce a la persona mejor que nosotros, pero el freno no lo maneja el.
+   */
+  kilosAMano?: number | null,
+): Proyeccion | null {
   const { pesoKg, alturaCm } = d;
   // Sin altura no hay IMC y sin IMC no se puede decidir el camino ni poner
   // topes. Antes que inventar, no se genera nada.
@@ -99,7 +125,7 @@ export function proyectar(d: DatosSocio, meses: number): Proyeccion | null {
     // El ritmo teórico sano, frenándose mes a mes.
     let restante = pesoKg;
     for (let m = 0; m < meses; m++) {
-      restante -= restante * RITMO_MAX_MENSUAL * Math.pow(FRENO_POR_MES, m);
+      restante -= restante * RITMO_SUGERIDO_MENSUAL * Math.pow(FRENO_POR_MES, m);
     }
     let porTeoria = restante;
 
@@ -121,6 +147,29 @@ export function proyectar(d: DatosSocio, meses: number): Proyeccion | null {
   }
   // En recomposición el peso queda igual a propósito: lo que cambia es la forma.
 
+  // El maximo que se puede pedir para este plazo, sin pasar el piso de IMC.
+  const pesoPisoAbs = IMC_PISO * ((alturaCm / 100) ** 2);
+  // El tope se frena mes a mes igual que la sugerencia. Lineal daba 22,8 kg a
+  // 6 meses para alguien de 95: matematicamente posible, pero no es algo que
+  // un gimnasio pueda poner en una imagen y sostener.
+  let topeCrudo = pesoKg;
+  for (let m = 0; m < meses; m++) {
+    topeCrudo -= topeCrudo * TOPE_MENSUAL * Math.pow(FRENO_POR_MES, m);
+  }
+  const topeKilos = enfoque === "bajar"
+    ? redondear(Math.min(pesoKg - topeCrudo, Math.max(0, pesoKg - pesoPisoAbs)))
+    : enfoque === "subir"
+      ? redondear(Math.max(0, IMC_TECHO * ((alturaCm / 100) ** 2) - pesoKg))
+      : redondear(Math.max(0, pesoKg - pesoPisoAbs));
+
+  // El entrenador manda, pero acotado.
+  let aMano = false;
+  if (kilosAMano != null && Number.isFinite(kilosAMano) && kilosAMano > 0) {
+    const pedidos = Math.min(Math.abs(kilosAMano), topeKilos);
+    pesoObjetivo = enfoque === "subir" ? pesoKg + pedidos : pesoKg - pedidos;
+    aMano = true;
+  }
+
   pesoObjetivo = redondear(pesoObjetivo);
   const cambio = redondear(pesoObjetivo - pesoKg);
   const imcObjetivo = imc(pesoObjetivo, alturaCm);
@@ -133,7 +182,14 @@ export function proyectar(d: DatosSocio, meses: number): Proyeccion | null {
     imcActual: redondear(imcActual),
     imcObjetivo: redondear(imcObjetivo),
     explicacion: explicar(enfoque, cambio, meses, pesoObjetivo),
-    descripcionFisica: describir(enfoque, Math.abs(cambio)),
+    // Con kilos puestos a mano el enfoque puede cambiar: si en recomposicion
+    // el entrenador pide bajar 4 kilos, hay que describirlo como bajada.
+    descripcionFisica: describir(
+      aMano && cambio < 0 ? "bajar" : aMano && cambio > 0 ? "subir" : enfoque,
+      Math.abs(cambio),
+    ),
+    topeKilos,
+    aMano,
   };
 }
 
