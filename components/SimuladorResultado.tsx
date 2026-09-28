@@ -31,7 +31,16 @@ interface Estado {
   hechas: Hecha[];
 }
 
-const PLAZOS = [3, 6] as const;
+/**
+ * En el mostrador va SOLO la de 3 meses; el socio, desde su app, puede las dos.
+ *
+ * Por dos razones. Una: son dos imagenes por persona, y con 50 altas al mes eso
+ * duplica el costo del gimnasio al pedo. La otra es mejor todavia: si la de 6
+ * meses se la tiene que generar el mismo, le estas dando un motivo concreto
+ * para abrir la app el primer dia — que es justo lo que queres que haga.
+ */
+const PLAZOS_GIMNASIO = [3] as const;
+const PLAZOS_SOCIO = [3, 6] as const;
 
 export default function SimuladorResultado({ memberId }: { memberId?: string }) {
   const [e, setE] = useState<Estado | null>(null);
@@ -81,6 +90,7 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
 
   if (!e || !e.habilitado) return null;
 
+  const plazos = e.es_socio ? PLAZOS_SOCIO : PLAZOS_GIMNASIO;
   const espera = meses === 3 ? e.espera?.tres : e.espera?.seis;
   const bloqueadoPorEspera = espera && !espera.puede;
   const sinCupo = e.quedan <= 0;
@@ -96,7 +106,7 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
       <p className="mb-4 text-xs leading-snug text-ink-2">
         {e.es_socio
           ? "Sacate una foto y mirá una imagen orientativa de cómo podrías verte siguiendo tu plan."
-          : "Sacale una foto y mostrale, en el momento, una imagen orientativa de a dónde puede llegar."}
+          : "Sacale una foto y mostrale, en el momento, a dónde puede llegar en 3 meses. La de 6 meses se la genera ella misma desde su app."}
       </p>
 
       {/* Las que ya tiene */}
@@ -126,8 +136,8 @@ export default function SimuladorResultado({ memberId }: { memberId?: string }) 
         </p>
       ) : (
         <>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            {PLAZOS.map((m) => (
+          <div className={`mb-3 flex flex-wrap items-center gap-2 ${plazos.length === 1 ? "hidden" : ""}`}>
+            {plazos.map((m) => (
               <button key={m} type="button" onClick={() => setMeses(m)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                   meses === m ? "bg-brand text-[#04121a]" : "border border-white/15 text-ink-2 hover:border-white/30"

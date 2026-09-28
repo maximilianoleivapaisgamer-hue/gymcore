@@ -19,6 +19,8 @@ interface Sub {
   dias_gracia?: number | null;
   /** Cuando se le corto el panel por falta de pago. */
   cortado_at?: string | null;
+  /** Tope propio de simulaciones. null = el general. */
+  simulaciones_por_mes?: number | null;
   trial_ends_at: string | null;
   current_period_end: string | null;
   payment_method: string | null;
@@ -285,7 +287,7 @@ export default function AdminDashboard() {
     (async () => {
       const [{ data: g }, { data: s }, { data: p }, { data: mem }, { data: demoG }] = await Promise.all([
         supabase.from("gyms").select("id, name, slug, owner_id, created_at, whatsapp, archived, is_test").eq("is_demo", false),
-        supabase.from("subscriptions").select("gym_id, plan, status, trial_ends_at, current_period_end, payment_method, dias_gracia, cortado_at"),
+        supabase.from("subscriptions").select("gym_id, plan, status, trial_ends_at, current_period_end, payment_method, dias_gracia, cortado_at, simulaciones_por_mes"),
         supabase.from("profiles").select("id, full_name"),
         supabase.from("members").select("gym_id"),
         supabase.from("gyms").select("owner_id").eq("is_demo", true),
@@ -435,6 +437,22 @@ Le queda el abono al dia y, si estaba cortado, se le destapa el panel.`)) return
       if (!j.ok) alert(j.error || "No se pudieron guardar los días.");
       else setSubs((ss) => ss.map((x) => (x.gym_id === gymId ? { ...x, dias_gracia: dias } : x)));
     } catch { alert("No se pudieron guardar los días."); }
+    setSavingId(null);
+  }
+
+  /** El tope de simulaciones de ESTE gimnasio. Vacio = usa el general. */
+  async function guardarSimulaciones(gymId: string, valor: string) {
+    const n = valor.trim() === "" ? null : Number(valor);
+    setSavingId(gymId);
+    try {
+      const r = await fetch("/api/admin/abono", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gym_id: gymId, accion: "simulaciones", dias: n }),
+      });
+      const j = await r.json();
+      if (!j.ok) alert(j.error || "No se pudo guardar el tope.");
+      else setSubs((ss) => ss.map((x) => (x.gym_id === gymId ? { ...x, simulaciones_por_mes: n } : x)));
+    } catch { alert("No se pudo guardar el tope."); }
     setSavingId(null);
   }
 
@@ -694,6 +712,21 @@ Le queda el abono al dia y, si estaba cortado, se le destapa el panel.`)) return
                             onBlur={(e) => {
                               const v = e.target.value;
                               if (v !== String(s?.dias_gracia ?? "")) guardarGracia(g.id, v);
+                            }}
+                          />
+                        </div>
+                        <div className="mt-1 flex items-center gap-1">
+                          <span className="text-[10px] text-muted" title="Cuantas simulaciones de resultado puede generar por mes. Vacio = el general (100). Cada imagen cuesta unos US$0,04.">
+                            Simul.:
+                          </span>
+                          <input
+                            type="number" min={0} max={5000}
+                            className="input w-[64px] py-1 text-[11px] tabular-nums"
+                            placeholder="100"
+                            defaultValue={s?.simulaciones_por_mes ?? ""}
+                            onBlur={(ev) => {
+                              const v = ev.target.value;
+                              if (v !== String(s?.simulaciones_por_mes ?? "")) guardarSimulaciones(g.id, v);
                             }}
                           />
                         </div>

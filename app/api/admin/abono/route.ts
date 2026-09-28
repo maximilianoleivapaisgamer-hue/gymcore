@@ -61,6 +61,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, dias_gracia: dias });
   }
 
+  // ── El tope de simulaciones de ESTE gimnasio ─────────────────────────
+  // Cada imagen cuesta plata, pero quedarse sin cupo con un cliente adelante
+  // en el mostrador cuesta mucho mas. Por eso se le puede subir a uno solo.
+  if (body.accion === "simulaciones") {
+    const n = body.dias;  // se reusa el campo: es el mismo "un numero o vacio"
+    if (n !== null && (!Number.isInteger(n) || (n as number) < 0 || (n as number) > 5000)) {
+      return NextResponse.json({ ok: false, error: "El tope va de 0 a 5000, o vacío para usar el general." }, { status: 400 });
+    }
+    const { error } = await g.admin.from("subscriptions")
+      .upsert({ gym_id: gymId, plan: sub?.plan || "basico", status: sub?.status || "trial", simulaciones_por_mes: n },
+        { onConflict: "gym_id" });
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true, simulaciones_por_mes: n });
+  }
+
   // ── Le entró la plata ────────────────────────────────────────────────
   if (body.accion === "registrar_pago") {
     const hasta = proximoVencimiento(sub?.current_period_end);

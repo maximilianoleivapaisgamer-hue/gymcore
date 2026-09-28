@@ -109,17 +109,29 @@ async function habilitado(sb: Admin, gymId: string): Promise<boolean> {
   return (plan?.capabilities || []).includes("simulaciones");
 }
 
-/** Cuántas lleva este mes y cuántas le quedan. */
+/**
+ * Cuántas lleva este mes y cuántas le quedan.
+ *
+ * El tope sale del gimnasio si tiene uno propio, y si no del general. Tiene que
+ * ser por gimnasio porque un estudio de 20 socias y uno de 400 no necesitan lo
+ * mismo, y quedarse sin cupo con un cliente adelante en el mostrador es mucho
+ * peor que el costo de las imágenes.
+ *
+ * Los intentos fallidos no cuentan (`error is null`): que el modelo se haya
+ * negado no es culpa del gimnasio.
+ */
 async function cupo(sb: Admin, gymId: string) {
   const desde = new Date();
   desde.setDate(1); desde.setHours(0, 0, 0, 0);
-  const [{ count }, { data: cfg }] = await Promise.all([
+  const [{ count }, { data: sub }, { data: cfg }] = await Promise.all([
     sb.from("member_simulaciones").select("id", { count: "exact", head: true })
       .eq("gym_id", gymId).gte("created_at", desde.toISOString()).is("error", null),
+    sb.from("subscriptions").select("simulaciones_por_mes").eq("gym_id", gymId)
+      .maybeSingle<{ simulaciones_por_mes: number | null }>(),
     sb.from("platform_settings").select("simulaciones_por_mes").eq("id", 1)
       .maybeSingle<{ simulaciones_por_mes: number }>(),
   ]);
-  const tope = cfg?.simulaciones_por_mes ?? 30;
+  const tope = sub?.simulaciones_por_mes ?? cfg?.simulaciones_por_mes ?? 100;
   return { usadas: count ?? 0, tope, quedan: Math.max(0, tope - (count ?? 0)) };
 }
 
