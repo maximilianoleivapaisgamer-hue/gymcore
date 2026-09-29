@@ -83,7 +83,19 @@ export async function POST(req: Request) {
 /** Para cruzar `classes.instructor` (texto libre) con la profe cargada. */
 const parejo = (s: string) => s.trim().toLowerCase();
 
-interface Cobro { member_id: string | null; amount: number }
+interface Cobro { member_id: string | null; amount: number; concept: string | null }
+
+/**
+ * Lo que NO se reparte con las profes.
+ *
+ * El recargo por pagar tarde es del estudio: no es plata de una clase que
+ * alguien dio. Las sueltas tampoco — esas se cobran aparte y no corresponden
+ * a la cuota del mes.
+ *
+ * ⚠️ Se filtra por el texto del concepto porque es lo que hay. Si alguna vez
+ * se agrega una columna de tipo de ingreso, esto se reemplaza por eso.
+ */
+const NO_ES_CUOTA = /recargo|suelta/i;
 interface Reserva { member_id: string; class_id: string }
 interface Clase { id: string; instructor: string | null }
 interface Socio { id: string; full_name: string }
@@ -109,7 +121,10 @@ export async function GET(req: Request) {
 
   const [{ data: cobrosRaw }, { data: reservasRaw }, { data: clasesRaw }, { data: sociosRaw }, { data: profesRaw }] =
     await Promise.all([
-      sb.from("cashflow_entries").select("member_id, amount")
+      // `concept` viene para poder sacar lo que NO es cuota: el recargo por
+      // pago fuera de termino y las clases sueltas son del estudio, no entran
+      // en el reparto con las profes. Lo confirmo DanzArte.
+      sb.from("cashflow_entries").select("member_id, amount, concept")
         .eq("gym_id", perfil.gym_id).eq("type", "income").gte("date", desde).lt("date", hasta),
       sb.from("bookings").select("member_id, class_id")
         .eq("gym_id", perfil.gym_id).gte("class_date", desde).lt("class_date", hasta),
@@ -132,6 +147,7 @@ export async function GET(req: Request) {
   const pagoDe = new Map<string, number>();
   ((cobrosRaw as Cobro[]) || []).forEach((c) => {
     if (!c.member_id) return;
+    if (NO_ES_CUOTA.test(c.concept || "")) return;  // del estudio, no se reparte
     pagoDe.set(c.member_id, (pagoDe.get(c.member_id) || 0) + Number(c.amount || 0));
   });
 

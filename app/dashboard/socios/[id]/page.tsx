@@ -163,19 +163,48 @@ export default function SocioDetallePage() {
     setCobrando(true);
     const monto = Number(cobroMonto) || 0;
     const hasta = nuevoVencimiento(member.membership_expiry, cobroCfg);
-    if (monto > 0) {
-      await supabase.from("cashflow_entries").insert({
-        gym_id: member.gym_id,
-        sede_id: sedeId,
-        member_id: member.id,
-        type: "income",
-        amount: monto,
-        method: cobroMedio,
+
+    // El recargo va en SU PROPIA LINEA, separado de la cuota.
+    //
+    // Antes se sumaba al monto y quedaba todo junto, y eso tenia dos
+    // consecuencias: no se podia saber cuanto se gano en recargos, y — peor —
+    // el reparto de comisiones lo tomaba como parte de la cuota y se lo
+    // repartia a las profes. El recargo es del estudio (lo confirmo DanzArte).
+    //
+    // Se separa solo lo que pasa del precio del plan: si el dueño le bajo el
+    // monto o le perdono el recargo, no hay nada que separar.
+    const base = Number(member.plan_price) || 0;
+    const recargo = base > 0 && monto > base ? Math.round((monto - base) * 100) / 100 : 0;
+    const cuota = recargo > 0 ? monto - recargo : monto;
+
+    const comun = {
+      gym_id: member.gym_id,
+      sede_id: sedeId,
+      member_id: member.id,
+      type: "income" as const,
+      method: cobroMedio,
+      date: hoyISO(),
+    };
+
+    const lineas = [];
+    if (cuota > 0) {
+      lineas.push({
+        ...comun,
+        amount: cuota,
         plan_name: member.plan_name || null,
         concept: `Cuota ${nombreMes(cobroMes)} — ${member.full_name.trim()}`,
-        date: hoyISO(),
       });
     }
+    if (recargo > 0) {
+      lineas.push({
+        ...comun,
+        amount: recargo,
+        // Sin plan_name a proposito: no es plata de un plan, es del estudio.
+        plan_name: null,
+        concept: `Recargo por pago fuera de termino — ${member.full_name.trim()}`,
+      });
+    }
+    if (lineas.length) await supabase.from("cashflow_entries").insert(lineas);
     // Los cupos extra NO se tocan al renovar: se acumulan hasta que los use.
     // Si compró una clase suelta y no llegó a usarla, la conserva.
     await supabase.from("members")
