@@ -183,6 +183,8 @@ export default function ClasesPage() {
   const [realPlans, setRealPlans] = useState<RealPlan[]>([]);
   /** Cuando se reinicia el cupo: "cuota" o "mes". Ver lib/cupo-clases. */
   const [reinicioClases, setReinicioClases] = useState<string | null>(null);
+  /** Quienes ENTRARON hoy, deducido del control de acceso. Ver el endpoint. */
+  const [asistieron, setAsistieron] = useState<{ member_id: string; class_id: string; fecha: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(emptyForm());
@@ -231,6 +233,7 @@ export default function ClasesPage() {
 
       setRealPlans((j.planes as RealPlan[]) || []);
       setReinicioClases(j.clases_reinicio ?? null);
+      setAsistieron(j.asistieron || []);
       setClasses((j.clases as Klass[]) || []);
       setMembers((j.socios as Member[]) || []);
       setAllBookings((j.reservas as { class_id: string; class_date: string }[]) || []);
@@ -597,6 +600,38 @@ export default function ClasesPage() {
               <span className="font-semibold">Reservas</span>
               <span className={full ? "text-crit" : "text-ink-2"}>{bookings.length}{resFor.capacity != null ? ` / ${resFor.capacity}` : ""}</span>
             </div>
+
+            {/* Anotadas vs las que realmente vinieron. DanzArte lo pidio porque
+                les pasa tener 20 anotadas y 40 en la sala: mucha gente viene
+                sin reservar. Solo tiene sentido para la clase de HOY, que es
+                de cuando tenemos los ingresos. */}
+            {(() => {
+              const hoy = iso(new Date());
+              if (resDate !== hoy) return null;
+              const vinieron = asistieron.filter((a) => a.class_id === resFor.id && a.fecha === hoy);
+              const sinReservar = vinieron.filter(
+                (a) => !bookings.some((b) => b.member_id === a.member_id),
+              ).length;
+              const noVinieron = bookings.filter(
+                (b) => !vinieron.some((a) => a.member_id === b.member_id),
+              ).length;
+              return (
+                <div className="mb-3 rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span><b className="text-ink">{vinieron.length}</b> <span className="text-ink-2">vinieron hoy</span></span>
+                    {sinReservar > 0 && (
+                      <span className="text-[#f5b13d]">{sinReservar} sin reservar</span>
+                    )}
+                    {noVinieron > 0 && (
+                      <span className="text-muted">{noVinieron} reservaron y no vinieron</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-muted">
+                    Sale del control de acceso, por el horario de entrada.
+                  </p>
+                </div>
+              );
+            })()}
 
             {resDate ? (
               <>

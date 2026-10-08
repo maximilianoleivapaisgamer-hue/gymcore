@@ -139,7 +139,12 @@ export default function ComisionesPage() {
             <Link href="/dashboard" className="hover:text-brand">Panel</Link>
             <span>/</span><span className="text-ink">Comisiones</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-[-.5px]">Comisiones de profes</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-[-.5px]">Comisiones de profes</h1>
+            <span className="rounded-full bg-[rgba(245,177,61,.16)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn">
+              Beta
+            </span>
+          </div>
           <p className="mt-1 text-sm text-ink-2">
             Lo que pagó cada socio se reparte según las clases que hizo con cada profe.
           </p>
@@ -153,6 +158,18 @@ export default function ComisionesPage() {
 
       {!cargando && datos && (
         <>
+          {/* Mientras se termina de calibrar, el numero se muestra pero se
+              avisa que todavia puede moverse. Es plata entre personas: que se
+              pague contra un numero que despues cambia es peor que esperar. */}
+          <div className="mb-5 rounded-xl border border-warn/30 bg-[rgba(245,177,61,.08)] px-4 py-3">
+            <div className="text-sm font-semibold text-warn">Esto está en pruebas, y es gratis mientras tanto.</div>
+            <p className="mt-0.5 text-xs leading-snug text-ink-2">
+              Los números ya salen de tus datos reales, pero todavía los estamos
+              afinando con vos. <b>Contrastalos con tu cuenta antes de pagar</b> y
+              avisanos si algo no cuadra: cada corrección que nos marcás la arreglamos.
+            </p>
+          </div>
+
           <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Dato titulo="Cobrado en el mes" valor={plata(datos.cobrado)} />
             <Dato titulo="A pagar a las profes" valor={plata(datos.a_pagar)} tono="text-warn" />
