@@ -606,6 +606,8 @@ export default function ClasesPage() {
                 sin reservar. Solo tiene sentido para la clase de HOY, que es
                 de cuando tenemos los ingresos. */}
             {(() => {
+              // `iso` usa la hora local del navegador, que para el dueño es la
+              // de Argentina: misma fecha que calcula el endpoint.
               const hoy = iso(new Date());
               if (resDate !== hoy) return null;
               const vinieron = asistieron.filter((a) => a.class_id === resFor.id && a.fecha === hoy);

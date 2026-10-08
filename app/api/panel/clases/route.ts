@@ -27,7 +27,13 @@ export async function GET(req: Request) {
     });
   }
 
-  const hoy = new Date().toISOString().slice(0, 10);
+  // La fecha de ARGENTINA, no la del servidor. `toISOString()` da UTC, y desde
+  // las 21 de Argentina eso ya es el dia siguiente: las clases de la noche
+  // (DanzArte tiene hasta las 20:30) quedaban del lado equivocado del corte.
+  const hoy = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
 
   let qClases = sb.from("classes").select("*").eq("gym_id", perfil.gym_id).order("start_time");
   let qReservas = sb.from("bookings").select("class_id, class_date")
