@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "revisar": "node scripts/revisar-hooks.mjs && tsc --noEmit",
+    "revisar": "node scripts/revisar-hooks.mjs && node scripts/revisar-tipos.mjs",
     "start": "next start",
     "lint": "next lint"
   },
