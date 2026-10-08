@@ -337,7 +337,11 @@ export default function ClasesPage() {
     const socio = members.find((m) => m.id === addMember);
     const limite = topeDelPlan(realPlans, socio?.plan_name);
     if (socio && limite) {
-      const { ini, fin } = cicloDe(resDate, socio.membership_expiry);
+      const { data: pago } = await supabase.from("cashflow_entries")
+        .select("date").eq("member_id", socio.id).eq("type", "income")
+        .ilike("concept", "Cuota %").order("date", { ascending: false }).limit(1)
+        .maybeSingle<{ date: string }>();
+      const { ini, fin } = cicloDe(resDate, socio.membership_expiry, pago?.date ?? null);
       const { count } = await supabase.from("bookings")
         .select("id", { count: "exact", head: true })
         .eq("member_id", socio.id).gt("class_date", ini).lte("class_date", fin);

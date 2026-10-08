@@ -253,7 +253,13 @@ export default function PortalPage() {
     if (!base) { setCupo(null); return; }
     // Las clases sueltas que le vendieron se suman a las del plan.
     const limite = base + (Number(m.clases_extra) || 0);
-    const { ini, fin } = cicloDe(todayIso(), m.membership_expiry);
+    // El ultimo pago reinicia el contador: sin esto, el que paga antes del dia
+    // de corte sigue contando contra el mes que ya gasto. Ver cicloDe.
+    const { data: pago } = await supabase.from("cashflow_entries")
+      .select("date").eq("member_id", m.id).eq("type", "income")
+      .ilike("concept", "Cuota %").order("date", { ascending: false }).limit(1)
+      .maybeSingle<{ date: string }>();
+    const { ini, fin } = cicloDe(todayIso(), m.membership_expiry, pago?.date ?? null);
     const { count } = await supabase.from("bookings")
       .select("id", { count: "exact", head: true })
       .eq("member_id", m.id).gt("class_date", ini).lte("class_date", fin);

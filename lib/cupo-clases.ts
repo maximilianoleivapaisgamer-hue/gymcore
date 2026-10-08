@@ -23,8 +23,43 @@ function sumarMeses(iso: string, n: number): string {
   return `${ay}-${String(am).padStart(2, "0")}-${String(ad).padStart(2, "0")}`;
 }
 
-/** Ciclo (ini, fin] que contiene a `fecha`. `ini` es exclusivo, `fin` inclusivo. */
-export function cicloDe(fecha: string, vence: string | null | undefined): { ini: string; fin: string } {
+/**
+ * Ciclo (ini, fin] que contiene a `fecha`. `ini` es exclusivo, `fin` inclusivo.
+ *
+ * ── Pagar REINICIA el contador ──────────────────────────────────────────
+ *
+ * Si hay un pago, el ciclo va desde ese pago hasta el vencimiento. Esto se
+ * agrego por un problema real: DanzArte cobra "todos el dia 10", y una socia
+ * que pagaba el 1 de octubre quedaba hasta el 10 contando contra el mes que YA
+ * habia gastado. Eugenia pago el 1/10, tenia sus 12 clases de PACK 2 usadas del
+ * ciclo anterior, y la app le decia "sin clases" aunque acabara de pagar.
+ *
+ * Sin el pago se cae al comportamiento de antes: el mes que termina en el
+ * vencimiento.
+ */
+export function cicloDe(
+  fecha: string,
+  vence: string | null | undefined,
+  /** Fecha del ultimo pago de cuota, "YYYY-MM-DD". */
+  ultimoPago?: string | null,
+): { ini: string; fin: string } {
+  // Pago + vencimiento: la ventana es de un pago al siguiente vencimiento.
+  if (ultimoPago && vence && ultimoPago <= vence) {
+    // `ini` es exclusivo, asi que se corre un dia para que la clase reservada
+    // el mismo dia que pago cuente dentro del ciclo nuevo.
+    return { ini: diaAnterior(ultimoPago), fin: vence };
+  }
+  return cicloPorVencimiento(fecha, vence);
+}
+
+/** El dia anterior a una fecha "YYYY-MM-DD". */
+function diaAnterior(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const x = new Date(Date.UTC(y, m - 1, d - 1));
+  return x.toISOString().slice(0, 10);
+}
+
+function cicloPorVencimiento(fecha: string, vence: string | null | undefined): { ini: string; fin: string } {
   if (!vence) {
     // Mes calendario. `ini` es exclusivo, así que es el último día del mes
     // anterior — igual que `date_trunc('month', ...) - 1` en el trigger.
