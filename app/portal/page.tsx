@@ -94,7 +94,7 @@ export default function PortalPage() {
   const [tab, setTab] = useState<TabKey>("perfil");
   const [state, setState] = useState<"loading" | "nomember" | "ok">("loading");
   const [member, setMember] = useState<Member | null>(null);
-  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null; reserva_semanas?: number | null; reserva_hasta_vencimiento?: boolean; app_icon_url?: string | null } | null>(null);
+  const [gym, setGym] = useState<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo?: boolean; slug?: string; hidden_member_sections?: string[] | null; cancelacion_activa?: boolean; cancelacion_horas?: number | null; reserva_semanas?: number | null; reserva_hasta_vencimiento?: boolean; app_icon_url?: string | null; clases_reinicio?: string | null } | null>(null);
   /** Cupo de clases del plan del socio. null = plan sin tope. */
   const [cupo, setCupo] = useState<{ limite: number; usadas: number } | null>(null);
   /** El plan del socio, para saber qué actividades tiene incluidas. */
@@ -136,7 +136,7 @@ export default function PortalPage() {
 
     const iso0 = todayIso();
     const [{ data: g }, { data: r }, { data: mb }, { data: cl }, { data: ab }, { data: wl }, { data: sub }, { data: dt }] = await Promise.all([
-      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null; reserva_semanas: number | null; reserva_hasta_vencimiento: boolean; app_icon_url: string | null }>(),
+      supabase.from("gyms").select("*").eq("id", m.gym_id).maybeSingle<{ name: string; logo_url: string | null; whatsapp: string | null; theme: string; bg_style: string; is_demo: boolean; slug: string; hidden_member_sections: string[] | null; real_plans: RealPlan[] | null; cancelacion_activa: boolean; cancelacion_horas: number | null; reserva_semanas: number | null; reserva_hasta_vencimiento: boolean; app_icon_url: string | null; clases_reinicio: string | null }>(),
       supabase.from("routines").select("id, name, routine_exercises(id, day_number, block_name, position, sets, reps, notes, exercises(name, image_url, image_url_end, instructions, primary_muscles, equipment))")
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Routine>(),
       supabase.from("bookings").select("id, class_id, class_date, classes(name, start_time, instructor)")
@@ -153,7 +153,7 @@ export default function PortalPage() {
         .eq("member_id", m.id).order("created_at", { ascending: false }).limit(1).maybeSingle<Diet>(),
     ]);
     setGym(g ?? null);
-    await recalcularCupo(m, g?.real_plans ?? null);
+    await recalcularCupo(m, g?.real_plans ?? null, g?.clases_reinicio ?? null);
     setRoutine((r as Routine) ?? null);
     setMyBookings((mb as MyBooking[]) || []);
     setClasses((cl as Klass[]) || []);
@@ -247,7 +247,7 @@ export default function PortalPage() {
 
   /** Cuántas clases del plan ya usó el socio en el ciclo de cuota actual.
    *  Es solo para mostrar: al que frena de verdad es el trigger de la base. */
-  async function recalcularCupo(m: Member, planes: RealPlan[] | null) {
+  async function recalcularCupo(m: Member, planes: RealPlan[] | null, reinicio?: string | null) {
     setMiPlan(planDelSocio(planes, m.plan_name));
     const base = topeDelPlan(planes, m.plan_name);
     if (!base) { setCupo(null); return; }
@@ -259,7 +259,7 @@ export default function PortalPage() {
       .select("date").eq("member_id", m.id).eq("type", "income")
       .ilike("concept", "Cuota %").order("date", { ascending: false }).limit(1)
       .maybeSingle<{ date: string }>();
-    const { ini, fin } = cicloDe(todayIso(), m.membership_expiry, pago?.date ?? null);
+    const { ini, fin } = cicloDe(todayIso(), m.membership_expiry, pago?.date ?? null, reinicio);
     const { count } = await supabase.from("bookings")
       .select("id", { count: "exact", head: true })
       .eq("member_id", m.id).gt("class_date", ini).lte("class_date", fin);
@@ -354,7 +354,7 @@ export default function PortalPage() {
     setAllBookings((bs) => bs.filter((b) => b.id !== bookingId));
     setMyBookings((mb) => mb.filter((b) => b.id !== bookingId));
     // Cancelar le devuelve el lugar, pero solo si la clase caía en este ciclo.
-    if (member) await recalcularCupo(member, (gym as { real_plans?: RealPlan[] | null } | null)?.real_plans ?? null);
+    if (member) await recalcularCupo(member, (gym as { real_plans?: RealPlan[] | null } | null)?.real_plans ?? null, gym?.clases_reinicio ?? null);
     // El lugar que dejó libre pasa al primero de la lista de espera, y le llega
     // el aviso al celular EN EL MOMENTO. Si esto fallara, el cron lo levanta más
     // tarde: por eso no se le avisa nada al que canceló.

@@ -38,8 +38,8 @@ export async function GET(req: Request) {
   }
 
   const [{ data: gym }, { data: clases }, { data: socios }, { data: reservas }] = await Promise.all([
-    sb.from("gyms").select("real_plans").eq("id", perfil.gym_id)
-      .maybeSingle<{ real_plans: RealPlan[] | null }>(),
+    sb.from("gyms").select("real_plans, clases_reinicio").eq("id", perfil.gym_id)
+      .maybeSingle<{ real_plans: RealPlan[] | null; clases_reinicio: string | null }>(),
     qClases,
     // El filtro por gimnasio faltaba: dependía solo de RLS. Los socios son
     // compartidos entre sucursales, así que acá no se filtra por sede.
@@ -54,6 +54,7 @@ export async function GET(req: Request) {
     sedes,
     sede_id: sedeId,
     planes: gym?.real_plans || [],
+    clases_reinicio: gym?.clases_reinicio ?? null,
     clases: clases || [],
     socios: socios || [],
     reservas: reservas || [],

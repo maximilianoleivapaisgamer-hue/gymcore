@@ -181,6 +181,8 @@ export default function ClasesPage() {
   const [members, setMembers] = useState<Member[]>([]);
   /** Planes del gimnasio, para saber el tope de clases de cada socio. */
   const [realPlans, setRealPlans] = useState<RealPlan[]>([]);
+  /** Cuando se reinicia el cupo: "cuota" o "mes". Ver lib/cupo-clases. */
+  const [reinicioClases, setReinicioClases] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(emptyForm());
@@ -228,6 +230,7 @@ export default function ClasesPage() {
       if (gym && j.sede_id) setActiveSedeId(gym, j.sede_id);
 
       setRealPlans((j.planes as RealPlan[]) || []);
+      setReinicioClases(j.clases_reinicio ?? null);
       setClasses((j.clases as Klass[]) || []);
       setMembers((j.socios as Member[]) || []);
       setAllBookings((j.reservas as { class_id: string; class_date: string }[]) || []);
@@ -341,7 +344,7 @@ export default function ClasesPage() {
         .select("date").eq("member_id", socio.id).eq("type", "income")
         .ilike("concept", "Cuota %").order("date", { ascending: false }).limit(1)
         .maybeSingle<{ date: string }>();
-      const { ini, fin } = cicloDe(resDate, socio.membership_expiry, pago?.date ?? null);
+      const { ini, fin } = cicloDe(resDate, socio.membership_expiry, pago?.date ?? null, reinicioClases);
       const { count } = await supabase.from("bookings")
         .select("id", { count: "exact", head: true })
         .eq("member_id", socio.id).gt("class_date", ini).lte("class_date", fin);

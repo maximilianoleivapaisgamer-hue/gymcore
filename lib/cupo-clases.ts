@@ -42,7 +42,16 @@ export function cicloDe(
   vence: string | null | undefined,
   /** Fecha del ultimo pago de cuota, "YYYY-MM-DD". */
   ultimoPago?: string | null,
+  /**
+   * Cuando se reinicia el cupo (`gyms.clases_reinicio`):
+   *   "cuota" → del pago al vencimiento de ESE socio (por defecto)
+   *   "mes"   → mes calendario, todos arrancan de cero el dia 1
+   */
+  reinicio?: string | null,
 ): { ini: string; fin: string } {
+  // Mes calendario: no importa cuando pago ni cuando le vence.
+  if (reinicio === "mes") return cicloPorVencimiento(fecha, null);
+
   // Pago + vencimiento: la ventana es de un pago al siguiente vencimiento.
   if (ultimoPago && vence && ultimoPago <= vence) {
     // `ini` es exclusivo, asi que se corre un dia para que la clase reservada

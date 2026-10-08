@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase-browser";
 import { resolveActiveSede, type Sede } from "@/lib/sede";
 import { WA_TARGET, abrirWhatsapp } from "@/lib/wa-link";
 import { type RealPlan } from "@/types/db";
+import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
+import { hoyISO } from "@/lib/fechas";
 import DatePicker from "@/components/DatePicker";
 
 interface Member {
@@ -54,6 +56,32 @@ function WhatsAppLogo({ className = "h-4 w-4" }: { className?: string }) {
 function initials(name: string) {
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 }
+/**
+ * Clases usadas y cuantas le quedan, para el contador de la lista.
+ *
+ * Lo pidio DanzArte: necesitaba ver de un vistazo quien ya gasto el pack y
+ * quien no, sin entrar socio por socio.
+ *
+ * ⚠️ Usa el MISMO `cicloDe` que la app del socio y que el trigger de la base.
+ * Si los tres no dan igual, la dueña ve un numero y el socio otro.
+ */
+function cupoDe(
+  m: { id: string; plan_name: string | null },
+  planes: RealPlan[],
+  reservas: { member_id: string; class_date: string }[],
+  vence: string | null,
+  pago: string | undefined,
+  reinicio: string | null,
+): { usadas: number; limite: number } | null {
+  const limite = topeDelPlan(planes, m.plan_name);
+  if (!limite) return null;  // plan sin tope: no hay nada que contar
+  const { ini, fin } = cicloDe(hoyISO(), vence, pago ?? null, reinicio);
+  const usadas = reservas.filter(
+    (r) => r.member_id === m.id && r.class_date > ini && r.class_date <= fin,
+  ).length;
+  return { usadas, limite };
+}
+
 function statusOf(expiry: string | null): { label: string; cls: string } {
   if (!expiry) return { label: "Sin plan", cls: "muted" };
   const days = Math.ceil((new Date(expiry + "T00:00:00").getTime() - Date.now()) / 86400000);
@@ -72,6 +100,9 @@ export default function SociosPage() {
   const [welcome, setWelcome] = useState<{ name: string; whatsapp: string | null; planName: string | null; planPrice: number | null } | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reservas, setReservas] = useState<{ member_id: string; class_date: string }[]>([]);
+  const [ultimoPago, setUltimoPago] = useState<Map<string, string>>(new Map());
+  const [reinicioClases, setReinicioClases] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
@@ -97,9 +128,10 @@ export default function SociosPage() {
     setGymId(profile?.gym_id ?? null);
     if (profile?.gym_id) {
       const { data: gym } = await supabase
-        .from("gyms").select("real_plans, slug").eq("id", profile.gym_id)
-        .single<{ real_plans: RealPlan[]; slug: string }>();
+        .from("gyms").select("real_plans, slug, clases_reinicio").eq("id", profile.gym_id)
+        .single<{ real_plans: RealPlan[]; slug: string; clases_reinicio: string | null }>();
       setPlans(gym?.real_plans || []);
+      setReinicioClases(gym?.clases_reinicio ?? null);
       const { data: sedes } = await supabase.from("sedes")
         .select("id, gym_id, name, address, created_at")
         .eq("gym_id", profile.gym_id).order("created_at", { ascending: true });
@@ -108,6 +140,25 @@ export default function SociosPage() {
     }
     const { data } = await supabase
       .from("members").select("*").order("created_at", { ascending: false });
+
+    // Las clases usadas en el ciclo de cada socio, para el contador de la
+    // lista. Se trae TODO de una y se cuenta en memoria: una consulta por
+    // socio serian 64 viajes a la base para dibujar una tabla.
+    const { data: reservas } = await supabase
+      .from("bookings").select("member_id, class_date")
+      .eq("gym_id", profile?.gym_id ?? "")
+      .gte("class_date", hoyISO().slice(0, 8) + "01");
+    const { data: pagos } = await supabase
+      .from("cashflow_entries").select("member_id, date")
+      .eq("gym_id", profile?.gym_id ?? "").eq("type", "income")
+      .ilike("concept", "Cuota %").order("date", { ascending: false });
+
+    const ultimoPago = new Map<string, string>();
+    ((pagos as { member_id: string | null; date: string }[]) || []).forEach((p) => {
+      if (p.member_id && !ultimoPago.has(p.member_id)) ultimoPago.set(p.member_id, p.date);
+    });
+    setReservas(((reservas as { member_id: string; class_date: string }[]) || []));
+    setUltimoPago(ultimoPago);
     setMembers((data as Member[]) || []);
     setLoading(false);
   }
@@ -334,6 +385,7 @@ export default function SociosPage() {
                   <th className="px-4 pb-3 pt-1">Socio</th>
                   <th className="px-4 pb-3 pt-1">DNI</th>
                   <th className="px-4 pb-3 pt-1">Plan</th>
+                  <th className="px-4 pb-3 pt-1">Clases</th>
                   <th className="px-4 pb-3 pt-1">Vencimiento</th>
                   <th className="px-4 pb-3 pt-1">Estado</th>
                   <th className="px-4 pb-3 pt-1 text-right">Acciones</th>
@@ -358,6 +410,23 @@ export default function SociosPage() {
                       </td>
                       <td className="px-4 py-3 text-ink-2">{m.dni || "—"}</td>
                       <td className="px-4 py-3">{m.plan_name || "—"}</td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const c = cupoDe(m, plans, reservas, m.membership_expiry,
+                                           ultimoPago.get(m.id), reinicioClases);
+                          if (!c) return <span className="text-muted">libre</span>;
+                          const quedan = Math.max(0, c.limite - c.usadas);
+                          return (
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
+                              quedan === 0 ? "bg-[rgba(240,82,82,.14)] text-crit"
+                              : quedan <= 2 ? "bg-[rgba(245,177,61,.14)] text-warn"
+                              : "bg-[rgba(34,197,94,.14)] text-good"}`}
+                              title={`Usó ${c.usadas} de ${c.limite} en este ciclo`}>
+                              {c.usadas}/{c.limite}
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3 text-ink-2">
                         {m.membership_expiry ? new Date(m.membership_expiry + "T00:00:00").toLocaleDateString("es-AR") : "—"}
                       </td>
