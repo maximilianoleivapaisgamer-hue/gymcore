@@ -18,11 +18,16 @@ import { contexto, esFallo } from "@/lib/panel";
  *      8 clases con Karina y 4 con Priscila ⇒ 2/3 y 1/3, NO mitad y mitad.
  *   3. Cada profe cobra SU porcentaje de la parte que le tocó.
  *
- * ⚠️ Se cuentan las RESERVAS, no las asistencias. Es a propósito y es correcto
- * para este negocio: DanzArte tiene prendida la regla de "si no cancelás a
- * tiempo, perdiste la clase", así que una reserva ES una clase consumida.
- * Además `attendances` no guarda a qué clase entró la persona, así que no
- * serviría para repartir entre profes aunque quisiéramos.
+ * ⚠️ Se cuenta la UNIÓN de reservas y asistencias, no una sola de las dos. Lo
+ * decidió DanzArte: la reserva no cancelada a tiempo ya se le descontó al
+ * socio (la clase se dio), y el que vino sin reservar también hizo la clase.
+ * Contando solo reservas, sobre un mes real quedaban 156 clases dadas sin
+ * pagar y 234 pagadas que nadie usó. Ver `asistenciasDeducidas` más abajo.
+ *
+ * ⚠️ El detalle (`profes[].detalle`) sale de las MISMAS unidades que el total,
+ * no de una segunda cuenta, y se redondea de modo que la suma del detalle dé
+ * exactamente el total. Si no cerraran, el número de arriba no se podría
+ * defender frente a la profe y la pantalla no serviría para nada.
  *
  * ⚠️ La plata de quien pagó y NO reservó nada no se le asigna a nadie: se
  * devuelve aparte, con nombre y apellido. Sin eso, la suma de las comisiones no
@@ -153,7 +158,47 @@ function asistenciasDeducidas(ingresos: Ingreso[], clases: Clase2[]): Set<string
   }
   return salida;
 }
-interface Clase { id: string; instructor: string | null }
+interface Clase { id: string; instructor: string | null; name: string | null; start_time: string | null }
+
+/** Una fila del detalle: una clase, un dia. */
+interface Fila {
+  class_id: string;
+  clase: string;
+  hora: string | null;
+  fecha: string;
+  /** Cuantas de las clases contadas para el reparto cayeron acá. */
+  personas: number;
+  /** Anotados y los que el control de acceso dice que vinieron, de verdad. */
+  reservas: number;
+  asistencias: number;
+  /** Reservaron o vinieron, pero no pagaron nada este mes: no hay qué repartir. */
+  sin_pago: number;
+  atribuido: number;
+  comision: number;
+}
+
+/**
+ * Reparte un total en enteros que SUMAN EXACTO ese total.
+ *
+ * Redondear cada fila por su cuenta deja la suma del detalle distinta del
+ * total de arriba por unos pesos, y eso es justo lo que hace desconfiar del
+ * número entero. Se redondea para abajo y los pesos que sobran se le dan a
+ * las filas de mayor resto.
+ */
+function enterosQueSuman(valores: number[], total: number): number[] {
+  const piso = valores.map((v) => Math.floor(v));
+  let falta = total - piso.reduce((a, b) => a + b, 0);
+  const porResto = valores
+    .map((v, i) => ({ i, resto: v - Math.floor(v) }))
+    .sort((x, y) => y.resto - x.resto);
+  for (const o of porResto) {
+    if (falta === 0) break;
+    // `falta` puede ser negativo si el total venía redondeado para abajo.
+    piso[o.i] += falta > 0 ? 1 : -1;
+    falta += falta > 0 ? -1 : 1;
+  }
+  return piso;
+}
 interface Socio { id: string; full_name: string }
 interface Profe { nombre: string; porcentaje: number; activo: boolean }
 
@@ -184,7 +229,8 @@ export async function GET(req: Request) {
         .eq("gym_id", perfil.gym_id).eq("type", "income").gte("date", desde).lt("date", hasta),
       sb.from("bookings").select("member_id, class_id, class_date")
         .eq("gym_id", perfil.gym_id).gte("class_date", desde).lt("class_date", hasta),
-      sb.from("classes").select("id, instructor, weekdays, start_time").eq("gym_id", perfil.gym_id),
+      // `name` y `start_time` son para el detalle: "Zumba, mié 17/09, 18:30".
+      sb.from("classes").select("id, name, instructor, weekdays, start_time").eq("gym_id", perfil.gym_id),
       sb.from("members").select("id, full_name").eq("gym_id", perfil.gym_id),
       sb.from("profesores").select("nombre, porcentaje, activo").eq("gym_id", perfil.gym_id),
       // El control de acceso: de aca sale quien vino de verdad.
@@ -198,6 +244,10 @@ export async function GET(req: Request) {
     ((clasesRaw as Clase[]) || [])
       .filter((c) => (c.instructor || "").trim())
       .map((c) => [c.id, (c.instructor as string).trim()]),
+  );
+  const nombreClase = new Map(((clasesRaw as Clase[]) || []).map((c) => [c.id, c.name || "Clase"]));
+  const horaDe = new Map(
+    ((clasesRaw as Clase[]) || []).map((c) => [c.id, c.start_time ? String(c.start_time).slice(0, 5) : null]),
   );
   const porcentajeDe = new Map(
     ((profesRaw as Profe[]) || []).map((p) => [parejo(p.nombre), Number(p.porcentaje)]),
@@ -225,24 +275,37 @@ export async function GET(req: Request) {
     (clasesRaw as Clase2[]) || [],
   );
 
-  const vistas = new Set<string>(deducidas);
+  const reservadas = new Set<string>();
   ((reservasRaw as Reserva[]) || []).forEach((r) => {
-    vistas.add(`${r.member_id}|${r.class_id}|${String(r.class_date).slice(0, 10)}`);
+    reservadas.add(`${r.member_id}|${r.class_id}|${String(r.class_date).slice(0, 10)}`);
   });
+  const vistas = new Set<string>([...deducidas, ...reservadas]);
+
+  // Cada clase contada, abierta: quién, cuál, qué día, y de dónde salió. De
+  // acá sale tanto el reparto como el detalle, así que no pueden diferir.
+  const unidades = [...vistas].map((clave) => {
+    const [member_id, class_id, fecha] = clave.split("|");
+    return {
+      member_id, class_id, fecha,
+      profe: profeDeClase.get(class_id) || "",
+      reserva: reservadas.has(clave),
+      asistencia: deducidas.has(clave),
+    };
+  }).filter((u) => u.profe);  // sin profe cargada no se le puede atribuir a nadie
 
   const clasesDe = new Map<string, Map<string, number>>();
-  vistas.forEach((clave) => {
-    const [memberId, classId] = clave.split("|");
-    const profe = profeDeClase.get(classId);
-    if (!profe) return;  // clase sin profe cargada: no se le puede atribuir
-    const suyas = clasesDe.get(memberId) || new Map<string, number>();
-    suyas.set(profe, (suyas.get(profe) || 0) + 1);
-    clasesDe.set(memberId, suyas);
+  unidades.forEach((u) => {
+    const suyas = clasesDe.get(u.member_id) || new Map<string, number>();
+    suyas.set(u.profe, (suyas.get(u.profe) || 0) + 1);
+    clasesDe.set(u.member_id, suyas);
   });
 
   // 3) El reparto.
   const porProfe = new Map<string, { plata: number; clases: number; socios: Set<string> }>();
   const sinAsignar: { member_id: string; nombre: string; pago: number }[] = [];
+  // Cuánto vale UNA clase de ese socio: lo que pagó dividido las que hizo. Es
+  // la pieza que permite abrir el total clase por clase sin recalcular nada.
+  const valorDe = new Map<string, number>();
   let cobradoTotal = 0;
 
   pagoDe.forEach((pago, socioId) => {
@@ -254,6 +317,7 @@ export async function GET(req: Request) {
       sinAsignar.push({ member_id: socioId, nombre: nombreDe.get(socioId) || "Socio", pago });
       return;
     }
+    valorDe.set(socioId, pago / total);
     suyas.forEach((cuantas, profe) => {
       const fila = porProfe.get(profe) || { plata: 0, clases: 0, socios: new Set<string>() };
       fila.plata += (pago * cuantas) / total;
@@ -271,19 +335,59 @@ export async function GET(req: Request) {
     });
   });
 
+  // 4) El detalle, una fila por profe + clase + día.
+  //
+  // Sale de las MISMAS unidades que el reparto de arriba, no de otra cuenta.
+  // Es para la conversación incómoda: la profe dice "yo di más clases que eso"
+  // y acá están, con fecha, horario y cuánta gente hubo en cada una.
+  const detalleDe = new Map<string, Map<string, Fila>>();
+  unidades.forEach((u) => {
+    const suyas = detalleDe.get(u.profe) || new Map<string, Fila>();
+    const clave = `${u.class_id}|${u.fecha}`;
+    const fila = suyas.get(clave) || {
+      class_id: u.class_id,
+      clase: nombreClase.get(u.class_id) || "Clase",
+      hora: horaDe.get(u.class_id) ?? null,
+      fecha: u.fecha,
+      personas: 0, reservas: 0, asistencias: 0, sin_pago: 0,
+      atribuido: 0, comision: 0,
+    };
+    // Anotados y presentes son la realidad, hayan pagado o no.
+    if (u.reserva) fila.reservas += 1;
+    if (u.asistencia) fila.asistencias += 1;
+    const valor = valorDe.get(u.member_id);
+    // Sin pago en el mes no hay nada para repartir, pero la clase se dio: se
+    // muestra aparte en vez de desaparecer, si no la profe cuenta más gente
+    // de la que figura y el número parece estar mal.
+    if (valor === undefined) fila.sin_pago += 1;
+    else { fila.personas += 1; fila.atribuido += valor; }
+    suyas.set(clave, fila);
+    detalleDe.set(u.profe, suyas);
+  });
+
   const profes = [...porProfe.entries()].map(([nombre, f]) => {
     const porcentaje = porcentajeDe.get(parejo(nombre)) ?? PORCENTAJE_POR_DEFECTO;
+    // Lo que de la plata cobrada corresponde a sus clases, y lo que hay que pagarle.
+    const atribuido = Math.round(f.plata);
+    const comision = Math.round((f.plata * porcentaje) / 100);
+
+    // Las más nuevas arriba, y dentro del día por horario.
+    const filas = [...(detalleDe.get(nombre)?.values() || [])].sort((x, y) =>
+      x.fecha === y.fecha ? (x.hora || "").localeCompare(y.hora || "") : y.fecha.localeCompare(x.fecha),
+    );
+    const sueltos = enterosQueSuman(filas.map((x) => x.atribuido), atribuido);
+    const cobros = enterosQueSuman(filas.map((x) => (x.atribuido * porcentaje) / 100), comision);
+
     return {
       nombre,
       porcentaje,
       clases: f.clases,
       socios: f.socios.size,
-      // Lo que de la plata cobrada corresponde a sus clases.
-      atribuido: Math.round(f.plata),
-      // Lo que hay que pagarle.
-      comision: Math.round((f.plata * porcentaje) / 100),
+      atribuido,
+      comision,
       // Si esta profe ya tiene su porcentaje cargado o está con el de por defecto.
       cargada: porcentajeDe.has(parejo(nombre)),
+      detalle: filas.map((x, i) => ({ ...x, atribuido: sueltos[i], comision: cobros[i] })),
     };
   }).sort((x, y) => y.comision - x.comision);
 

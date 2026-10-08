@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { allows, loadPlans, loadGymExtras, type PlanConfig } from "@/lib/plans";
@@ -22,9 +22,15 @@ import { allows, loadPlans, loadGymExtras, type PlanConfig } from "@/lib/plans";
  * defender frente a sus profes.
  */
 
+/** Una clase, un día: de acá sale el total de la profe. */
+interface Fila {
+  class_id: string; clase: string; hora: string | null; fecha: string;
+  personas: number; reservas: number; asistencias: number; sin_pago: number;
+  atribuido: number; comision: number;
+}
 interface Profe {
   nombre: string; porcentaje: number; clases: number; socios: number;
-  atribuido: number; comision: number; cargada: boolean;
+  atribuido: number; comision: number; cargada: boolean; detalle: Fila[];
 }
 interface SinAsignar { plata: number; socios: { member_id: string; nombre: string; pago: number }[] }
 interface Datos {
@@ -38,6 +44,14 @@ const plata = (n: number) => `$${Math.round(n).toLocaleString("es-AR")}`;
 function mesLargo(mes: string): string {
   const [a, m] = mes.split("-").map(Number);
   return new Date(a, m - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+}
+
+/** "2026-09-17" → "mié 17/09". Se arma a mano para que no corra la zona horaria. */
+function fechaCorta(f: string): string {
+  const [a, m, d] = f.split("-").map(Number);
+  return new Date(a, m - 1, d).toLocaleDateString("es-AR", {
+    weekday: "short", day: "2-digit", month: "2-digit",
+  });
 }
 
 /** Los últimos 12 meses, para el selector. */
@@ -60,6 +74,9 @@ export default function ComisionesPage() {
   const [habilitado, setHabilitado] = useState<boolean | null>(null);
   const [guardando, setGuardando] = useState<string | null>(null);
   const [verSinAsignar, setVerSinAsignar] = useState(false);
+  // Una profe abierta a la vez: el detalle es largo y dos abiertos no se leen.
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const [vista, setVista] = useState<"dia" | "clase">("dia");
   const [gymId, setGymId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -196,6 +213,7 @@ export default function ComisionesPage() {
                 <thead>
                   <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-muted">
                     <th className="px-4 py-3 font-semibold">Profe</th>
+                    <th className="px-4 py-3 font-semibold"></th>
                     <th className="px-4 py-3 text-right font-semibold">Clases</th>
                     <th className="px-4 py-3 text-right font-semibold">Socios</th>
                     <th className="px-4 py-3 text-right font-semibold">Le corresponde</th>
@@ -205,12 +223,24 @@ export default function ComisionesPage() {
                 </thead>
                 <tbody>
                   {datos.profes.map((p) => (
-                    <tr key={p.nombre} className="border-b border-white/5 last:border-0">
+                    <Fragment key={p.nombre}>
+                    <tr className="border-b border-white/5 last:border-0">
                       <td className="px-4 py-3">
                         <div className="font-semibold">{p.nombre}</div>
                         {!p.cargada && (
                           <div className="text-[11px] text-muted">con el 50% por defecto</div>
                         )}
+                      </td>
+                      <td className="py-3 pr-2">
+                        <button
+                          type="button"
+                          aria-expanded={abierta === p.nombre}
+                          onClick={() => setAbierta((a) => (a === p.nombre ? null : p.nombre))}
+                          className="whitespace-nowrap rounded-lg px-2 py-1 text-xs text-ink-2 hover:bg-white/5 hover:text-brand"
+                          title="Ver una por una las clases que entran en este número"
+                        >
+                          {abierta === p.nombre ? "Ocultar clases" : "Ver clases"}
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-ink-2">{p.clases}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-ink-2">{p.socios}</td>
@@ -232,6 +262,14 @@ export default function ComisionesPage() {
                         {guardando === p.nombre ? "…" : plata(p.comision)}
                       </td>
                     </tr>
+                    {abierta === p.nombre && (
+                      <tr className="border-b border-white/5 bg-black/20 last:border-0">
+                        <td colSpan={7} className="px-4 py-4">
+                          <Detalle p={p} vista={vista} setVista={setVista} />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -248,7 +286,7 @@ export default function ComisionesPage() {
                   <p className="mt-1 text-xs leading-snug text-ink-2">
                     {datos.sin_asignar.socios.length}{" "}
                     {datos.sin_asignar.socios.length === 1 ? "socio pagó" : "socios pagaron"} y
-                    no reservaron ninguna clase este mes, así que esa plata no se le
+                    no reservaron ni vinieron a ninguna clase este mes, así que esa plata no se le
                     atribuye a nadie. <b>Es plata que se te puede ir</b>: si están
                     pagando y no vienen, conviene llamarlos.
                   </p>
@@ -275,9 +313,11 @@ export default function ComisionesPage() {
           )}
 
           <p className="mt-5 text-xs leading-relaxed text-muted">
-            Se cuentan las <b>reservas</b> del mes. Como una clase reservada y no
-            cancelada a tiempo ya se le descuenta al socio, cuenta como clase dada.
-            El porcentaje de cada profe se guarda solo al cambiarlo.
+            Se cuentan las <b>reservas y las entradas</b> del mes, sin repetir: la
+            clase reservada y no cancelada a tiempo ya se le descontó al socio, y la
+            que vino sin reservar también la hizo. Tocá <b>Ver clases</b> en cualquier
+            profe para ver una por una de dónde sale su número. El porcentaje de cada
+            profe se guarda solo al cambiarlo.
           </p>
         </>
       )}
@@ -291,5 +331,174 @@ function Dato({ titulo, valor, tono = "text-ink" }: { titulo: string; valor: str
       <div className="text-xs uppercase tracking-wide text-muted">{titulo}</div>
       <div className={`mt-1 text-2xl font-bold tabular-nums ${tono}`}>{valor}</div>
     </div>
+  );
+}
+
+/**
+ * Las clases que forman el total de una profe, una por una.
+ *
+ * Existe para una conversación concreta: la profe dice "yo di más clases que
+ * eso". Acá están, con fecha y horario, y la suma de la última columna da
+ * exactamente lo que figura arriba — el servidor redondea para que cierre.
+ *
+ * Dos vistas porque son dos preguntas distintas: "qué clases di" (por día) y
+ * "cuánto me rinde Kangoo" (por clase).
+ */
+function Detalle({ p, vista, setVista }: {
+  p: Profe; vista: "dia" | "clase"; setVista: (v: "dia" | "clase") => void;
+}) {
+  const porClase = useMemo(() => {
+    const m = new Map<string, {
+      class_id: string; clase: string; hora: string | null; veces: number; personas: number;
+      reservas: number; asistencias: number; sin_pago: number;
+      atribuido: number; comision: number;
+    }>();
+    p.detalle.forEach((f) => {
+      const x = m.get(f.class_id) || {
+        class_id: f.class_id, clase: f.clase, hora: f.hora, veces: 0, personas: 0,
+        reservas: 0, asistencias: 0, sin_pago: 0, atribuido: 0, comision: 0,
+      };
+      x.veces += 1;
+      x.personas += f.personas; x.reservas += f.reservas;
+      x.asistencias += f.asistencias; x.sin_pago += f.sin_pago;
+      x.atribuido += f.atribuido; x.comision += f.comision;
+      m.set(f.class_id, x);
+    });
+    return [...m.values()].sort((a, b) => b.comision - a.comision);
+  }, [p]);
+
+  if (p.detalle.length === 0) {
+    return (
+      <p className="text-sm text-ink-2">
+        No hay clases contadas para {p.nombre} en este mes. Pasa cuando las clases
+        no la tienen cargada como profe, o cuando nadie reservó ni vino.
+      </p>
+    );
+  }
+
+  const tot = p.detalle.reduce(
+    (a, f) => ({
+      personas: a.personas + f.personas, reservas: a.reservas + f.reservas,
+      asistencias: a.asistencias + f.asistencias, sin_pago: a.sin_pago + f.sin_pago,
+      atribuido: a.atribuido + f.atribuido, comision: a.comision + f.comision,
+    }),
+    { personas: 0, reservas: 0, asistencias: 0, sin_pago: 0, atribuido: 0, comision: 0 },
+  );
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm">
+          <b>{p.nombre}</b>
+          <span className="text-ink-2">
+            {" "}· {p.detalle.length} {p.detalle.length === 1 ? "clase" : "clases"} en el mes
+            {vista === "clase" && `, en ${porClase.length} ${porClase.length === 1 ? "actividad" : "actividades"}`}
+          </span>
+        </div>
+        <div className="flex gap-1 rounded-lg bg-white/5 p-1 text-xs">
+          <button type="button" onClick={() => setVista("dia")}
+            className={botonVista(vista === "dia")}>
+            Por día
+          </button>
+          <button type="button" onClick={() => setVista("clase")}
+            className={botonVista(vista === "clase")}>
+            Por clase
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-white/10">
+        <table className="w-full min-w-[620px] text-xs">
+          <thead>
+            <tr className="border-b border-white/10 bg-white/[.03] text-left uppercase tracking-wide text-muted">
+              {vista === "dia" ? (
+                <>
+                  <th className="px-3 py-2 font-semibold">Día</th>
+                  <th className="px-3 py-2 font-semibold">Clase</th>
+                </>
+              ) : (
+                <>
+                  <th className="px-3 py-2 font-semibold">Clase</th>
+                  <th className="px-3 py-2 text-right font-semibold">Veces</th>
+                </>
+              )}
+              <th className="px-3 py-2 text-right font-semibold">Anotados</th>
+              <th className="px-3 py-2 text-right font-semibold">Vinieron</th>
+              <th className="px-3 py-2 text-right font-semibold">Contadas</th>
+              <th className="px-3 py-2 text-right font-semibold">Le corresponde</th>
+              <th className="px-3 py-2 text-right font-semibold">A cobrar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {vista === "dia"
+              ? p.detalle.map((f) => (
+                  <tr key={`${f.class_id}-${f.fecha}`} className="border-b border-white/5 last:border-0">
+                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-ink-2">{fechaCorta(f.fecha)}</td>
+                    <td className="px-3 py-2">
+                      {f.clase}
+                      {f.hora && <span className="ml-1 text-muted">{f.hora}</span>}
+                    </td>
+                    <Celdas f={f} />
+                  </tr>
+                ))
+              : porClase.map((c) => (
+                  <tr key={c.class_id} className="border-b border-white/5 last:border-0">
+                    <td className="px-3 py-2">
+                      {c.clase}
+                      {c.hora && <span className="ml-1 text-muted">{c.hora}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink-2">{c.veces}</td>
+                    <Celdas f={c} />
+                  </tr>
+                ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-white/10 bg-white/[.03] font-semibold">
+              <td className="px-3 py-2" colSpan={2}>Total</td>
+              <td className="px-3 py-2 text-right tabular-nums text-ink-2">{tot.reservas}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-ink-2">{tot.asistencias}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{tot.personas}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{plata(tot.atribuido)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-brand">{plata(tot.comision)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <p className="mt-2 text-[11px] leading-snug text-muted">
+        <b>Anotados</b> son las reservas y <b>vinieron</b> los que marcaron entrada.
+        <b> Contadas</b> es lo que entra en el reparto: las dos cosas sin repetir, de
+        socios que pagaron este mes.
+        {tot.sin_pago > 0 && (
+          <> Hay <b>{tot.sin_pago}</b> {tot.sin_pago === 1 ? "clase" : "clases"} de gente
+          que no pagó nada este mes: la clase se dio, pero no hay plata para repartir.</>
+        )}
+      </p>
+    </div>
+  );
+}
+
+const botonVista = (activa: boolean) =>
+  `rounded-md px-2.5 py-1 ${activa ? "bg-white/10 font-semibold text-ink" : "text-ink-2 hover:text-ink"}`;
+
+/** Las cinco columnas de números, iguales en las dos vistas. */
+function Celdas({ f }: {
+  f: { personas: number; reservas: number; asistencias: number; sin_pago: number; atribuido: number; comision: number };
+}) {
+  return (
+    <>
+      <td className="px-3 py-2 text-right tabular-nums text-ink-2">{f.reservas || "—"}</td>
+      <td className="px-3 py-2 text-right tabular-nums text-ink-2">{f.asistencias || "—"}</td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {f.personas}
+        {f.sin_pago > 0 && (
+          <span className="ml-1 text-[10px] text-muted" title="Reservaron o vinieron, pero no pagaron este mes">
+            +{f.sin_pago} s/pago
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums text-ink-2">{plata(f.atribuido)}</td>
+      <td className="px-3 py-2 text-right font-semibold tabular-nums text-brand">{plata(f.comision)}</td>
+    </>
   );
 }
