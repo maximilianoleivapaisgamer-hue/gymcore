@@ -146,9 +146,28 @@ export default function SocioDetallePage() {
     load();
   }
 
+  /**
+   * El precio que corresponde HOY, no el que se le guardo cuando entro.
+   *
+   * `members.plan_price` es una foto del dia que se le asigno el plan. Cuando
+   * el negocio sube sus precios, los socios que ya estaban se quedan con el
+   * viejo y al cobrar aparece el monto de antes. Le paso en DanzArte con 63
+   * socias: la dueña tenia que corregir el monto a mano una por una.
+   *
+   * Ahora manda el precio de la lista. Si el plan ya no existe (se renombro o
+   * se borro), se cae al guardado antes que dejarla sin nada.
+   */
+  function precioHoy(): number {
+    const plan = gymPlans.find(
+      (p) => p.name.trim().toLowerCase() === (member?.plan_name || "").trim().toLowerCase(),
+    );
+    const dePlan = Number(plan?.price) || 0;
+    return dePlan > 0 ? dePlan : Number(member?.plan_price) || 0;
+  }
+
   function abrirCobro() {
     if (!member) return;
-    const base = Number(member.plan_price) || 0;
+    const base = precioHoy();
     const rec = recargoDe(base, cobroCfg, member.membership_expiry);
     setCobroMonto(base ? String(base + rec) : "");
     setCobroMes(mesQueCubre(nuevoVencimiento(member.membership_expiry, cobroCfg)));
@@ -400,7 +419,7 @@ export default function SocioDetallePage() {
       {/* Cobrar la cuota: registra el pago y corre el vencimiento de una vez. */}
       {cobroModal && member && (() => {
         const hasta = nuevoVencimiento(member.membership_expiry, cobroCfg);
-        const rec = recargoDe(Number(member.plan_price) || 0, cobroCfg, member.membership_expiry);
+        const rec = recargoDe(precioHoy(), cobroCfg, member.membership_expiry);
         return (
           <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setCobroModal(false)}>
             <div className="card my-auto w-full max-w-md" onClick={(e) => e.stopPropagation()}>
