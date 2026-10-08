@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import SimuladorResultado from "@/components/SimuladorResultado";
@@ -9,6 +9,8 @@ import { resolveActiveSede, type Sede } from "@/lib/sede";
 import { nuevoVencimiento, fechaCorta, hoyISO, recargoDe, mesesOpciones, mesQueCubre, nombreMes, type CobroConfig } from "@/lib/fechas";
 import { PAY_METHODS, type PayMethod, type RealPlan } from "@/types/db";
 import { allows, loadPlans, loadGymExtras } from "@/lib/plans";
+import { cicloDe, topeDelPlan } from "@/lib/cupo-clases";
+import { ubicarEntrada, type ClaseConHorario } from "@/lib/asistencias";
 
 interface Member {
   id: string; gym_id: string; member_number: number | null;
@@ -22,6 +24,83 @@ interface Member {
 interface Payment { id: string; date: string; concept: string | null; amount: number; method: PayMethod | null; plan_name: string | null; }
 interface Routine { id: string; name: string | null; is_template: boolean; created_at: string; }
 interface Diet { id: string; name: string | null; is_template: boolean; created_at: string; }
+
+interface ClaseGym { id: string; name: string | null; start_time: string | null; weekdays: string[] | null }
+interface Reserva { class_id: string; class_date: string }
+interface Entrada { entered_at: string }
+
+/** Una fila del historial de clases. */
+interface FilaClase {
+  clave: string; fecha: string; clase: string; hora: string | null;
+  reservo: boolean; entrada: string | null; suelta: boolean;
+}
+
+/**
+ * El historial de clases del socio: lo que reservó y lo que el control de
+ * acceso dice que pasó, en una sola lista.
+ *
+ * Lo pidió DanzArte después de un caso concreto: una socia pagó, la app le
+ * decía "te quedan 5 de 8" y la dueña no tenía dónde ver CUÁLES tres había
+ * usado, así que no podía ni confirmarlo ni discutirlo.
+ *
+ * Reservar y entrar el mismo día a la misma clase es UNA fila, no dos.
+ */
+function historialDeClases(reservas: Reserva[], entradas: Entrada[], clases: ClaseGym[]): FilaClase[] {
+  const nombreDe = new Map(clases.map((c) => [c.id, c.name || "Clase"]));
+  const horaDe = new Map(clases.map((c) => [c.id, c.start_time ? String(c.start_time).slice(0, 5) : null]));
+  const filas = new Map<string, FilaClase>();
+
+  reservas.forEach((r) => {
+    const fecha = String(r.class_date).slice(0, 10);
+    const clave = `${r.class_id}|${fecha}`;
+    filas.set(clave, {
+      clave, fecha, clase: nombreDe.get(r.class_id) || "Clase",
+      hora: horaDe.get(r.class_id) ?? null, reservo: true, entrada: null, suelta: false,
+    });
+  });
+
+  entradas.forEach((e) => {
+    const u = ubicarEntrada(e.entered_at, clases as ClaseConHorario[]);
+    if (u.class_id) {
+      const clave = `${u.class_id}|${u.fecha}`;
+      const ya = filas.get(clave);
+      if (ya) { ya.entrada = u.hora; return; }   // reservó Y vino: una sola fila
+      filas.set(clave, {
+        clave, fecha: u.fecha, clase: nombreDe.get(u.class_id) || "Clase",
+        hora: horaDe.get(u.class_id) ?? null, reservo: false, entrada: u.hora, suelta: false,
+      });
+      return;
+    }
+    // Entró pero no cae en ninguna clase, o cae en dos y no se puede saber en
+    // cuál. Se muestra igual: esconder una entrada real hace dudar del resto.
+    const clave = `entrada|${u.fecha}|${u.hora}`;
+    filas.set(clave, {
+      clave, fecha: u.fecha,
+      clase: u.ambiguo ? "Entró (hay dos clases a esa hora)" : "Entró al gimnasio",
+      hora: null, reservo: false, entrada: u.hora, suelta: true,
+    });
+  });
+
+  return [...filas.values()].sort((a, b) =>
+    a.fecha === b.fecha
+      ? (b.hora || b.entrada || "").localeCompare(a.hora || a.entrada || "")
+      : b.fecha.localeCompare(a.fecha),
+  );
+}
+
+/** "2026-10-08" → "jue 8/10". El día de la semana es lo que la dueña reconoce. */
+function diaYFecha(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("es-AR", {
+    weekday: "short", day: "numeric", month: "2-digit",
+  });
+}
+
+/** El primer día del mes de hace N meses, para no traerse el historial entero. */
+function mesesAtras(n: number): string {
+  const [y, m] = hoyISO().split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1 - n, 1)).toISOString().slice(0, 10);
+}
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 const methodLabel = (m: string | null) => PAY_METHODS.find((x) => x.value === m)?.label || "—";
@@ -64,6 +143,12 @@ export default function SocioDetallePage() {
   const [isElite, setIsElite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [gymPlans, setGymPlans] = useState<RealPlan[]>([]);
+  // Historial de clases: lo reservado, lo que entró y los horarios del gimnasio.
+  const [reservas, setReservas] = useState<Reserva[]>([]);
+  const [entradas, setEntradas] = useState<Entrada[]>([]);
+  const [clasesGym, setClasesGym] = useState<ClaseGym[]>([]);
+  const [reinicio, setReinicio] = useState<string | null>(null);
+  const [verViejas, setVerViejas] = useState(false);
 
   // Cambio de plan
   const [planModal, setPlanModal] = useState(false);
@@ -89,7 +174,8 @@ export default function SocioDetallePage() {
     if (m?.gym_id) {
       const [{ data: sub }, { data: gym }, { data: cfg }, { data: sedes }] = await Promise.all([
         supabase.from("subscriptions").select("plan").eq("gym_id", m.gym_id).maybeSingle<{ plan: string }>(),
-        supabase.from("gyms").select("real_plans").eq("id", m.gym_id).maybeSingle<{ real_plans: RealPlan[] }>(),
+        supabase.from("gyms").select("real_plans, clases_reinicio").eq("id", m.gym_id)
+          .maybeSingle<{ real_plans: RealPlan[]; clases_reinicio: string | null }>(),
         // Cómo cobra el negocio. Best-effort: sin migration_041 quedan los defaults.
         supabase.from("gyms").select("cobro_modo, cobro_dia, recargo_tipo, recargo_valor, clase_suelta_activa, clase_suelta_precio")
           .eq("id", m.gym_id).maybeSingle(),
@@ -99,6 +185,21 @@ export default function SocioDetallePage() {
       setSedeId(resolveActiveSede(m.gym_id, ((sedes as Sede[]) || [])));
       setIsElite(allows(await loadPlans(supabase), sub?.plan, "dietas", await loadGymExtras(supabase, m.gym_id))); // Dieta: según el plan + bonificadas
       setGymPlans(gym?.real_plans || []);
+      setReinicio(gym?.clases_reinicio ?? null);
+
+      // El historial de clases. Se filtra por gimnasio además de por socio:
+      // RLS es la red, no la única barrera.
+      const desde = mesesAtras(3);
+      const [{ data: res }, { data: ent }, { data: cls }] = await Promise.all([
+        supabase.from("bookings").select("class_id, class_date")
+          .eq("gym_id", m.gym_id).eq("member_id", id).gte("class_date", desde),
+        supabase.from("attendances").select("entered_at")
+          .eq("gym_id", m.gym_id).eq("member_id", id).gte("entered_at", `${desde}T00:00:00-03:00`),
+        supabase.from("classes").select("id, name, start_time, weekdays").eq("gym_id", m.gym_id),
+      ]);
+      setReservas((res as Reserva[]) || []);
+      setEntradas((ent as Entrada[]) || []);
+      setClasesGym((cls as ClaseGym[]) || []);
       setCobroCfg((cfg as CobroConfig) || null);
       const cf = cfg as { clase_suelta_activa?: boolean; clase_suelta_precio?: number | null } | null;
       setClaseCfg({ activa: !!cf?.clase_suelta_activa, precio: cf?.clase_suelta_precio != null ? Number(cf.clase_suelta_precio) : null });
@@ -268,6 +369,36 @@ export default function SocioDetallePage() {
   const st = statusOf(member.membership_expiry);
   const totalPagado = payments.reduce((s, p) => s + Number(p.amount), 0);
 
+  const filasClases = useMemo(
+    () => historialDeClases(reservas, entradas, clasesGym),
+    [reservas, entradas, clasesGym],
+  );
+
+  /**
+   * El ciclo que corre hoy y cuántas clases van.
+   *
+   * ⚠️ Usa el MISMO `cicloDe` y el MISMO tope que la lista de socios, la app
+   * del socio y el trigger de la base. Si no dieran igual, la dueña ve un
+   * número y la socia otro — que es justo el problema que esto vino a
+   * resolver. Los cupos extra (clases sueltas vendidas) suben el tope, igual
+   * que en el trigger de migration_043.
+   */
+  const cupo = useMemo(() => {
+    if (!member) return null;
+    const ultimoPago = payments.find((p) => /^cuota /i.test((p.concept || "").trim()))?.date;
+    const { ini, fin } = cicloDe(hoyISO(), member.membership_expiry, ultimoPago ?? null, reinicio);
+    const base = topeDelPlan(gymPlans, member.plan_name);
+    const limite = base === null ? null : base + (Number(member.clases_extra) || 0);
+    const usadas = reservas.filter((r) => {
+      const f = String(r.class_date).slice(0, 10);
+      return f > ini && f <= fin;
+    }).length;
+    return { ini, fin, limite, usadas };
+  }, [member, payments, reservas, gymPlans, reinicio]);
+
+  const delCiclo = cupo ? filasClases.filter((f) => f.fecha > cupo.ini && f.fecha <= cupo.fin) : filasClases;
+  const viejas = cupo ? filasClases.filter((f) => !(f.fecha > cupo.ini && f.fecha <= cupo.fin)) : [];
+
   return (
     <main className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-6">
@@ -336,6 +467,80 @@ export default function SocioDetallePage() {
           )}
           <Link href="/dashboard/socios" className="btn btn-ghost text-sm">✏️ Editar en Socios</Link>
           <button className="btn btn-ghost text-sm" onClick={openPlanModal}>🔄 Cambiar plan</button>
+        </div>
+      </div>
+
+      {/* CLASES DEL CICLO */}
+      <div className="card mb-6 p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 p-4">
+          <div>
+            <span className="text-sm font-semibold">Clases</span>
+            {cupo && (
+              <span className="ml-2 text-xs text-muted">
+                del {diaYFecha(cupo.ini)} al {diaYFecha(cupo.fin)}
+              </span>
+            )}
+          </div>
+          {cupo?.limite != null ? (
+            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+              cupo.usadas >= cupo.limite
+                ? "bg-[rgba(240,82,82,.14)] text-[#f87171]"
+                : cupo.limite - cupo.usadas <= 2
+                  ? "bg-[rgba(245,177,61,.14)] text-[#f5b13d]"
+                  : "bg-[rgba(34,197,94,.14)] text-[#4ade80]"
+            }`}>
+              {cupo.usadas} de {cupo.limite} usadas · {cupo.usadas >= cupo.limite
+                ? "sin cupo"
+                : `le ${cupo.limite - cupo.usadas === 1 ? "queda" : "quedan"} ${cupo.limite - cupo.usadas}`}
+            </span>
+          ) : (
+            <span className="text-xs text-muted">Plan sin tope de clases</span>
+          )}
+        </div>
+
+        {delCiclo.length === 0 ? (
+          <p className="p-8 text-center text-ink-2">
+            Todavía no reservó ni vino a ninguna clase en este período.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-muted">
+                  <th className="px-4 pb-3 pt-1">Día</th>
+                  <th className="px-4 pb-3 pt-1">Clase</th>
+                  <th className="px-4 pb-3 pt-1">Se anotó</th>
+                  <th className="px-4 pb-3 pt-1">Vino</th>
+                </tr>
+              </thead>
+              <tbody>
+                {delCiclo.map((f) => <FilaDeClase key={f.clave} f={f} />)}
+                {verViejas && viejas.length > 0 && (
+                  <>
+                    <tr className="border-t border-white/10">
+                      <td colSpan={4} className="bg-white/[.03] px-4 py-2 text-xs uppercase tracking-wide text-muted">
+                        Períodos anteriores
+                      </td>
+                    </tr>
+                    {viejas.map((f) => <FilaDeClase key={f.clave} f={f} vieja />)}
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 p-3">
+          <p className="text-[11px] leading-snug text-muted">
+            El cupo cuenta las <b>reservas</b>: la clase que reservó y no canceló a
+            tiempo se le descuenta igual, haya venido o no. Quién vino se deduce del
+            control de acceso por el horario de entrada.
+          </p>
+          {viejas.length > 0 && (
+            <button className="btn btn-ghost shrink-0 text-xs" onClick={() => setVerViejas((v) => !v)}>
+              {verViejas ? "Ocultar anteriores" : `Ver ${viejas.length} de períodos anteriores`}
+            </button>
+          )}
         </div>
       </div>
 
@@ -587,5 +792,49 @@ export default function SocioDetallePage() {
         <SimuladorResultado memberId={id} />
       </div>
     </main>
+  );
+}
+
+/**
+ * Una fila del historial de clases.
+ *
+ * "No figura" y no "No vino" a propósito: el sistema sabe que no quedó
+ * registrada la entrada, no que la persona faltó. Puede haber entrado fuera
+ * del horario de la clase o que ese día no se haya marcado. Si esto se usa
+ * para discutir con una socia, el texto tiene que decir exactamente lo que
+ * el sistema sabe.
+ */
+function FilaDeClase({ f, vieja }: { f: FilaClase; vieja?: boolean }) {
+  const hoy = hoyISO();
+  return (
+    <tr className={`border-t border-white/10 ${vieja ? "opacity-60" : ""}`}>
+      <td className="whitespace-nowrap px-4 py-3 text-ink-2">{diaYFecha(f.fecha)}</td>
+      <td className="px-4 py-3">
+        {f.clase}
+        {f.hora && <span className="ml-1 text-muted">{f.hora}</span>}
+      </td>
+      <td className="px-4 py-3">
+        {f.reservo ? (
+          <span className="text-ink-2">Sí</span>
+        ) : f.suelta ? (
+          <span className="text-muted">—</span>
+        ) : (
+          <span className="text-[#f5b13d]" title="No reservó, pero el control de acceso la registró">
+            No, vino igual
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        {f.entrada ? (
+          <span className="text-good">Sí, {f.entrada}</span>
+        ) : f.fecha > hoy ? (
+          <span className="text-muted">Es más adelante</span>
+        ) : f.fecha === hoy ? (
+          <span className="text-muted">Todavía no</span>
+        ) : (
+          <span className="text-muted" title="No quedó registrada su entrada ese día">No figura</span>
+        )}
+      </td>
+    </tr>
   );
 }

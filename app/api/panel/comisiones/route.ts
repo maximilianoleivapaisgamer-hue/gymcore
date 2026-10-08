@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { contexto, esFallo } from "@/lib/panel";
+import { asistenciasDeducidas, type Ingreso } from "@/lib/asistencias";
 
 /**
  * Cuánto le toca a cada profe en un mes.
@@ -102,62 +103,8 @@ interface Cobro { member_id: string | null; amount: number; concept: string | nu
  */
 const NO_ES_CUOTA = /recargo|suelta/i;
 interface Reserva { member_id: string; class_id: string; class_date: string }
+/** `classes` con lo que hace falta para deducir a qué clase entró cada uno. */
 interface Clase2 { id: string; instructor: string | null; weekdays: string[] | null; start_time: string | null }
-interface Ingreso { member_id: string; entered_at: string }
-
-/** Cuanto antes y despues del horario se acepta una entrada como "vino a esa clase". */
-const ANTES_MIN = 40;
-const DESPUES_MIN = 20;
-
-const DIAS = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"];
-
-/**
- * A que clase entro cada persona, deducido del control de acceso.
- *
- * ── Por que hace falta ──────────────────────────────────────────────────
- *
- * DanzArte cuenta "la reserva Y la asistencia", porque mucha gente se olvida
- * de reservar, viene igual y si hay lugar hace la clase. Medido sobre un mes
- * real: 156 clases se dieron sin reserva (hoy no se le pagaban a nadie) y 234
- * reservas no se usaron.
- *
- * ── Como se deduce ──────────────────────────────────────────────────────
- *
- * `attendances` guarda QUE la persona entro, no a que clase. Pero guarda la
- * HORA, y las clases tienen dia y horario. Si a esa hora hay una sola clase,
- * no hay nada que adivinar. Probado con los 542 ingresos de un mes de
- * DanzArte: el 95,2% cae en una sola clase y NINGUNO en dos.
- *
- * ⚠️ Si a esa hora hay DOS clases, se descarta en vez de adivinar. Puede pasar
- * en un gimnasio con horarios superpuestos, y pagarle a la profe equivocada es
- * peor que no contar esa entrada.
- */
-function asistenciasDeducidas(ingresos: Ingreso[], clases: Clase2[]): Set<string> {
-  const salida = new Set<string>();
-  const conHorario = clases.filter((c) => c.start_time && (c.weekdays || []).length);
-
-  for (const i of ingresos) {
-    // La hora local de Argentina, que es con la que estan cargados los horarios.
-    const local = new Date(new Date(i.entered_at).toLocaleString("en-US", {
-      timeZone: "America/Argentina/Buenos_Aires",
-    }));
-    const dia = DIAS[local.getDay()];
-    const minutos = local.getHours() * 60 + local.getMinutes();
-
-    const candidatas = conHorario.filter((c) => {
-      if (!(c.weekdays || []).includes(dia)) return false;
-      const [h, m] = (c.start_time as string).slice(0, 5).split(":").map(Number);
-      const arranca = h * 60 + m;
-      return minutos >= arranca - ANTES_MIN && minutos <= arranca + DESPUES_MIN;
-    });
-
-    // Una sola: se cuenta. Ninguna o varias: se deja pasar.
-    if (candidatas.length !== 1) continue;
-    const fecha = `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
-    salida.add(`${i.member_id}|${candidatas[0].id}|${fecha}`);
-  }
-  return salida;
-}
 interface Clase { id: string; instructor: string | null; name: string | null; start_time: string | null }
 
 /** Una fila del detalle: una clase, un dia. */

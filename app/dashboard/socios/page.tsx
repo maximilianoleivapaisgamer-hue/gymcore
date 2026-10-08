@@ -66,15 +66,18 @@ function initials(name: string) {
  * Si los tres no dan igual, la dueña ve un numero y el socio otro.
  */
 function cupoDe(
-  m: { id: string; plan_name: string | null },
+  m: { id: string; plan_name: string | null; clases_extra?: number | null },
   planes: RealPlan[],
   reservas: { member_id: string; class_date: string }[],
   vence: string | null,
   pago: string | undefined,
   reinicio: string | null,
 ): { usadas: number; limite: number } | null {
-  const limite = topeDelPlan(planes, m.plan_name);
-  if (!limite) return null;  // plan sin tope: no hay nada que contar
+  const base = topeDelPlan(planes, m.plan_name);
+  if (!base) return null;  // plan sin tope: no hay nada que contar
+  // Las clases sueltas vendidas suben el tope, igual que en el trigger
+  // (migration_043). Sin esto la dueña veía 8 y la socia 9.
+  const limite = base + (Number(m.clases_extra) || 0);
   const { ini, fin } = cicloDe(hoyISO(), vence, pago ?? null, reinicio);
   const usadas = reservas.filter(
     (r) => r.member_id === m.id && r.class_date > ini && r.class_date <= fin,
