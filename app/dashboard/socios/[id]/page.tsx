@@ -358,17 +358,10 @@ export default function SocioDetallePage() {
     load();
   }
 
-  if (loading) return <main className="p-8 text-center text-ink-2">Cargando…</main>;
-  if (!member) return (
-    <main className="mx-auto max-w-3xl px-6 py-8 text-center">
-      <p className="text-ink-2">No se encontró el socio.</p>
-      <Link href="/dashboard/socios" className="mt-3 inline-block text-brand hover:underline">← Volver a Socios</Link>
-    </main>
-  );
-
-  const st = statusOf(member.membership_expiry);
-  const totalPagado = payments.reduce((s, p) => s + Number(p.amount), 0);
-
+  // ⚠️ Los hooks van ACÁ ARRIBA, antes de los `return` de abajo. Si se
+  // declaran después, el render de "Cargando…" corre con menos hooks que el
+  // de la ficha cargada y React tira la pantalla entera abajo con
+  // "Application error: a client-side exception has occurred". Ya pasó.
   const filasClases = useMemo(
     () => historialDeClases(reservas, entradas, clasesGym),
     [reservas, entradas, clasesGym],
@@ -395,6 +388,18 @@ export default function SocioDetallePage() {
     }).length;
     return { ini, fin, limite, usadas };
   }, [member, payments, reservas, gymPlans, reinicio]);
+
+
+  if (loading) return <main className="p-8 text-center text-ink-2">Cargando…</main>;
+  if (!member) return (
+    <main className="mx-auto max-w-3xl px-6 py-8 text-center">
+      <p className="text-ink-2">No se encontró el socio.</p>
+      <Link href="/dashboard/socios" className="mt-3 inline-block text-brand hover:underline">← Volver a Socios</Link>
+    </main>
+  );
+
+  const st = statusOf(member.membership_expiry);
+  const totalPagado = payments.reduce((s, p) => s + Number(p.amount), 0);
 
   const delCiclo = cupo ? filasClases.filter((f) => f.fecha > cupo.ini && f.fecha <= cupo.fin) : filasClases;
   const viejas = cupo ? filasClases.filter((f) => !(f.fecha > cupo.ini && f.fecha <= cupo.fin)) : [];
