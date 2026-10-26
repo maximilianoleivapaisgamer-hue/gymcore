@@ -18,6 +18,8 @@ interface Member {
   plan_name: string | null; plan_price: number | null; membership_expiry: string | null;
   observacion: string | null; reminder_whatsapp: boolean; reminder_email: boolean;
   height_cm: number | null; created_at: string;
+  /** La cuenta con la que entra a la app. null = nunca se le creó. */
+  linked_user_id?: string | null;
   /** Cupos extra por clases sueltas vendidas (migration_043). */
   clases_extra?: number | null;
 }
@@ -149,6 +151,10 @@ export default function SocioDetallePage() {
   const [clasesGym, setClasesGym] = useState<ClaseGym[]>([]);
   const [reinicio, setReinicio] = useState<string | null>(null);
   const [verViejas, setVerViejas] = useState(false);
+  // Acceso del socio a la app.
+  const [creandoAcceso, setCreandoAcceso] = useState(false);
+  const [accesoError, setAccesoError] = useState("");
+  const [accesoListo, setAccesoListo] = useState(false);
 
   // Cambio de plan
   const [planModal, setPlanModal] = useState(false);
@@ -207,6 +213,36 @@ export default function SocioDetallePage() {
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  /**
+   * Crearle el acceso a la app a un socio que no lo tiene.
+   *
+   * Hace falta porque el alta automática solo corre al crear el socio: si se
+   * cargó sin DNI, si vino de una importación o si ese pedido falló, no había
+   * forma de arreglarlo desde el panel y la persona no podía entrar nunca.
+   */
+  async function crearAcceso() {
+    if (!member) return;
+    setCreandoAcceso(true);
+    setAccesoError("");
+    try {
+      const r = await fetch("/api/socio-alta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: member.id }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!j?.ok) {
+        setAccesoError(j?.error || "No se pudo crear el acceso.");
+      } else {
+        setAccesoListo(true);
+        await load();
+      }
+    } catch {
+      setAccesoError("No se pudo crear el acceso. Probá de nuevo.");
+    }
+    setCreandoAcceso(false);
+  }
 
   function openPlanModal() {
     if (!member) return;
@@ -474,6 +510,45 @@ export default function SocioDetallePage() {
           <button className="btn btn-ghost text-sm" onClick={openPlanModal}>🔄 Cambiar plan</button>
         </div>
       </div>
+
+      {/* ACCESO A LA APP */}
+      {!member.linked_user_id ? (
+        <div className="card mb-6 border-warn/30 bg-[rgba(245,177,61,.08)]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-warn">Todavía no puede entrar a la app</div>
+              <p className="mt-1 text-xs leading-snug text-ink-2">
+                {member.dni ? (
+                  <>
+                    Nunca se le creó la cuenta. Tocá el botón y queda listo: entra con
+                    su DNI <b>{member.dni}</b> como usuario y como contraseña.
+                  </>
+                ) : (
+                  <>
+                    No tiene DNI cargado, y el DNI es su usuario y su contraseña.
+                    Cargáselo en <Link href="/dashboard/socios" className="text-brand">Socios</Link> y
+                    después volvé acá.
+                  </>
+                )}
+              </p>
+              {accesoError && <p className="mt-2 text-xs font-semibold text-crit">{accesoError}</p>}
+            </div>
+            {member.dni && (
+              <button className="btn btn-primary shrink-0 text-sm" onClick={crearAcceso} disabled={creandoAcceso}>
+                {creandoAcceso ? "Creando…" : "Crear su acceso"}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : accesoListo ? (
+        <div className="card mb-6 border-good/30 bg-[rgba(34,197,94,.08)]">
+          <div className="text-sm font-semibold text-good">Listo, ya puede entrar a la app</div>
+          <p className="mt-1 text-xs leading-snug text-ink-2">
+            Avisale que entra con su DNI <b>{member.dni}</b> como usuario y como
+            contraseña, y que la puede cambiar desde adentro.
+          </p>
+        </div>
+      ) : null}
 
       {/* CLASES DEL CICLO */}
       <div className="card mb-6 p-0">

@@ -26,6 +26,8 @@ interface Member {
   reminder_email: boolean;
   height_cm: number | null;
   created_at: string;
+  /** La cuenta con la que entra a la app. null = nunca se le creó. */
+  linked_user_id: string | null;
 }
 
 const EMPTY: Partial<Member> = {
@@ -100,7 +102,7 @@ export default function SociosPage() {
   const [sedeId, setSedeId] = useState<string | null>(null);
   const [gymSlug, setGymSlug] = useState<string | null>(null);
   const [plans, setPlans] = useState<RealPlan[]>([]);
-  const [welcome, setWelcome] = useState<{ name: string; whatsapp: string | null; planName: string | null; planPrice: number | null } | null>(null);
+  const [welcome, setWelcome] = useState<{ name: string; whatsapp: string | null; planName: string | null; planPrice: number | null; accesoFallo: string | null } | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [reservas, setReservas] = useState<{ member_id: string; class_date: string }[]>([]);
@@ -256,20 +258,24 @@ export default function SociosPage() {
     }
     // Auto-alta en la app: crea la cuenta del socio para que pueda entrar al
     // portal. Usuario = DNI y contraseña = DNI (lo hace el route con service role).
-    if (isNew && memberId && (editing.dni || "").trim()) {
+    //
+    // ⚠️ Si falla, se AVISA. Antes se tragaba el error en un catch vacío: el
+    // socio quedaba cargado, sin cuenta, y nadie se enteraba hasta que la
+    // persona decía "no puedo entrar". Le pasó a una socia de DanzArte y
+    // estuvo un mes y medio sin poder usar la app.
+    let accesoFallo: string | null = null;
+    if (isNew && memberId) {
       try {
-        await fetch("/api/socio-alta", {
+        const r = await fetch("/api/socio-alta", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            memberId,
-            dni: (editing.dni || "").trim(),
-            email: (editing.email || "").trim() || null,
-            fullName: editing.full_name || "",
-            gymId,
-          }),
+          body: JSON.stringify({ memberId }),
         });
-      } catch { /* si falla, el socio queda creado igual y puede registrarse manual */ }
+        const j = await r.json().catch(() => null);
+        if (!j?.ok) accesoFallo = j?.error || "No se pudo crear su acceso a la app.";
+      } catch {
+        accesoFallo = "No se pudo crear su acceso a la app (se cortó la conexión).";
+      }
     }
     // Bienvenida automática → después de dar de alta a un socio nuevo, ofrece
     // mandarle por WhatsApp el detalle de su plan + el link para bajar la app.
@@ -279,6 +285,7 @@ export default function SociosPage() {
         whatsapp: editing.whatsapp || null,
         planName: editing.plan_name || null,
         planPrice: price,
+        accesoFallo,
       });
     }
     setSaving(false); setModal(false); setEditing(null); load();
@@ -349,6 +356,14 @@ export default function SociosPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="font-semibold">✅ {welcome.name} fue dado de alta</div>
+              {welcome.accesoFallo && (
+                <div className="mt-2 rounded-lg border border-warn/30 bg-[rgba(245,177,61,.1)] px-3 py-2 text-left text-xs leading-snug text-warn">
+                  <b>Ojo: todavía no puede entrar a la app.</b> {welcome.accesoFallo}{" "}
+                  <span className="text-ink-2">
+                    Entrá a su ficha y tocá “Crear su acceso” cuando lo resuelvas.
+                  </span>
+                </div>
+              )}
               <div className="text-sm text-ink-2">Ya tiene su cuenta (usuario y clave = su DNI). Pasale el link para que entre a la app.</div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -406,7 +421,19 @@ export default function SociosPage() {
                             {initials(m.full_name)}
                           </div>
                           <div>
-                            <div className="font-medium">{m.full_name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium">{m.full_name}</span>
+                              {/* Sin cuenta no puede entrar a la app, y hasta ahora
+                                  no se veía en ningún lado: el socio avisaba. */}
+                              {!m.linked_user_id && (
+                                <span
+                                  className="rounded-full bg-[rgba(245,177,61,.16)] px-1.5 py-0.5 text-[10px] font-bold text-warn"
+                                  title="Nunca se le creó la cuenta. Entrá a su ficha para crearle el acceso."
+                                >
+                                  sin app
+                                </span>
+                              )}
+                            </div>
                             <div className="text-xs text-muted">{m.email}</div>
                           </div>
                         </Link>
